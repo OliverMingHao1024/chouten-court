@@ -1,9 +1,13 @@
 import { useId, useState } from 'react'
+import type { SeasonPhase } from '../../domain/calendar'
 import { ATTRIBUTE_KEYS, ATTRIBUTE_LABELS, type AttributeKey } from '../../domain/types'
 import type { PracticeStrength, TrainingIntensity } from '../../domain/weeklyAction'
 
 export interface WeekScreenProps {
-  week: number
+  year: number
+  weekOfYear: number
+  phase: SeasonPhase
+  practiceMatchAllowed: boolean
   onTrain: (attribute: AttributeKey, intensity: TrainingIntensity) => void
   onPracticeMatch: (strength: PracticeStrength) => void
   lastResult: string | null
@@ -23,7 +27,24 @@ const INTENSITY_LABELS: Record<TrainingIntensity, string> = {
   intense: '重',
 }
 
-export function WeekScreen({ week, onTrain, onPracticeMatch, lastResult }: WeekScreenProps) {
+const PHASE_LABELS: Record<SeasonPhase, string> = {
+  offseason: '非賽季',
+  qualifying: '資格賽',
+  preliminary: '預賽',
+  group: '複賽',
+  quarterfinal: '八強賽',
+  final4: '四強賽',
+}
+
+export function WeekScreen({
+  year,
+  weekOfYear,
+  phase,
+  practiceMatchAllowed,
+  onTrain,
+  onPracticeMatch,
+  lastResult,
+}: WeekScreenProps) {
   const modeGroupName = useId()
   const attributeId = useId()
   const intensityId = useId()
@@ -34,14 +55,21 @@ export function WeekScreen({ week, onTrain, onPracticeMatch, lastResult }: WeekS
   const [intensity, setIntensity] = useState<TrainingIntensity>('moderate')
   const [strength, setStrength] = useState<PracticeStrength>('medium')
 
+  // Derived, not stored: if the gate closes after "practice" was picked, treat this
+  // render as "train" without needing an effect to resynchronize state.
+  const effectiveMode: Mode = mode === 'practice' && !practiceMatchAllowed ? 'train' : mode
+
   return (
     <section>
-      <h2>第 {week} 週</h2>
+      <h2>
+        第 {year} 年 第 {weekOfYear} 週
+      </h2>
+      <p>{PHASE_LABELS[phase]}</p>
       {lastResult && <p>{lastResult}</p>}
       <form
         onSubmit={(event) => {
           event.preventDefault()
-          if (mode === 'train') onTrain(attribute, intensity)
+          if (effectiveMode === 'train') onTrain(attribute, intensity)
           else onPracticeMatch(strength)
         }}
       >
@@ -50,7 +78,7 @@ export function WeekScreen({ week, onTrain, onPracticeMatch, lastResult }: WeekS
             type="radio"
             name={modeGroupName}
             value="train"
-            checked={mode === 'train'}
+            checked={effectiveMode === 'train'}
             onChange={() => setMode('train')}
           />
           訓練
@@ -60,13 +88,15 @@ export function WeekScreen({ week, onTrain, onPracticeMatch, lastResult }: WeekS
             type="radio"
             name={modeGroupName}
             value="practice"
-            checked={mode === 'practice'}
+            checked={effectiveMode === 'practice'}
+            disabled={!practiceMatchAllowed}
             onChange={() => setMode('practice')}
           />
           練習賽
         </label>
+        {!practiceMatchAllowed && <p>本週不能安排練習賽(賽季中或即將開打,請專注訓練)。</p>}
 
-        {mode === 'train' && (
+        {effectiveMode === 'train' && (
           <div>
             <label htmlFor={attributeId}>訓練重點</label>
             <select
@@ -98,7 +128,7 @@ export function WeekScreen({ week, onTrain, onPracticeMatch, lastResult }: WeekS
           </div>
         )}
 
-        {mode === 'practice' && (
+        {effectiveMode === 'practice' && (
           <div>
             <label htmlFor={strengthId}>對手強度</label>
             <select

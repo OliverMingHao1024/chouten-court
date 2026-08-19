@@ -1,4 +1,9 @@
 import { useState } from 'react'
+import {
+  canScheduleAnotherPracticeMatch,
+  getCalendarPosition,
+  getSeasonPhase,
+} from './domain/calendar'
 import { createInitialRoster } from './domain/roster'
 import { hashSeed } from './domain/rng'
 import { ATTRIBUTE_LABELS, type Player } from './domain/types'
@@ -11,9 +16,10 @@ interface Team {
   teamName: string
   coachName: string
   seed: number
-  week: number
+  totalWeek: number
   players: Player[]
   lastResult: string | null
+  practiceMatchTotalWeeks: number[]
 }
 
 function App() {
@@ -28,36 +34,48 @@ function App() {
             teamName,
             coachName,
             seed,
-            week: 1,
+            totalWeek: 1,
             players: createInitialRoster(seed),
             lastResult: null,
+            practiceMatchTotalWeeks: [],
           })
         }}
       />
     )
   }
 
+  const { year, weekOfYear } = getCalendarPosition(team.totalWeek)
+  const phase = getSeasonPhase(weekOfYear)
+  const practiceMatchWeeksThisYear = team.practiceMatchTotalWeeks
+    .filter((totalWeek) => getCalendarPosition(totalWeek).year === year)
+    .map((totalWeek) => getCalendarPosition(totalWeek).weekOfYear)
+  const practiceMatchAllowed = canScheduleAnotherPracticeMatch(weekOfYear, practiceMatchWeeksThisYear)
+
   return (
     <>
       <WeekScreen
-        week={team.week}
+        year={year}
+        weekOfYear={weekOfYear}
+        phase={phase}
+        practiceMatchAllowed={practiceMatchAllowed}
         lastResult={team.lastResult}
         onTrain={(attribute, intensity) => {
           const players = applyTraining(team.players, attribute, intensity)
           setTeam({
             ...team,
-            week: team.week + 1,
+            totalWeek: team.totalWeek + 1,
             players,
             lastResult: `本週訓練重點:${ATTRIBUTE_LABELS[attribute]}`,
           })
         }}
         onPracticeMatch={(strength: PracticeStrength) => {
-          const result = applyPracticeMatch(team.players, strength, team.seed + team.week)
+          const result = applyPracticeMatch(team.players, strength, team.seed + team.totalWeek)
           setTeam({
             ...team,
-            week: team.week + 1,
+            totalWeek: team.totalWeek + 1,
             players: result.roster,
             lastResult: result.outcome === 'win' ? '練習賽獲勝!' : '練習賽落敗',
+            practiceMatchTotalWeeks: [...team.practiceMatchTotalWeeks, team.totalWeek],
           })
         }}
       />
