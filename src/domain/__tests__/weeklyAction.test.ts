@@ -20,7 +20,7 @@ describe('applyTraining', () => {
     const roster = createInitialRoster(1)
     const before = roster.map((p) => p.attributes.three)
 
-    const after = applyTraining(roster, 'three', 5)
+    const after = applyTraining(roster, 'three', 'moderate')
 
     after.forEach((player, index) => {
       expect(player.attributes.three).toBeGreaterThanOrEqual(before[index])
@@ -29,7 +29,7 @@ describe('applyTraining', () => {
 
   it('does not change attributes other than the chosen one', () => {
     const roster = createInitialRoster(1)
-    const after = applyTraining(roster, 'three', 5)
+    const after = applyTraining(roster, 'three', 'moderate')
 
     roster.forEach((player, index) => {
       expect(after[index].attributes.shooting).toBe(player.attributes.shooting)
@@ -43,19 +43,33 @@ describe('applyTraining', () => {
     const steadyIndex = roster.findIndex((p) => p.personality === 'steady')
     if (geniusIndex === -1 || steadyIndex === -1) return // seed didn't roll both; skip rather than flake
 
-    const after = applyTraining(roster, 'three', 5)
+    const after = applyTraining(roster, 'three', 'moderate')
     const geniusGain = after[geniusIndex].attributes.three - roster[geniusIndex].attributes.three
     const steadyGain = after[steadyIndex].attributes.three - roster[steadyIndex].attributes.three
     expect(geniusGain).toBeGreaterThanOrEqual(steadyGain)
   })
 
-  it('reduces fatigue toward the baseline recovery amount (net recovery on a training-only week)', () => {
+  it('reduces fatigue on light/moderate intensity (net recovery), but not on intense', () => {
     const roster = createInitialRoster(1).map((p) => ({ ...p, fatigue: 40 }))
-    const after = applyTraining(roster, 'three', 5)
-    after.forEach((player) => {
-      expect(player.fatigue).toBeLessThan(40)
-      expect(player.fatigue).toBeGreaterThanOrEqual(0)
-    })
+    const light = applyTraining(roster, 'three', 'light')
+    const moderate = applyTraining(roster, 'three', 'moderate')
+    light.forEach((player) => expect(player.fatigue).toBeLessThan(40))
+    moderate.forEach((player) => expect(player.fatigue).toBeLessThanOrEqual(40))
+  })
+
+  it('grows attributes more and costs more fatigue as intensity increases', () => {
+    const roster = createInitialRoster(1).map((p) => ({ ...p, fatigue: 40, personality: 'steady' as const }))
+
+    const light = applyTraining(roster, 'three', 'light')
+    const moderate = applyTraining(roster, 'three', 'moderate')
+    const intense = applyTraining(roster, 'three', 'intense')
+
+    const gain = (after: Player[]) => after[0].attributes.three - roster[0].attributes.three
+    expect(gain(light)).toBeLessThan(gain(moderate))
+    expect(gain(moderate)).toBeLessThan(gain(intense))
+
+    expect(light[0].fatigue).toBeLessThan(moderate[0].fatigue)
+    expect(moderate[0].fatigue).toBeLessThan(intense[0].fatigue)
   })
 })
 

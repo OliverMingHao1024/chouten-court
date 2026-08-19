@@ -42,8 +42,8 @@ function App() {
       <WeekScreen
         week={team.week}
         lastResult={team.lastResult}
-        onTrain={(attribute) => {
-          const players = applyTraining(team.players, attribute, 5)
+        onTrain={(attribute, intensity) => {
+          const players = applyTraining(team.players, attribute, intensity)
           setTeam({
             ...team,
             week: team.week + 1,

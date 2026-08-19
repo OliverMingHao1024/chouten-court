@@ -1,10 +1,10 @@
 import { useId, useState } from 'react'
 import { ATTRIBUTE_KEYS, ATTRIBUTE_LABELS, type AttributeKey } from '../../domain/types'
-import type { PracticeStrength } from '../../domain/weeklyAction'
+import type { PracticeStrength, TrainingIntensity } from '../../domain/weeklyAction'
 
 export interface WeekScreenProps {
   week: number
-  onTrain: (attribute: AttributeKey) => void
+  onTrain: (attribute: AttributeKey, intensity: TrainingIntensity) => void
   onPracticeMatch: (strength: PracticeStrength) => void
   lastResult: string | null
 }
@@ -17,13 +17,21 @@ const STRENGTH_LABELS: Record<PracticeStrength, string> = {
   strong: '強',
 }
 
+const INTENSITY_LABELS: Record<TrainingIntensity, string> = {
+  light: '輕',
+  moderate: '中',
+  intense: '重',
+}
+
 export function WeekScreen({ week, onTrain, onPracticeMatch, lastResult }: WeekScreenProps) {
   const modeGroupName = useId()
   const attributeId = useId()
+  const intensityId = useId()
   const strengthId = useId()
 
   const [mode, setMode] = useState<Mode>('train')
   const [attribute, setAttribute] = useState<AttributeKey>('three')
+  const [intensity, setIntensity] = useState<TrainingIntensity>('moderate')
   const [strength, setStrength] = useState<PracticeStrength>('medium')
 
   return (
@@ -33,7 +41,7 @@ export function WeekScreen({ week, onTrain, onPracticeMatch, lastResult }: WeekS
       <form
         onSubmit={(event) => {
           event.preventDefault()
-          if (mode === 'train') onTrain(attribute)
+          if (mode === 'train') onTrain(attribute, intensity)
           else onPracticeMatch(strength)
         }}
       >
@@ -71,6 +79,21 @@ export function WeekScreen({ week, onTrain, onPracticeMatch, lastResult }: WeekS
                   {ATTRIBUTE_LABELS[key]}
                 </option>
               ))}
+            </select>
+
+            <label htmlFor={intensityId}>訓練強度</label>
+            <select
+              id={intensityId}
+              value={intensity}
+              onChange={(event) => setIntensity(event.target.value as TrainingIntensity)}
+            >
+              {(Object.entries(INTENSITY_LABELS) as [TrainingIntensity, string][]).map(
+                ([key, label]) => (
+                  <option key={key} value={key}>
+                    {label}
+                  </option>
+                ),
+              )}
             </select>
           </div>
         )}

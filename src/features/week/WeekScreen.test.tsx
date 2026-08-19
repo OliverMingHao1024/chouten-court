@@ -9,7 +9,7 @@ describe('WeekScreen', () => {
     expect(screen.getByText('第 3 週')).toBeInTheDocument()
   })
 
-  it('submits the chosen training attribute', async () => {
+  it('submits the chosen training attribute and intensity', async () => {
     const user = userEvent.setup()
     const onTrain = vi.fn()
     render(
@@ -18,9 +18,23 @@ describe('WeekScreen', () => {
 
     await user.click(screen.getByRole('radio', { name: '訓練' }))
     await user.selectOptions(screen.getByLabelText('訓練重點'), '三分')
+    await user.selectOptions(screen.getByLabelText('訓練強度'), '重')
     await user.click(screen.getByRole('button', { name: '執行這一週' }))
 
-    expect(onTrain).toHaveBeenCalledWith('three')
+    expect(onTrain).toHaveBeenCalledWith('three', 'intense')
+  })
+
+  it('defaults training intensity to moderate', async () => {
+    const user = userEvent.setup()
+    const onTrain = vi.fn()
+    render(
+      <WeekScreen week={1} onTrain={onTrain} onPracticeMatch={vi.fn()} lastResult={null} />,
+    )
+
+    await user.click(screen.getByRole('radio', { name: '訓練' }))
+    await user.click(screen.getByRole('button', { name: '執行這一週' }))
+
+    expect(onTrain).toHaveBeenCalledWith('three', 'moderate')
   })
 
   it('submits the chosen practice match strength', async () => {

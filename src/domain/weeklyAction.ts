@@ -7,7 +7,21 @@ const FATIGUE_MAX = 100
 const ATTRIBUTE_MAX = 99
 
 const BASELINE_RECOVERY = 10
-const TRAINING_LOAD = 5
+
+export type TrainingIntensity = 'light' | 'moderate' | 'intense'
+
+// 強度越高,單週成長越多,但消耗的體力也越多(重訓長期會侵蝕淨疲勞,呼應受傷風險)。
+const TRAINING_GROWTH: Record<TrainingIntensity, number> = {
+  light: 1,
+  moderate: 2,
+  intense: 3,
+}
+
+const TRAINING_LOAD: Record<TrainingIntensity, number> = {
+  light: 4,
+  moderate: 8,
+  intense: 16,
+}
 
 export type PracticeStrength = 'weak' | 'medium' | 'strong'
 
@@ -51,15 +65,22 @@ function applyFatigueDelta(player: Player, load: number): Player {
   return { ...player, fatigue }
 }
 
-export function applyTraining(roster: Player[], attribute: AttributeKey, amount: number): Player[] {
+export function applyTraining(
+  roster: Player[],
+  attribute: AttributeKey,
+  intensity: TrainingIntensity,
+): Player[] {
+  const baseGrowth = TRAINING_GROWTH[intensity]
+  const load = TRAINING_LOAD[intensity]
+
   return roster.map((player) => {
-    const gain = Math.round(amount * personalityMultiplier(attribute, player.personality))
+    const gain = Math.round(baseGrowth * personalityMultiplier(attribute, player.personality))
     const attributes = {
       ...player.attributes,
       [attribute]: clamp(player.attributes[attribute] + gain, 0, ATTRIBUTE_MAX),
     }
     const withAttributes = { ...player, attributes, styleTag: computeStyleTag(attributes) }
-    return applyFatigueDelta(withAttributes, TRAINING_LOAD)
+    return applyFatigueDelta(withAttributes, load)
   })
 }
 
