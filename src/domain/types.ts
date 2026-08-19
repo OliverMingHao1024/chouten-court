@@ -12,6 +12,16 @@ export type AttributeKey = (typeof ATTRIBUTE_KEYS)[number]
 
 export type AttributeSet = Record<AttributeKey, number>
 
+export const ATTRIBUTE_LABELS: Record<AttributeKey, string> = {
+  shooting: '投籃',
+  three: '三分',
+  rebound: '籃板',
+  pass: '傳球',
+  defense: '防守',
+  athletic: '運動能力',
+  iq: 'IQ',
+}
+
 export const POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'] as const
 
 export type Position = (typeof POSITIONS)[number]

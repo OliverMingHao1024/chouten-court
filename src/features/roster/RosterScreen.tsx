@@ -1,4 +1,4 @@
-import type { Player } from '../../domain/types'
+import { ATTRIBUTE_KEYS, ATTRIBUTE_LABELS, type Player } from '../../domain/types'
 
 export interface RosterScreenProps {
   teamName: string
@@ -14,7 +14,17 @@ export function RosterScreen({ teamName, coachName, players }: RosterScreenProps
       <ul>
         {players.map((player) => (
           <li key={player.id}>
-            {player.name} · {player.position} · {player.styleTag.label}
+            <p>
+              {player.name} · {player.position} · {player.styleTag.label}
+            </p>
+            <dl>
+              {ATTRIBUTE_KEYS.map((key) => (
+                <div key={key}>
+                  <dt>{ATTRIBUTE_LABELS[key]}</dt>
+                  <dd>{player.attributes[key]}</dd>
+                </div>
+              ))}
+            </dl>
           </li>
         ))}
       </ul>
