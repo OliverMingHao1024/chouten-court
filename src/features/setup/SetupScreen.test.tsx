@@ -7,10 +7,12 @@ describe('SetupScreen', () => {
   it('shows the opening story naming the fixed team, and submits that team name', async () => {
     const user = userEvent.setup()
     const onSubmit = vi.fn()
-    render(<SetupScreen onSubmit={onSubmit} />)
+    const { container } = render(<SetupScreen onSubmit={onSubmit} />)
 
-    expect(screen.getByText(/淡水高中/)).toBeInTheDocument()
-    expect(screen.getByText(/退役球員/)).toBeInTheDocument()
+    const story = container.querySelector('.setup__story')
+    expect(story).not.toBeNull()
+    expect(story?.textContent).toContain('淡水高中')
+    expect(story?.textContent).toContain('場邊的教練')
 
     await user.clear(screen.getByLabelText('教練名稱'))
     await user.type(screen.getByLabelText('教練名稱'), '山田')

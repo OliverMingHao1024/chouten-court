@@ -27,9 +27,10 @@ export function SetupScreen({ onSubmit }: SetupScreenProps) {
         <p className="setup__subtitle">台灣高中籃球生涯模擬</p>
       </div>
       <p className="setup__story">
-        <strong>{TEAM_NAME},一支剛成立的球隊。</strong>
+        <strong>球鞋早已收進衣櫃深處,你曾以為那段球員生涯就此落幕。</strong>
         <br />
-        一名默默無名的退役球員轉任教練,將在這裡展開屬於自己的教練生涯。
+        如今,你換了個身分重新走進球場——不再是場上的球員,而是場邊的教練。{TEAM_NAME}
+        ,一支剛成立、一切從零開始的球隊,將是你故事真正的起點。
       </p>
       <form
         className="setup__form"
