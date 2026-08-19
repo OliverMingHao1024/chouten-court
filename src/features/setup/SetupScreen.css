@@ -25,6 +25,19 @@
   margin-top: var(--space-1);
 }
 
+.setup__story {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.setup__story strong {
+  color: var(--text);
+}
+
 .setup__form {
   display: flex;
   flex-direction: column;
@@ -41,15 +54,9 @@
   gap: var(--space-1);
 }
 
-.setup__field label,
-.setup__field > span {
+.setup__field label {
   font-size: 0.85rem;
   color: var(--text-muted);
-}
-
-.setup__team-name {
-  font-weight: 700;
-  color: var(--text);
 }
 
 .setup__coach-row {

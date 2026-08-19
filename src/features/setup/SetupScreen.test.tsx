@@ -4,12 +4,13 @@ import { describe, expect, it, vi } from 'vitest'
 import { SetupScreen } from './SetupScreen'
 
 describe('SetupScreen', () => {
-  it('shows a fixed team name and submits it along with a custom coach name and seed', async () => {
+  it('shows the opening story naming the fixed team, and submits that team name', async () => {
     const user = userEvent.setup()
     const onSubmit = vi.fn()
     render(<SetupScreen onSubmit={onSubmit} />)
 
-    expect(screen.getByText('淡水高中')).toBeInTheDocument()
+    expect(screen.getByText(/淡水高中/)).toBeInTheDocument()
+    expect(screen.getByText(/退役球員/)).toBeInTheDocument()
 
     await user.clear(screen.getByLabelText('教練名稱'))
     await user.type(screen.getByLabelText('教練名稱'), '山田')

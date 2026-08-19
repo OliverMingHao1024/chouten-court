@@ -26,6 +26,11 @@ export function SetupScreen({ onSubmit }: SetupScreenProps) {
         <h1 className="setup__title">頂点コート</h1>
         <p className="setup__subtitle">台灣高中籃球生涯模擬</p>
       </div>
+      <p className="setup__story">
+        <strong>{TEAM_NAME},一支剛成立的球隊。</strong>
+        <br />
+        一名默默無名的退役球員轉任教練,將在這裡展開屬於自己的教練生涯。
+      </p>
       <form
         className="setup__form"
         onSubmit={(event) => {
@@ -35,10 +40,6 @@ export function SetupScreen({ onSubmit }: SetupScreenProps) {
           onSubmit(TEAM_NAME, coachName.trim(), trimmedSeed.length > 0 ? trimmedSeed : undefined)
         }}
       >
-        <div className="setup__field">
-          <span>球隊名稱</span>
-          <p className="setup__team-name">{TEAM_NAME}</p>
-        </div>
         <div className="setup__field">
           <label htmlFor={coachId}>教練名稱</label>
           <div className="setup__coach-row">
