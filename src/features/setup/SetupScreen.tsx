@@ -26,12 +26,17 @@ export function SetupScreen({ onSubmit }: SetupScreenProps) {
         <h1 className="setup__title">頂点コート</h1>
         <p className="setup__subtitle">台灣高中籃球生涯模擬</p>
       </div>
-      <p className="setup__story">
-        <strong>球鞋早已收進衣櫃深處,你曾以為那段球員生涯就此落幕。</strong>
-        <br />
-        如今,你換了個身分重新走進球場——不再是場上的球員,而是場邊的教練。{TEAM_NAME}
-        ,一支剛成立、一切從零開始的球隊,將是你故事真正的起點。
-      </p>
+      <div className="setup__story">
+        <p className="setup__story-line setup__story-line--lead">
+          球鞋早已收進衣櫃深處,你以為球員生涯就這樣結束了。
+        </p>
+        <p className="setup__story-line">
+          如今你重新走回球場,只是身分變了——不再是場上的球員,而是場邊的教練。
+        </p>
+        <p className="setup__story-line">
+          {TEAM_NAME},一支才剛成立的球隊。從零開始,正是你故事的起點。
+        </p>
+      </div>
       <form
         className="setup__form"
         onSubmit={(event) => {
