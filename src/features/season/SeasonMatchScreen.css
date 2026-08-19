@@ -1,0 +1,39 @@
+.matchup-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-5) var(--space-4);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.matchup-card__progress {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.matchup-card__versus {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+}
+
+.matchup-card__side {
+  flex: 1;
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.matchup-card__side--us {
+  color: var(--accent-strong);
+}
+
+.matchup-card__vs {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+

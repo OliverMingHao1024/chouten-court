@@ -4,20 +4,15 @@ import { describe, expect, it, vi } from 'vitest'
 import { SeasonMatchScreen } from './SeasonMatchScreen'
 
 describe('SeasonMatchScreen', () => {
-  it('shows the year, week, phase, and game progress', () => {
+  it('shows game progress within the phase', () => {
     render(
       <SeasonMatchScreen
-        year={1}
-        weekOfYear={30}
-        phase="qualifying"
         gameNumber={2}
         totalGamesInPhase={4}
         lastResult={null}
         onPlayGame={vi.fn()}
       />,
     )
-    expect(screen.getByText('第 1 年 第 30 週')).toBeInTheDocument()
-    expect(screen.getByText('資格賽')).toBeInTheDocument()
     expect(screen.getByText('第 2 / 4 戰')).toBeInTheDocument()
   })
 
@@ -26,9 +21,6 @@ describe('SeasonMatchScreen', () => {
     const onPlayGame = vi.fn()
     render(
       <SeasonMatchScreen
-        year={1}
-        weekOfYear={27}
-        phase="qualifying"
         gameNumber={1}
         totalGamesInPhase={4}
         lastResult={null}
@@ -42,9 +34,6 @@ describe('SeasonMatchScreen', () => {
   it('shows the last result message when provided', () => {
     render(
       <SeasonMatchScreen
-        year={1}
-        weekOfYear={27}
-        phase="qualifying"
         gameNumber={1}
         totalGamesInPhase={4}
         lastResult="qualifying 第 1 戰:獲勝"

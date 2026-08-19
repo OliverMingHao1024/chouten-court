@@ -16,6 +16,15 @@ export function getCalendarPosition(totalWeek: number): CalendarPosition {
 
 export type SeasonPhase = 'offseason' | 'qualifying' | 'preliminary' | 'group' | 'quarterfinal' | 'final4'
 
+export const PHASE_LABELS: Record<SeasonPhase, string> = {
+  offseason: '非賽季',
+  qualifying: '資格賽',
+  preliminary: '預賽',
+  group: '複賽',
+  quarterfinal: '八強賽',
+  final4: '四強賽',
+}
+
 // HBL 甲級五階段的原創週數配置(尚未依實際賽程精細調校),依序佔滿賽季的 22 週。
 const SEASON_PHASE_LENGTHS: Array<[Exclude<SeasonPhase, 'offseason'>, number]> = [
   ['qualifying', 4],

@@ -23,7 +23,7 @@ const player: Player = {
 
 describe('RosterScreen', () => {
   it('shows every attribute value for each player', () => {
-    render(<RosterScreen teamName="頂點高中" coachName="山田" players={[player]} />)
+    render(<RosterScreen players={[player]} />)
 
     const expected: Array<[string, number]> = [
       ['投籃', 61],

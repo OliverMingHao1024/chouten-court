@@ -1,0 +1,47 @@
+.setup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-5) var(--space-4);
+  flex: 1;
+  justify-content: center;
+}
+
+.setup__hero {
+  text-align: center;
+}
+
+.setup__emoji {
+  font-size: 2.5rem;
+  margin-bottom: var(--space-2);
+}
+
+.setup__title {
+  font-size: 1.6rem;
+}
+
+.setup__subtitle {
+  color: var(--text-muted);
+  margin-top: var(--space-1);
+}
+
+.setup__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+}
+
+.setup__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.setup__field label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}

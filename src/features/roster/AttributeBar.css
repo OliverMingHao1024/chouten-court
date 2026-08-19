@@ -1,0 +1,31 @@
+.attribute-bar {
+  display: grid;
+  grid-template-columns: 4.6em 1fr 2ch;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.8rem;
+}
+
+.attribute-bar__label {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.attribute-bar__track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--accent-bg);
+  overflow: hidden;
+}
+
+.attribute-bar__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--accent-strong));
+}
+
+.attribute-bar__value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}

@@ -1,4 +1,4 @@
-import { getCalendarPosition, getSeasonPhase, WEEKS_PER_YEAR } from './calendar'
+import { getCalendarPosition, getSeasonPhase, PHASE_LABELS, WEEKS_PER_YEAR } from './calendar'
 import {
   PHASE_GAME_COUNT,
   didAdvancePhase,
@@ -60,7 +60,7 @@ export function advanceSeasonWeek(
       roster: fatiguedRoster,
       gameLogEntry,
       nextTotalWeek: totalWeek + 1,
-      message: `${phase} 第 ${gameIndex + 1} 戰:${outcome === 'win' ? '獲勝' : '落敗'}`,
+      message: `${PHASE_LABELS[phase]} 第 ${gameIndex + 1} 戰:${outcome === 'win' ? '獲勝' : '落敗'}`,
     }
   }
 
@@ -88,7 +88,7 @@ export function advanceSeasonWeek(
     gameLogEntry,
     nextTotalWeek: advanced ? totalWeek + 1 : nextYearStart(totalWeek),
     message: advanced
-      ? `${phase} 戰績 ${wins}勝${losses}敗,晉級下一階段!`
-      : `${phase} 戰績 ${wins}勝${losses}敗,球季提前結束。`,
+      ? `${PHASE_LABELS[phase]} 戰績 ${wins}勝${losses}敗,晉級下一階段!`
+      : `${PHASE_LABELS[phase]} 戰績 ${wins}勝${losses}敗,球季提前結束。`,
   }
 }

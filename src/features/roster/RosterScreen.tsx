@@ -1,33 +1,34 @@
+import { ATTRIBUTE_MAX } from '../../domain/matchEngine'
 import { ATTRIBUTE_KEYS, ATTRIBUTE_LABELS, type Player } from '../../domain/types'
+import { AttributeBar } from './AttributeBar'
+import './RosterScreen.css'
 
 export interface RosterScreenProps {
-  teamName: string
-  coachName: string
   players: Player[]
 }
 
-export function RosterScreen({ teamName, coachName, players }: RosterScreenProps) {
+export function RosterScreen({ players }: RosterScreenProps) {
   return (
-    <div>
-      <h1>{teamName}</h1>
-      <p>{coachName} 教練</p>
-      <ul>
-        {players.map((player) => (
-          <li key={player.id}>
-            <p>
-              {player.name} · {player.position} · {player.styleTag.label}
-            </p>
-            <dl>
-              {ATTRIBUTE_KEYS.map((key) => (
-                <div key={key}>
-                  <dt>{ATTRIBUTE_LABELS[key]}</dt>
-                  <dd>{player.attributes[key]}</dd>
-                </div>
-              ))}
-            </dl>
-          </li>
-        ))}
-      </ul>
-    </div>
+    <ul className="roster">
+      {players.map((player) => (
+        <li key={player.id} className="roster__card">
+          <p className="roster__headline">
+            <span className="roster__name">{player.name}</span>
+            <span className="roster__position">{player.position}</span>
+            <span className="roster__style">{player.styleTag.label}</span>
+          </p>
+          <div className="roster__attributes">
+            {ATTRIBUTE_KEYS.map((key) => (
+              <AttributeBar
+                key={key}
+                label={ATTRIBUTE_LABELS[key]}
+                value={player.attributes[key]}
+                max={ATTRIBUTE_MAX}
+              />
+            ))}
+          </div>
+        </li>
+      ))}
+    </ul>
   )
 }

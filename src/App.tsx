@@ -1,5 +1,10 @@
 import { useState, type ReactNode } from 'react'
-import { canScheduleAnotherPracticeMatch, getCalendarPosition, getSeasonPhase } from './domain/calendar'
+import {
+  canScheduleAnotherPracticeMatch,
+  getCalendarPosition,
+  getSeasonPhase,
+  PHASE_LABELS,
+} from './domain/calendar'
 import { PHASE_GAME_COUNT, getGameIndexForWeek } from './domain/officialMatch'
 import { createInitialRoster } from './domain/roster'
 import { hashSeed } from './domain/rng'
@@ -9,6 +14,7 @@ import { applyPracticeMatch, applyTraining, type PracticeStrength } from './doma
 import { RosterScreen } from './features/roster/RosterScreen'
 import { SeasonMatchScreen } from './features/season/SeasonMatchScreen'
 import { SetupScreen } from './features/setup/SetupScreen'
+import { AppShell } from './features/shell/AppShell'
 import { WeekScreen } from './features/week/WeekScreen'
 
 interface Team {
@@ -53,9 +59,6 @@ function App() {
   if (phase !== 'offseason' && gameIndex !== null) {
     actionPanel = (
       <SeasonMatchScreen
-        year={year}
-        weekOfYear={weekOfYear}
-        phase={phase}
         gameNumber={gameIndex + 1}
         totalGamesInPhase={PHASE_GAME_COUNT[phase]}
         lastResult={team.lastResult}
@@ -84,9 +87,6 @@ function App() {
 
     actionPanel = (
       <WeekScreen
-        year={year}
-        weekOfYear={weekOfYear}
-        phase={phase}
         practiceMatchAllowed={practiceMatchAllowed}
         lastResult={team.lastResult}
         onTrain={(attribute, intensity) => {
@@ -113,10 +113,16 @@ function App() {
   }
 
   return (
-    <>
+    <AppShell
+      teamName={team.teamName}
+      coachName={team.coachName}
+      year={year}
+      weekOfYear={weekOfYear}
+      phaseLabel={PHASE_LABELS[phase]}
+    >
       {actionPanel}
-      <RosterScreen teamName={team.teamName} coachName={team.coachName} players={team.players} />
-    </>
+      <RosterScreen players={team.players} />
+    </AppShell>
   )
 }
 

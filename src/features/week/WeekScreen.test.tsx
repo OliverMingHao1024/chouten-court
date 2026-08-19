@@ -6,9 +6,6 @@ import { WeekScreen } from './WeekScreen'
 function renderScreen(overrides: Partial<React.ComponentProps<typeof WeekScreen>> = {}) {
   return render(
     <WeekScreen
-      year={1}
-      weekOfYear={3}
-      phase="offseason"
       practiceMatchAllowed={true}
       onTrain={vi.fn()}
       onPracticeMatch={vi.fn()}
@@ -19,12 +16,6 @@ function renderScreen(overrides: Partial<React.ComponentProps<typeof WeekScreen>
 }
 
 describe('WeekScreen', () => {
-  it('shows the current year, week, and phase', () => {
-    renderScreen({ year: 2, weekOfYear: 5, phase: 'qualifying' })
-    expect(screen.getByText('第 2 年 第 5 週')).toBeInTheDocument()
-    expect(screen.getByText('資格賽')).toBeInTheDocument()
-  })
-
   it('submits the chosen training attribute and intensity', async () => {
     const user = userEvent.setup()
     const onTrain = vi.fn()
@@ -81,9 +72,6 @@ describe('WeekScreen', () => {
 
     rerender(
       <WeekScreen
-        year={1}
-        weekOfYear={24}
-        phase="offseason"
         practiceMatchAllowed={false}
         onTrain={onTrain}
         onPracticeMatch={onPracticeMatch}
