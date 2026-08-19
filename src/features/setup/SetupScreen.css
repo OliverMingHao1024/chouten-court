@@ -41,7 +41,31 @@
   gap: var(--space-1);
 }
 
-.setup__field label {
+.setup__field label,
+.setup__field > span {
   font-size: 0.85rem;
   color: var(--text-muted);
+}
+
+.setup__team-name {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.setup__coach-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.setup__coach-row input {
+  flex: 1;
+}
+
+.setup__dice {
+  background: var(--accent-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0 var(--space-3);
+  cursor: pointer;
+  font-size: 1.1rem;
 }

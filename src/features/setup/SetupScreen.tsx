@@ -1,19 +1,21 @@
 import { useId, useState } from 'react'
+import { generateCoachName } from '../../domain/nameGenerator'
 import './SetupScreen.css'
 
 export interface SetupScreenProps {
   onSubmit: (teamName: string, coachName: string, seedInput: string | undefined) => void
 }
 
+// 虛構球隊,之後會補校史/故事內容(暫時只有名字)。
+const TEAM_NAME = '淡水高中'
+
 export function SetupScreen({ onSubmit }: SetupScreenProps) {
-  const teamId = useId()
   const coachId = useId()
   const seedId = useId()
-  const [teamName, setTeamName] = useState('')
-  const [coachName, setCoachName] = useState('')
+  const [coachName, setCoachName] = useState(() => generateCoachName(Math.random))
   const [seedInput, setSeedInput] = useState('')
 
-  const canSubmit = teamName.trim().length > 0 && coachName.trim().length > 0
+  const canSubmit = coachName.trim().length > 0
 
   return (
     <div className="setup">
@@ -30,24 +32,30 @@ export function SetupScreen({ onSubmit }: SetupScreenProps) {
           event.preventDefault()
           if (!canSubmit) return
           const trimmedSeed = seedInput.trim()
-          onSubmit(teamName.trim(), coachName.trim(), trimmedSeed.length > 0 ? trimmedSeed : undefined)
+          onSubmit(TEAM_NAME, coachName.trim(), trimmedSeed.length > 0 ? trimmedSeed : undefined)
         }}
       >
         <div className="setup__field">
-          <label htmlFor={teamId}>球隊名稱</label>
-          <input
-            id={teamId}
-            value={teamName}
-            onChange={(event) => setTeamName(event.target.value)}
-          />
+          <span>球隊名稱</span>
+          <p className="setup__team-name">{TEAM_NAME}</p>
         </div>
         <div className="setup__field">
           <label htmlFor={coachId}>教練名稱</label>
-          <input
-            id={coachId}
-            value={coachName}
-            onChange={(event) => setCoachName(event.target.value)}
-          />
+          <div className="setup__coach-row">
+            <input
+              id={coachId}
+              value={coachName}
+              onChange={(event) => setCoachName(event.target.value)}
+            />
+            <button
+              type="button"
+              className="setup__dice"
+              aria-label="隨機產生教練名稱"
+              onClick={() => setCoachName(generateCoachName(Math.random))}
+            >
+              🎲
+            </button>
+          </div>
         </div>
         <div className="setup__field">
           <label htmlFor={seedId}>種子碼(選填)</label>
