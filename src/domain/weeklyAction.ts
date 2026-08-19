@@ -76,26 +76,40 @@ export function computeTrainingSuccessGain(
   return Math.round(TRAINING_GROWTH[intensity] * personalityMultiplier(attribute, personality))
 }
 
+export interface TrainingResult {
+  roster: Player[]
+  successCount: number
+  totalPlayers: number
+  totalGain: number
+}
+
 export function applyTraining(
   roster: Player[],
   attribute: AttributeKey,
   intensity: TrainingIntensity,
   seed: number,
-): Player[] {
+): TrainingResult {
   const rng = createSeededRng(seed)
   const load = TRAINING_LOAD[intensity]
   const successRate = TRAINING_SUCCESS_RATE[intensity]
 
-  return roster.map((player) => {
+  let successCount = 0
+  let totalGain = 0
+
+  const newRoster = roster.map((player) => {
     const succeeded = rng() < successRate
     const gain = succeeded ? computeTrainingSuccessGain(intensity, attribute, player.personality) : 0
-    const attributes = {
-      ...player.attributes,
-      [attribute]: clamp(player.attributes[attribute] + gain, 0, ATTRIBUTE_MAX),
-    }
+    if (succeeded) successCount += 1
+
+    const clampedAttribute = clamp(player.attributes[attribute] + gain, 0, ATTRIBUTE_MAX)
+    totalGain += clampedAttribute - player.attributes[attribute]
+
+    const attributes = { ...player.attributes, [attribute]: clampedAttribute }
     const withAttributes = { ...player, attributes, styleTag: computeStyleTag(attributes) }
     return applyFatigueDelta(withAttributes, load)
   })
+
+  return { roster: newRoster, successCount, totalPlayers: roster.length, totalGain }
 }
 
 export interface PracticeMatchResult {

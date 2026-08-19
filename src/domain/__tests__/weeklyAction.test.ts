@@ -55,18 +55,18 @@ describe('applyTraining', () => {
   it('never regresses the chosen attribute (failure = 0 growth, never negative)', () => {
     const roster = createInitialRoster(1)
     const before = roster.map((p) => p.attributes.three)
-    const after = applyTraining(roster, 'three', 'intense', 999)
-    after.forEach((player, index) => {
+    const result = applyTraining(roster, 'three', 'intense', 999)
+    result.roster.forEach((player, index) => {
       expect(player.attributes.three).toBeGreaterThanOrEqual(before[index])
     })
   })
 
   it('does not change attributes other than the chosen one', () => {
     const roster = createInitialRoster(1)
-    const after = applyTraining(roster, 'three', 'moderate', 42)
+    const result = applyTraining(roster, 'three', 'moderate', 42)
     roster.forEach((player, index) => {
-      expect(after[index].attributes.shooting).toBe(player.attributes.shooting)
-      expect(after[index].attributes.iq).toBe(player.attributes.iq)
+      expect(result.roster[index].attributes.shooting).toBe(player.attributes.shooting)
+      expect(result.roster[index].attributes.iq).toBe(player.attributes.iq)
     })
   })
 
@@ -75,16 +75,16 @@ describe('applyTraining', () => {
     const light = applyTraining(roster, 'three', 'light', 1)
     const moderate = applyTraining(roster, 'three', 'moderate', 1)
     const intense = applyTraining(roster, 'three', 'intense', 1)
-    light.forEach((player) => expect(player.fatigue).toBeLessThan(40))
-    moderate.forEach((player) => expect(player.fatigue).toBeLessThanOrEqual(40))
-    intense.forEach((player) => expect(player.fatigue).toBeGreaterThan(40))
+    light.roster.forEach((player) => expect(player.fatigue).toBeLessThan(40))
+    moderate.roster.forEach((player) => expect(player.fatigue).toBeLessThanOrEqual(40))
+    intense.roster.forEach((player) => expect(player.fatigue).toBeGreaterThan(40))
   })
 
   it('fatigue load applies regardless of success or failure', () => {
     const roster = createInitialRoster(1).map((p) => ({ ...p, fatigue: 40 }))
     // Fatigue delta only depends on intensity/load, not the success roll, across many seeds.
     const deltas = new Set(
-      Array.from({ length: 10 }, (_, seed) => applyTraining(roster, 'three', 'intense', seed)[0].fatigue),
+      Array.from({ length: 10 }, (_, seed) => applyTraining(roster, 'three', 'intense', seed).roster[0].fatigue),
     )
     expect(deltas.size).toBe(1)
   })
@@ -97,12 +97,28 @@ describe('applyTraining', () => {
     const sampleSeeds = Array.from({ length: 200 }, (_, i) => i)
 
     const totalGain = (intensity: 'light' | 'intense') =>
-      sampleSeeds.reduce((sum, seed) => {
-        const after = applyTraining(roster, 'three', intensity, seed)
-        return sum + (after[0].attributes.three - roster[0].attributes.three)
-      }, 0)
+      sampleSeeds.reduce((sum, seed) => sum + applyTraining(roster, 'three', intensity, seed).totalGain, 0)
 
     expect(totalGain('intense')).toBeGreaterThan(totalGain('light'))
+  })
+
+  it('reports successCount and totalGain consistent with the roster outcome', () => {
+    const roster = withUniformAttributes(createInitialRoster(1), 40).map((p) => ({
+      ...p,
+      personality: 'steady' as const,
+    }))
+    const result = applyTraining(roster, 'three', 'moderate', 7)
+
+    const actualSuccessCount = result.roster.filter((p, i) => p.attributes.three > roster[i].attributes.three)
+      .length
+    const actualTotalGain = result.roster.reduce(
+      (sum, p, i) => sum + (p.attributes.three - roster[i].attributes.three),
+      0,
+    )
+
+    expect(result.successCount).toBe(actualSuccessCount)
+    expect(result.totalGain).toBe(actualTotalGain)
+    expect(result.totalPlayers).toBe(roster.length)
   })
 })
 

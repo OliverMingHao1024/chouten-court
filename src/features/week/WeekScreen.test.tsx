@@ -11,6 +11,7 @@ function renderScreen(overrides: Partial<React.ComponentProps<typeof WeekScreen>
       onTrain={vi.fn()}
       onPracticeMatch={vi.fn()}
       lastResult={null}
+      trainingRollResult={null}
       {...overrides}
     />,
   )

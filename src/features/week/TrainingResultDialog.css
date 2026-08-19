@@ -1,0 +1,57 @@
+.training-result-dialog {
+  border: none;
+  border-radius: var(--radius);
+  padding: 0;
+  background: var(--bg-elevated);
+  color: var(--text);
+  max-width: min(90vw, 360px);
+}
+
+.training-result-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.training-result-dialog__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  text-align: center;
+}
+
+.training-result-dialog__dice {
+  font-size: 2.5rem;
+  margin: 0;
+  animation: training-result-dice-roll 0.4s ease-out;
+}
+
+@keyframes training-result-dice-roll {
+  0% {
+    transform: rotate(-20deg) scale(0.6);
+    opacity: 0;
+  }
+  100% {
+    transform: rotate(0deg) scale(1);
+    opacity: 1;
+  }
+}
+
+.training-result-dialog__intensity {
+  margin: 0;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.training-result-dialog__count {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.training-result-dialog__gain {
+  margin: 0;
+  font-weight: 700;
+  font-size: 1.3rem;
+  color: var(--accent-strong);
+}

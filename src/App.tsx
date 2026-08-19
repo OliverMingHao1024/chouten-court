@@ -24,6 +24,7 @@ import { SeasonMatchScreen } from './features/season/SeasonMatchScreen'
 import { SetupScreen } from './features/setup/SetupScreen'
 import { AppShell } from './features/shell/AppShell'
 import { WeekScreen } from './features/week/WeekScreen'
+import type { TrainingRollResult } from './features/week/TrainingResultDialog'
 
 interface Team {
   teamName: string
@@ -34,6 +35,7 @@ interface Team {
   lastResult: string | null
   practiceMatchTotalWeeks: number[]
   seasonGameLog: SeasonGameLogEntry[]
+  trainingRollResult: TrainingRollResult | null
 }
 
 function opponentNameForWeek(team: Team): string {
@@ -66,6 +68,7 @@ function App() {
             lastResult: null,
             practiceMatchTotalWeeks: [],
             seasonGameLog: [],
+            trainingRollResult: null,
           })
         }}
       />
@@ -113,13 +116,21 @@ function App() {
         practiceMatchAllowed={practiceMatchAllowed}
         opponentNames={practiceOpponentNamesForWeek(team)}
         lastResult={team.lastResult}
+        trainingRollResult={team.trainingRollResult}
         onTrain={(attribute, intensity) => {
-          const players = applyTraining(team.players, attribute, intensity, team.seed + team.totalWeek)
+          const result = applyTraining(team.players, attribute, intensity, team.seed + team.totalWeek)
           setTeam({
             ...team,
             totalWeek: team.totalWeek + 1,
-            players,
+            players: result.roster,
             lastResult: `本週訓練重點:${ATTRIBUTE_LABELS[attribute]}(${TRAINING_INTENSITY_LABELS[intensity]})`,
+            trainingRollResult: {
+              attributeLabel: ATTRIBUTE_LABELS[attribute],
+              intensityLabel: TRAINING_INTENSITY_LABELS[intensity],
+              successCount: result.successCount,
+              totalPlayers: result.totalPlayers,
+              totalGain: result.totalGain,
+            },
           })
         }}
         onPracticeMatch={(strength: PracticeStrength) => {

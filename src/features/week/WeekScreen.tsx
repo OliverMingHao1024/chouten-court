@@ -10,6 +10,7 @@ import {
   type PracticeStrength,
   type TrainingIntensity,
 } from '../../domain/weeklyAction'
+import { TrainingResultDialog, type TrainingRollResult } from './TrainingResultDialog'
 import './WeekScreen.css'
 
 export interface WeekScreenProps {
@@ -18,6 +19,7 @@ export interface WeekScreenProps {
   onTrain: (attribute: AttributeKey, intensity: TrainingIntensity) => void
   onPracticeMatch: (strength: PracticeStrength) => void
   lastResult: string | null
+  trainingRollResult: TrainingRollResult | null
 }
 
 type Panel = 'closed' | 'train' | 'practice'
@@ -35,6 +37,7 @@ export function WeekScreen({
   onTrain,
   onPracticeMatch,
   lastResult,
+  trainingRollResult,
 }: WeekScreenProps) {
   const attributeId = useId()
   const [panel, setPanel] = useState<Panel>('closed')
@@ -42,6 +45,7 @@ export function WeekScreen({
 
   return (
     <section className="week-card">
+      <TrainingResultDialog result={trainingRollResult} />
       {lastResult && <p className="result-banner week-card__result">{lastResult}</p>}
 
       <div className="week-card__entry">
