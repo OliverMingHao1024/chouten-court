@@ -36,4 +36,21 @@ describe('App', () => {
     const second = await buildWithSeed()
     expect(first).toEqual(second)
   })
+
+  it('advances the week and reports the result after a training week', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.type(screen.getByLabelText('球隊名稱'), '頂點高中')
+    await user.type(screen.getByLabelText('教練名稱'), '山田')
+    await user.click(screen.getByRole('button', { name: '建隊' }))
+    await screen.findByText('第 1 週')
+
+    await user.click(screen.getByRole('radio', { name: '訓練' }))
+    await user.selectOptions(screen.getByLabelText('訓練重點'), '三分')
+    await user.click(screen.getByRole('button', { name: '執行這一週' }))
+
+    expect(await screen.findByText('第 2 週')).toBeInTheDocument()
+    expect(screen.getByText('本週訓練重點:三分')).toBeInTheDocument()
+  })
 })
