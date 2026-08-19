@@ -25,6 +25,21 @@ const SEASON_PHASE_LENGTHS: Array<[Exclude<SeasonPhase, 'offseason'>, number]> =
   ['final4', 3],
 ]
 
+export interface PhaseWeekRange {
+  start: number
+  end: number
+}
+
+export function getPhaseWeekRange(phase: Exclude<SeasonPhase, 'offseason'>): PhaseWeekRange {
+  let cursor = OFFSEASON_WEEKS
+  for (const [candidate, length] of SEASON_PHASE_LENGTHS) {
+    const start = cursor + 1
+    cursor += length
+    if (candidate === phase) return { start, end: cursor }
+  }
+  throw new Error(`unknown season phase: ${phase}`)
+}
+
 export function getSeasonPhase(weekOfYear: number): SeasonPhase {
   if (weekOfYear < 1 || weekOfYear > WEEKS_PER_YEAR) {
     throw new RangeError(`weekOfYear must be within 1..${WEEKS_PER_YEAR}, got ${weekOfYear}`)

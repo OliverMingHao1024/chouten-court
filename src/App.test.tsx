@@ -54,7 +54,7 @@ describe('App', () => {
     expect(screen.getByText('本週訓練重點:三分')).toBeInTheDocument()
   })
 
-  it('blocks practice matches during the season and shows why', async () => {
+  it('switches to the season match screen once the offseason ends, replacing the train/practice form', async () => {
     const user = userEvent.setup()
     render(<App />)
 
@@ -68,6 +68,26 @@ describe('App', () => {
     }
 
     expect(await screen.findByText('資格賽')).toBeInTheDocument()
-    expect(screen.getByRole('radio', { name: '練習賽' })).toBeDisabled()
+    expect(screen.getByText('第 1 / 4 戰')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '開打' })).toBeInTheDocument()
+    expect(screen.queryByRole('radio', { name: '練習賽' })).not.toBeInTheDocument()
+  })
+
+  it('plays through official season games and reports each result', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.type(screen.getByLabelText('球隊名稱'), '頂點高中')
+    await user.type(screen.getByLabelText('教練名稱'), '山田')
+    await user.click(screen.getByRole('button', { name: '建隊' }))
+
+    for (let i = 0; i < 26; i++) {
+      await user.click(screen.getByRole('button', { name: '執行這一週' }))
+    }
+
+    await screen.findByText('第 1 / 4 戰')
+    await user.click(screen.getByRole('button', { name: '開打' }))
+
+    expect(await screen.findByText('第 2 / 4 戰')).toBeInTheDocument()
   })
 })

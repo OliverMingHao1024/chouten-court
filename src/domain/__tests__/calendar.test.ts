@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   getCalendarPosition,
+  getPhaseWeekRange,
   getSeasonPhase,
   isPracticeMatchAllowed,
   canScheduleAnotherPracticeMatch,
@@ -47,6 +48,20 @@ describe('getSeasonPhase', () => {
   it('throws on an out-of-range week-of-year', () => {
     expect(() => getSeasonPhase(0)).toThrow()
     expect(() => getSeasonPhase(49)).toThrow()
+  })
+})
+
+describe('getPhaseWeekRange', () => {
+  it('returns contiguous, non-overlapping ranges that cover the whole season', () => {
+    const phases = ['qualifying', 'preliminary', 'group', 'quarterfinal', 'final4'] as const
+    let expectedStart = 27
+    for (const phase of phases) {
+      const range = getPhaseWeekRange(phase)
+      expect(range.start).toBe(expectedStart)
+      expect(range.end).toBeGreaterThanOrEqual(range.start)
+      expectedStart = range.end + 1
+    }
+    expect(expectedStart - 1).toBe(48)
   })
 })
 
