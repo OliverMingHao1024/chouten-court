@@ -1,32 +1,29 @@
-# React + TypeScript + Vite
+# 頂点コート(chouten-court)
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+台灣高中籃球球隊經營模擬遊戲。教練視角,經營一支高中球隊,目標是拿下 HBL 甲級總冠軍。
 
-Currently, two official plugins are available:
+純前端、無後端的網頁遊戲,靈感來自「実況パワフルプロ野球」的栄冠ナイン模式,但玩法與程式碼皆為原創設計。
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 目前功能(開發中)
 
-## React Compiler
+- 建隊:輸入教練名稱(可骰子隨機產生),固定球隊「淡水高中」
+- 球員名冊:2×6 頭像網格,點擊查看完整7項屬性
+- 每週決策:訓練(選重點+強度)或練習賽(非賽季限定)
+- 賽季行事曆:對應 HBL 甲級五階段(資格賽→預賽→複賽→八強→四強),依戰績晉級或淘汰
+- 正式比賽自動模擬,四強賽解出冠亞季殿名次
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+完整設計規格見 [`docs/spec.md`](docs/spec.md)。
 
-## Expanding the Oxlint configuration
+## 開發
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
+npm run dev       # 開發伺服器
+npm test          # 跑測試(Vitest)
+npm run build     # 型別檢查 + 正式build
+npm run lint      # oxlint
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## 技術棧
+
+Vite + React + TypeScript,PWA(可加入主畫面),部署 GitHub Pages。
