@@ -5,9 +5,11 @@ import {
   getSeasonPhase,
   PHASE_LABELS,
 } from './domain/calendar'
-import { PHASE_GAME_COUNT, getGameIndexForWeek } from './domain/officialMatch'
+import { generateOpponentName } from './domain/opponentName'
+import { getOpponentTier } from './domain/opponentTier'
+import { PHASE_GAME_COUNT, PHASE_OPPONENT_STRENGTH, getGameIndexForWeek } from './domain/officialMatch'
 import { createInitialRoster } from './domain/roster'
-import { hashSeed } from './domain/rng'
+import { createSeededRng, hashSeed } from './domain/rng'
 import { advanceSeasonWeek, type SeasonGameLogEntry } from './domain/season'
 import { ATTRIBUTE_LABELS, type Player } from './domain/types'
 import { applyPracticeMatch, applyTraining, type PracticeStrength } from './domain/weeklyAction'
@@ -26,6 +28,11 @@ interface Team {
   lastResult: string | null
   practiceMatchTotalWeeks: number[]
   seasonGameLog: SeasonGameLogEntry[]
+}
+
+function opponentNameForWeek(team: Team): string {
+  const rng = createSeededRng(hashSeed(`${team.seed}-${team.totalWeek}-opponent`))
+  return generateOpponentName(rng)
 }
 
 function App() {
@@ -61,6 +68,8 @@ function App() {
       <SeasonMatchScreen
         gameNumber={gameIndex + 1}
         totalGamesInPhase={PHASE_GAME_COUNT[phase]}
+        opponentName={opponentNameForWeek(team)}
+        opponentTier={getOpponentTier(PHASE_OPPONENT_STRENGTH[phase])}
         lastResult={team.lastResult}
         onPlayGame={() => {
           const result = advanceSeasonWeek(
@@ -88,6 +97,7 @@ function App() {
     actionPanel = (
       <WeekScreen
         practiceMatchAllowed={practiceMatchAllowed}
+        opponentName={opponentNameForWeek(team)}
         lastResult={team.lastResult}
         onTrain={(attribute, intensity) => {
           const players = applyTraining(team.players, attribute, intensity)

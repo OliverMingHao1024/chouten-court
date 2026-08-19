@@ -41,3 +41,8 @@
   font-size: 0.85rem;
   color: var(--text-muted);
 }
+
+.week-card__opponent {
+  font-size: 0.9rem;
+  font-weight: 700;
+}

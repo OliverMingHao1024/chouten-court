@@ -2,6 +2,11 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import App from './App'
+import { REGIONS, SUFFIXES } from './domain/opponentName'
+import { OPPONENT_TIERS } from './domain/opponentTier'
+
+const OPPONENT_NAME_PATTERN = new RegExp(`(${REGIONS.join('|')})(${SUFFIXES.join('|')})`)
+const OPPONENT_TIER_PATTERN = new RegExp(`^(${OPPONENT_TIERS.join('|')})$`)
 
 async function buildTeam(user: ReturnType<typeof userEvent.setup>, seed?: string) {
   render(<App />)
@@ -85,5 +90,27 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: '開打' }))
 
     expect(await screen.findByText('第 2 / 4 戰')).toBeInTheDocument()
+  })
+
+  it('shows a generated opponent school name for a practice match', async () => {
+    const user = userEvent.setup()
+    await buildTeam(user)
+
+    await user.click(screen.getByRole('radio', { name: '練習賽' }))
+
+    expect(screen.getByText(OPPONENT_NAME_PATTERN)).toBeInTheDocument()
+  })
+
+  it('shows a generated opponent school name and tier for an official season game', async () => {
+    const user = userEvent.setup()
+    await buildTeam(user)
+
+    for (let i = 0; i < 26; i++) {
+      await user.click(screen.getByRole('button', { name: '執行這一週' }))
+    }
+    await screen.findByText('第 1 / 4 戰')
+
+    expect(screen.getByText(OPPONENT_NAME_PATTERN)).toBeInTheDocument()
+    expect(screen.getByText(OPPONENT_TIER_PATTERN)).toBeInTheDocument()
   })
 })

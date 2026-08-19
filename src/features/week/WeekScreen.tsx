@@ -1,10 +1,16 @@
 import { useId, useState } from 'react'
+import { getOpponentTier } from '../../domain/opponentTier'
 import { ATTRIBUTE_KEYS, ATTRIBUTE_LABELS, type AttributeKey } from '../../domain/types'
-import type { PracticeStrength, TrainingIntensity } from '../../domain/weeklyAction'
+import {
+  PRACTICE_OPPONENT_STRENGTH,
+  type PracticeStrength,
+  type TrainingIntensity,
+} from '../../domain/weeklyAction'
 import './WeekScreen.css'
 
 export interface WeekScreenProps {
   practiceMatchAllowed: boolean
+  opponentName: string
   onTrain: (attribute: AttributeKey, intensity: TrainingIntensity) => void
   onPracticeMatch: (strength: PracticeStrength) => void
   lastResult: string | null
@@ -13,9 +19,9 @@ export interface WeekScreenProps {
 type Mode = 'train' | 'practice'
 
 const STRENGTH_LABELS: Record<PracticeStrength, string> = {
-  weak: '弱',
-  medium: '中',
-  strong: '強',
+  weak: getOpponentTier(PRACTICE_OPPONENT_STRENGTH.weak),
+  medium: getOpponentTier(PRACTICE_OPPONENT_STRENGTH.medium),
+  strong: getOpponentTier(PRACTICE_OPPONENT_STRENGTH.strong),
 }
 
 const INTENSITY_LABELS: Record<TrainingIntensity, string> = {
@@ -24,7 +30,13 @@ const INTENSITY_LABELS: Record<TrainingIntensity, string> = {
   intense: '重',
 }
 
-export function WeekScreen({ practiceMatchAllowed, onTrain, onPracticeMatch, lastResult }: WeekScreenProps) {
+export function WeekScreen({
+  practiceMatchAllowed,
+  opponentName,
+  onTrain,
+  onPracticeMatch,
+  lastResult,
+}: WeekScreenProps) {
   const modeGroupName = useId()
   const attributeId = useId()
   const intensityId = useId()
@@ -111,6 +123,7 @@ export function WeekScreen({ practiceMatchAllowed, onTrain, onPracticeMatch, las
 
         {effectiveMode === 'practice' && (
           <div className="week-card__fields">
+            <p className="week-card__opponent">邀約對手:{opponentName}</p>
             <label htmlFor={strengthId}>對手強度</label>
             <select
               id={strengthId}

@@ -7,6 +7,7 @@ function renderScreen(overrides: Partial<React.ComponentProps<typeof WeekScreen>
   return render(
     <WeekScreen
       practiceMatchAllowed={true}
+      opponentName="板橋高中"
       onTrain={vi.fn()}
       onPracticeMatch={vi.fn()}
       lastResult={null}
@@ -46,10 +47,19 @@ describe('WeekScreen', () => {
     renderScreen({ practiceMatchAllowed: true, onPracticeMatch })
 
     await user.click(screen.getByRole('radio', { name: '練習賽' }))
-    await user.selectOptions(screen.getByLabelText('對手強度'), '強')
+    await user.selectOptions(screen.getByLabelText('對手強度'), '名門')
     await user.click(screen.getByRole('button', { name: '執行這一週' }))
 
     expect(onPracticeMatch).toHaveBeenCalledWith('strong')
+  })
+
+  it('shows the generated opponent school name when practice mode is selected', async () => {
+    const user = userEvent.setup()
+    renderScreen({ practiceMatchAllowed: true, opponentName: '林口商工' })
+
+    await user.click(screen.getByRole('radio', { name: '練習賽' }))
+
+    expect(screen.getByText(/林口商工/)).toBeInTheDocument()
   })
 
   it('disables the practice match option when not allowed', () => {
@@ -73,6 +83,7 @@ describe('WeekScreen', () => {
     rerender(
       <WeekScreen
         practiceMatchAllowed={false}
+        opponentName="板橋高中"
         onTrain={onTrain}
         onPracticeMatch={onPracticeMatch}
         lastResult={null}

@@ -20,7 +20,7 @@ const TRAINING_LOAD: Record<TrainingIntensity, number> = {
 
 export type PracticeStrength = 'weak' | 'medium' | 'strong'
 
-const OPPONENT_STRENGTH: Record<PracticeStrength, number> = {
+export const PRACTICE_OPPONENT_STRENGTH: Record<PracticeStrength, number> = {
   weak: 50,
   medium: 65,
   strong: 80,
@@ -83,7 +83,7 @@ export function applyPracticeMatch(
   const rng = createSeededRng(seed)
 
   const teamStrength = computeTeamStrength(roster)
-  const opponentStrength = OPPONENT_STRENGTH[strength]
+  const opponentStrength = PRACTICE_OPPONENT_STRENGTH[strength]
   const winProbability = computeWinProbability(teamStrength, opponentStrength)
   const outcome: 'win' | 'loss' = rng() < winProbability ? 'win' : 'loss'
 

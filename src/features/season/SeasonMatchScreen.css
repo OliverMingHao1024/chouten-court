@@ -32,6 +32,19 @@
   color: var(--accent-strong);
 }
 
+.matchup-card__side--them {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.matchup-card__tier {
+  font-weight: 400;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
 .matchup-card__vs {
   color: var(--text-muted);
   font-size: 0.8rem;

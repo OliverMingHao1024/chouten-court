@@ -16,7 +16,7 @@ export const PHASE_GAME_COUNT: Record<OfficialPhase, number> = {
 }
 
 // 對手強度隨階段遞增(原創配置,尚未依實際隊伍精細調校)。
-const PHASE_OPPONENT_STRENGTH: Record<OfficialPhase, number> = {
+export const PHASE_OPPONENT_STRENGTH: Record<OfficialPhase, number> = {
   qualifying: 55,
   preliminary: 62,
   group: 70,

@@ -1,8 +1,11 @@
+import type { OpponentTier } from '../../domain/opponentTier'
 import './SeasonMatchScreen.css'
 
 export interface SeasonMatchScreenProps {
   gameNumber: number
   totalGamesInPhase: number
+  opponentName: string
+  opponentTier: OpponentTier
   lastResult: string | null
   onPlayGame: () => void
 }
@@ -10,6 +13,8 @@ export interface SeasonMatchScreenProps {
 export function SeasonMatchScreen({
   gameNumber,
   totalGamesInPhase,
+  opponentName,
+  opponentTier,
   lastResult,
   onPlayGame,
 }: SeasonMatchScreenProps) {
@@ -21,7 +26,10 @@ export function SeasonMatchScreen({
       <div className="matchup-card__versus">
         <span className="matchup-card__side matchup-card__side--us">我方</span>
         <span className="matchup-card__vs">VS</span>
-        <span className="matchup-card__side matchup-card__side--them">對手校</span>
+        <span className="matchup-card__side matchup-card__side--them">
+          {opponentName}
+          <span className="matchup-card__tier">{opponentTier}</span>
+        </span>
       </div>
       {lastResult && <p className="result-banner">{lastResult}</p>}
       <button className="button-primary" type="button" onClick={onPlayGame}>
