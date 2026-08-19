@@ -40,4 +40,10 @@ describe('createInitialRoster', () => {
     const ids = new Set(roster.map((p) => p.id))
     expect(ids.size).toBe(roster.length)
   })
+
+  it('does not pin the first five players to a fixed position order', () => {
+    const firstPositions = Array.from({ length: 20 }, (_, seed) => createInitialRoster(seed)[0].position)
+    const distinctFirstPositions = new Set(firstPositions)
+    expect(distinctFirstPositions.size).toBeGreaterThan(1)
+  })
 })

@@ -25,8 +25,17 @@ function randomAttributes(rng: Rng): AttributeSet {
   return attrs
 }
 
+function shuffle<T>(items: readonly T[], rng: Rng): T[] {
+  const result = [...items]
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = randomInt(rng, 0, i)
+    ;[result[i], result[j]] = [result[j], result[i]]
+  }
+  return result
+}
+
 function assignPositions(size: number, rng: Rng): Position[] {
-  const assignments: Position[] = [...POSITIONS]
+  const assignments: Position[] = shuffle(POSITIONS, rng)
   while (assignments.length < size) {
     assignments.push(POSITIONS[randomInt(rng, 0, POSITIONS.length - 1)])
   }

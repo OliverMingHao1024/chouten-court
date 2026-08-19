@@ -18,4 +18,22 @@ describe('App', () => {
     const roster = screen.getAllByRole('listitem')
     expect(roster).toHaveLength(12)
   })
+
+  it('reproduces the same roster when the same seed code is entered again', async () => {
+    async function buildWithSeed() {
+      const user = userEvent.setup()
+      const { unmount } = render(<App />)
+      await user.type(screen.getByLabelText('球隊名稱'), '頂點高中')
+      await user.type(screen.getByLabelText('教練名稱'), '山田')
+      await user.type(screen.getByLabelText('種子碼(選填)'), 'same-luck')
+      await user.click(screen.getByRole('button', { name: '建隊' }))
+      const roster = (await screen.findAllByRole('listitem')).map((item) => item.textContent)
+      unmount()
+      return roster
+    }
+
+    const first = await buildWithSeed()
+    const second = await buildWithSeed()
+    expect(first).toEqual(second)
+  })
 })

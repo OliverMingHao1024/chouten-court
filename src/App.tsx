@@ -17,8 +17,8 @@ function App() {
   if (!team) {
     return (
       <SetupScreen
-        onSubmit={(teamName, coachName) => {
-          const seed = hashSeed(`${teamName}:${coachName}`)
+        onSubmit={(teamName, coachName, seedInput) => {
+          const seed = hashSeed(seedInput ?? `${teamName}:${coachName}`)
           setTeam({ teamName, coachName, players: createInitialRoster(seed) })
         }}
       />
