@@ -1,69 +1,87 @@
-.roster {
+.roster-grid {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
   gap: var(--space-2);
 }
 
-.roster__card {
+.roster-tile {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-}
-
-.roster__card summary {
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-1);
   cursor: pointer;
-  list-style: none;
+  color: inherit;
 }
 
-.roster__card summary::-webkit-details-marker {
-  display: none;
-}
-
-.roster__headline {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.roster__name {
+.roster-tile__name {
+  font-size: 0.65rem;
   font-weight: 700;
-  min-width: 4.5em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
-.roster__position {
-  font-size: 0.75rem;
+.roster-tile__position {
+  font-size: 0.6rem;
   color: var(--text-muted);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 0 var(--space-2);
 }
 
-.roster__style {
-  font-size: 0.75rem;
-  color: var(--accent-strong);
-  flex: 1;
-}
-
-.roster__grade {
+.roster-tile__grade {
   font-weight: 700;
-  font-size: 0.9rem;
+  font-size: 0.75rem;
   color: var(--accent-strong);
   border: 1px solid var(--accent-strong);
   border-radius: 999px;
-  width: 1.8em;
-  height: 1.8em;
+  width: 1.4em;
+  height: 1.4em;
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
-.roster__attributes {
+.roster-dialog {
+  border: none;
+  border-radius: var(--radius);
+  padding: 0;
+  background: var(--bg-elevated);
+  color: var(--text);
+  max-width: min(90vw, 400px);
+}
+
+.roster-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.roster-dialog__content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.roster-dialog__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.roster-dialog__header p {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin-top: 2px;
+}
+
+.roster-dialog__attributes {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-  padding: 0 var(--space-3) var(--space-3);
 }

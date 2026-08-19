@@ -1,7 +1,9 @@
+import { useRef, useState } from 'react'
 import { computeOverallGrade } from '../../domain/attributeGrade'
 import { ATTRIBUTE_MAX } from '../../domain/matchEngine'
 import { ATTRIBUTE_KEYS, ATTRIBUTE_LABELS, type Player } from '../../domain/types'
 import { AttributeBar } from './AttributeBar'
+import { PlayerAvatar } from './PlayerAvatar'
 import './RosterScreen.css'
 
 export interface RosterScreenProps {
@@ -9,30 +11,59 @@ export interface RosterScreenProps {
 }
 
 export function RosterScreen({ players }: RosterScreenProps) {
+  const dialogRef = useRef<HTMLDialogElement>(null)
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null)
+
   return (
-    <ul className="roster">
-      {players.map((player) => (
-        <li key={player.id} className="roster__card">
-          <details>
-            <summary className="roster__headline">
-              <span className="roster__name">{player.name}</span>
-              <span className="roster__position">{player.position}</span>
-              <span className="roster__style">{player.styleTag.label}</span>
-              <span className="roster__grade">{computeOverallGrade(player.attributes)}</span>
-            </summary>
-            <div className="roster__attributes">
+    <div className="roster">
+      <ul className="roster-grid">
+        {players.map((player) => (
+          <li key={player.id}>
+            <button
+              type="button"
+              className="roster-tile"
+              onClick={() => {
+                setSelectedPlayer(player)
+                dialogRef.current?.showModal()
+              }}
+            >
+              <PlayerAvatar seed={player.id} size={56} />
+              <span className="roster-tile__name">{player.name}</span>
+              <span className="roster-tile__position">{player.position}</span>
+              <span className="roster-tile__grade">{computeOverallGrade(player.attributes)}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      <dialog ref={dialogRef} className="roster-dialog" onClick={(e) => e.target === e.currentTarget && dialogRef.current?.close()}>
+        {selectedPlayer && (
+          <div className="roster-dialog__content">
+            <header className="roster-dialog__header">
+              <PlayerAvatar seed={selectedPlayer.id} size={64} />
+              <div>
+                <h3>{selectedPlayer.name}</h3>
+                <p>
+                  {selectedPlayer.position} · {selectedPlayer.styleTag.label}
+                </p>
+              </div>
+            </header>
+            <div className="roster-dialog__attributes">
               {ATTRIBUTE_KEYS.map((key) => (
                 <AttributeBar
                   key={key}
                   label={ATTRIBUTE_LABELS[key]}
-                  value={player.attributes[key]}
+                  value={selectedPlayer.attributes[key]}
                   max={ATTRIBUTE_MAX}
                 />
               ))}
             </div>
-          </details>
-        </li>
-      ))}
-    </ul>
+            <button type="button" className="button-primary" onClick={() => dialogRef.current?.close()}>
+              關閉
+            </button>
+          </div>
+        )}
+      </dialog>
+    </div>
   )
 }
