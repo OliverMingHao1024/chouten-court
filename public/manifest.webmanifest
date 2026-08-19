@@ -1,0 +1,16 @@
+{
+  "name": "頂点コート",
+  "short_name": "頂点コート",
+  "start_url": "/chouten-court/",
+  "scope": "/chouten-court/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/chouten-court/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
