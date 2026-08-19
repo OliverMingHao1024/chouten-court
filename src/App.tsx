@@ -12,7 +12,13 @@ import { createInitialRoster } from './domain/roster'
 import { createSeededRng, hashSeed } from './domain/rng'
 import { advanceSeasonWeek, type SeasonGameLogEntry } from './domain/season'
 import { ATTRIBUTE_LABELS, type Player } from './domain/types'
-import { applyPracticeMatch, applyTraining, type PracticeStrength } from './domain/weeklyAction'
+import {
+  applyPracticeMatch,
+  applyTraining,
+  PRACTICE_STRENGTHS,
+  TRAINING_INTENSITY_LABELS,
+  type PracticeStrength,
+} from './domain/weeklyAction'
 import { RosterScreen } from './features/roster/RosterScreen'
 import { SeasonMatchScreen } from './features/season/SeasonMatchScreen'
 import { SetupScreen } from './features/setup/SetupScreen'
@@ -33,6 +39,14 @@ interface Team {
 function opponentNameForWeek(team: Team): string {
   const rng = createSeededRng(hashSeed(`${team.seed}-${team.totalWeek}-opponent`))
   return generateOpponentName(rng)
+}
+
+function practiceOpponentNamesForWeek(team: Team): Record<PracticeStrength, string> {
+  const entries = PRACTICE_STRENGTHS.map((strength) => {
+    const rng = createSeededRng(hashSeed(`${team.seed}-${team.totalWeek}-opponent-${strength}`))
+    return [strength, generateOpponentName(rng)] as const
+  })
+  return Object.fromEntries(entries) as Record<PracticeStrength, string>
 }
 
 function App() {
@@ -97,15 +111,15 @@ function App() {
     actionPanel = (
       <WeekScreen
         practiceMatchAllowed={practiceMatchAllowed}
-        opponentName={opponentNameForWeek(team)}
+        opponentNames={practiceOpponentNamesForWeek(team)}
         lastResult={team.lastResult}
         onTrain={(attribute, intensity) => {
-          const players = applyTraining(team.players, attribute, intensity)
+          const players = applyTraining(team.players, attribute, intensity, team.seed + team.totalWeek)
           setTeam({
             ...team,
             totalWeek: team.totalWeek + 1,
             players,
-            lastResult: `本週訓練重點:${ATTRIBUTE_LABELS[attribute]}`,
+            lastResult: `本週訓練重點:${ATTRIBUTE_LABELS[attribute]}(${TRAINING_INTENSITY_LABELS[intensity]})`,
           })
         }}
         onPracticeMatch={(strength: PracticeStrength) => {

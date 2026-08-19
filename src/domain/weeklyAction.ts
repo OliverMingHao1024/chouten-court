@@ -5,11 +5,26 @@ import type { AttributeKey, Player, PersonalityKey } from './types'
 
 export type TrainingIntensity = 'light' | 'moderate' | 'intense'
 
-// 強度越高,單週成長越多,但消耗的體力也越多(重訓長期會侵蝕淨疲勞,呼應受傷風險)。
+export const TRAINING_INTENSITIES: TrainingIntensity[] = ['light', 'moderate', 'intense']
+
+// 風險越高,成功時單週成長越多,但成功機率越低、消耗的體力也越多
+// (原創數值,概念參考「保守應對/照常執行/全力一搏」這種三檔風險賭博機制,實際機率/數值皆自行設計)。
 const TRAINING_GROWTH: Record<TrainingIntensity, number> = {
   light: 1,
   moderate: 2,
   intense: 3,
+}
+
+export const TRAINING_SUCCESS_RATE: Record<TrainingIntensity, number> = {
+  light: 0.85,
+  moderate: 0.65,
+  intense: 0.45,
+}
+
+export const TRAINING_INTENSITY_LABELS: Record<TrainingIntensity, string> = {
+  light: '保守應對',
+  moderate: '照常執行',
+  intense: '全力一搏',
 }
 
 const TRAINING_LOAD: Record<TrainingIntensity, number> = {
@@ -19,6 +34,8 @@ const TRAINING_LOAD: Record<TrainingIntensity, number> = {
 }
 
 export type PracticeStrength = 'weak' | 'medium' | 'strong'
+
+export const PRACTICE_STRENGTHS: PracticeStrength[] = ['weak', 'medium', 'strong']
 
 export const PRACTICE_OPPONENT_STRENGTH: Record<PracticeStrength, number> = {
   weak: 50,
@@ -51,16 +68,27 @@ function personalityMultiplier(attribute: AttributeKey, personality: Personality
   return 1.0
 }
 
+export function computeTrainingSuccessGain(
+  intensity: TrainingIntensity,
+  attribute: AttributeKey,
+  personality: PersonalityKey,
+): number {
+  return Math.round(TRAINING_GROWTH[intensity] * personalityMultiplier(attribute, personality))
+}
+
 export function applyTraining(
   roster: Player[],
   attribute: AttributeKey,
   intensity: TrainingIntensity,
+  seed: number,
 ): Player[] {
-  const baseGrowth = TRAINING_GROWTH[intensity]
+  const rng = createSeededRng(seed)
   const load = TRAINING_LOAD[intensity]
+  const successRate = TRAINING_SUCCESS_RATE[intensity]
 
   return roster.map((player) => {
-    const gain = Math.round(baseGrowth * personalityMultiplier(attribute, player.personality))
+    const succeeded = rng() < successRate
+    const gain = succeeded ? computeTrainingSuccessGain(intensity, attribute, player.personality) : 0
     const attributes = {
       ...player.attributes,
       [attribute]: clamp(player.attributes[attribute] + gain, 0, ATTRIBUTE_MAX),

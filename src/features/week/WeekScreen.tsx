@@ -3,6 +3,10 @@ import { getOpponentTier } from '../../domain/opponentTier'
 import { ATTRIBUTE_KEYS, ATTRIBUTE_LABELS, type AttributeKey } from '../../domain/types'
 import {
   PRACTICE_OPPONENT_STRENGTH,
+  PRACTICE_STRENGTHS,
+  TRAINING_INTENSITIES,
+  TRAINING_INTENSITY_LABELS,
+  TRAINING_SUCCESS_RATE,
   type PracticeStrength,
   type TrainingIntensity,
 } from '../../domain/weeklyAction'
@@ -10,13 +14,13 @@ import './WeekScreen.css'
 
 export interface WeekScreenProps {
   practiceMatchAllowed: boolean
-  opponentName: string
+  opponentNames: Record<PracticeStrength, string>
   onTrain: (attribute: AttributeKey, intensity: TrainingIntensity) => void
   onPracticeMatch: (strength: PracticeStrength) => void
   lastResult: string | null
 }
 
-type Mode = 'train' | 'practice'
+type Panel = 'closed' | 'train' | 'practice'
 
 const STRENGTH_LABELS: Record<PracticeStrength, string> = {
   weak: getOpponentTier(PRACTICE_OPPONENT_STRENGTH.weak),
@@ -24,127 +28,93 @@ const STRENGTH_LABELS: Record<PracticeStrength, string> = {
   strong: getOpponentTier(PRACTICE_OPPONENT_STRENGTH.strong),
 }
 
-const INTENSITY_LABELS: Record<TrainingIntensity, string> = {
-  light: '輕',
-  moderate: '中',
-  intense: '重',
-}
 
 export function WeekScreen({
   practiceMatchAllowed,
-  opponentName,
+  opponentNames,
   onTrain,
   onPracticeMatch,
   lastResult,
 }: WeekScreenProps) {
-  const modeGroupName = useId()
   const attributeId = useId()
-  const intensityId = useId()
-  const strengthId = useId()
-
-  const [mode, setMode] = useState<Mode>('train')
+  const [panel, setPanel] = useState<Panel>('closed')
   const [attribute, setAttribute] = useState<AttributeKey>('three')
-  const [intensity, setIntensity] = useState<TrainingIntensity>('moderate')
-  const [strength, setStrength] = useState<PracticeStrength>('medium')
-
-  // Derived, not stored: if the gate closes after "practice" was picked, treat this
-  // render as "train" without needing an effect to resynchronize state.
-  const effectiveMode: Mode = mode === 'practice' && !practiceMatchAllowed ? 'train' : mode
 
   return (
     <section className="week-card">
       {lastResult && <p className="result-banner week-card__result">{lastResult}</p>}
-      <form
-        className="week-card__form"
-        onSubmit={(event) => {
-          event.preventDefault()
-          if (effectiveMode === 'train') onTrain(attribute, intensity)
-          else onPracticeMatch(strength)
-        }}
-      >
-        <div className="week-card__mode">
-          <label className="week-card__mode-option">
-            <input
-              type="radio"
-              name={modeGroupName}
-              value="train"
-              checked={effectiveMode === 'train'}
-              onChange={() => setMode('train')}
-            />
-            訓練
-          </label>
-          <label className="week-card__mode-option">
-            <input
-              type="radio"
-              name={modeGroupName}
-              value="practice"
-              checked={effectiveMode === 'practice'}
-              disabled={!practiceMatchAllowed}
-              onChange={() => setMode('practice')}
-            />
-            練習賽
-          </label>
-        </div>
-        {!practiceMatchAllowed && (
-          <p className="week-card__hint">本週不能安排練習賽(賽季中或即將開打,請專注訓練)。</p>
-        )}
 
-        {effectiveMode === 'train' && (
-          <div className="week-card__fields">
-            <label htmlFor={attributeId}>訓練重點</label>
-            <select
-              id={attributeId}
-              value={attribute}
-              onChange={(event) => setAttribute(event.target.value as AttributeKey)}
-            >
-              {ATTRIBUTE_KEYS.map((key) => (
-                <option key={key} value={key}>
-                  {ATTRIBUTE_LABELS[key]}
-                </option>
-              ))}
-            </select>
-
-            <label htmlFor={intensityId}>訓練強度</label>
-            <select
-              id={intensityId}
-              value={intensity}
-              onChange={(event) => setIntensity(event.target.value as TrainingIntensity)}
-            >
-              {(Object.entries(INTENSITY_LABELS) as [TrainingIntensity, string][]).map(
-                ([key, label]) => (
-                  <option key={key} value={key}>
-                    {label}
-                  </option>
-                ),
-              )}
-            </select>
-          </div>
-        )}
-
-        {effectiveMode === 'practice' && (
-          <div className="week-card__fields">
-            <p className="week-card__opponent">邀約對手:{opponentName}</p>
-            <label htmlFor={strengthId}>對手強度</label>
-            <select
-              id={strengthId}
-              value={strength}
-              onChange={(event) => setStrength(event.target.value as PracticeStrength)}
-            >
-              {(Object.entries(STRENGTH_LABELS) as [PracticeStrength, string][]).map(
-                ([key, label]) => (
-                  <option key={key} value={key}>
-                    {label}
-                  </option>
-                ),
-              )}
-            </select>
-          </div>
-        )}
-
-        <button className="button-primary" type="submit">
-          執行這一週
+      <div className="week-card__entry">
+        <button
+          type="button"
+          className="week-card__entry-button"
+          onClick={() => setPanel(panel === 'train' ? 'closed' : 'train')}
+        >
+          訓練
         </button>
-      </form>
+        <button
+          type="button"
+          className="week-card__entry-button"
+          disabled={!practiceMatchAllowed}
+          onClick={() => setPanel(panel === 'practice' ? 'closed' : 'practice')}
+        >
+          練習賽
+        </button>
+      </div>
+      {!practiceMatchAllowed && (
+        <p className="week-card__hint">本週不能安排練習賽(賽季中或即將開打,請專注訓練)。</p>
+      )}
+
+      {panel === 'train' && (
+        <div className="week-card__panel">
+          <label htmlFor={attributeId}>訓練重點</label>
+          <select
+            id={attributeId}
+            value={attribute}
+            onChange={(event) => setAttribute(event.target.value as AttributeKey)}
+          >
+            {ATTRIBUTE_KEYS.map((key) => (
+              <option key={key} value={key}>
+                {ATTRIBUTE_LABELS[key]}
+              </option>
+            ))}
+          </select>
+
+          <div className="week-card__options">
+            {TRAINING_INTENSITIES.map((intensity) => (
+              <button
+                key={intensity}
+                type="button"
+                className="week-card__option"
+                onClick={() => onTrain(attribute, intensity)}
+              >
+                <span className="week-card__option-label">{TRAINING_INTENSITY_LABELS[intensity]}</span>
+                <span className="week-card__option-rate">
+                  成功率 {Math.round(TRAINING_SUCCESS_RATE[intensity] * 100)}%
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {panel === 'practice' && practiceMatchAllowed && (
+        <div className="week-card__panel">
+          <div className="week-card__options">
+            {PRACTICE_STRENGTHS.map((strength) => (
+              <button
+                key={strength}
+                type="button"
+                className="week-card__option"
+                onClick={() => onPracticeMatch(strength)}
+              >
+                <span className="week-card__option-label">{opponentNames[strength]}</span>
+                <span className="week-card__option-rate">{STRENGTH_LABELS[strength]}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </section>
   )
 }

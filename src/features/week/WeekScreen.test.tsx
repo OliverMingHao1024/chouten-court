@@ -7,7 +7,7 @@ function renderScreen(overrides: Partial<React.ComponentProps<typeof WeekScreen>
   return render(
     <WeekScreen
       practiceMatchAllowed={true}
-      opponentName="板橋高中"
+      opponentNames={{ weak: '板橋高中', medium: '三重高工', strong: '新莊家商' }}
       onTrain={vi.fn()}
       onPracticeMatch={vi.fn()}
       lastResult={null}
@@ -17,81 +17,62 @@ function renderScreen(overrides: Partial<React.ComponentProps<typeof WeekScreen>
 }
 
 describe('WeekScreen', () => {
-  it('submits the chosen training attribute and intensity', async () => {
+  it('starts with the two entry buttons and no sub-options visible', () => {
+    renderScreen()
+    expect(screen.getByRole('button', { name: '訓練' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '練習賽' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /保守應對/ })).not.toBeInTheDocument()
+  })
+
+  it('reveals the attribute picker and 3 risk options after clicking 訓練, and submits on click', async () => {
     const user = userEvent.setup()
     const onTrain = vi.fn()
     renderScreen({ onTrain })
 
-    await user.click(screen.getByRole('radio', { name: '訓練' }))
+    await user.click(screen.getByRole('button', { name: '訓練' }))
     await user.selectOptions(screen.getByLabelText('訓練重點'), '三分')
-    await user.selectOptions(screen.getByLabelText('訓練強度'), '重')
-    await user.click(screen.getByRole('button', { name: '執行這一週' }))
+    await user.click(screen.getByRole('button', { name: /全力一搏/ }))
 
     expect(onTrain).toHaveBeenCalledWith('three', 'intense')
   })
 
-  it('defaults training intensity to moderate', async () => {
+  it('submits the moderate-risk option as 照常執行', async () => {
     const user = userEvent.setup()
     const onTrain = vi.fn()
     renderScreen({ onTrain })
 
-    await user.click(screen.getByRole('radio', { name: '訓練' }))
-    await user.click(screen.getByRole('button', { name: '執行這一週' }))
+    await user.click(screen.getByRole('button', { name: '訓練' }))
+    await user.click(screen.getByRole('button', { name: /照常執行/ }))
 
     expect(onTrain).toHaveBeenCalledWith('three', 'moderate')
   })
 
-  it('submits the chosen practice match strength when allowed', async () => {
+  it('reveals 3 opponent buttons, each a different school, after clicking 練習賽', async () => {
     const user = userEvent.setup()
     const onPracticeMatch = vi.fn()
-    renderScreen({ practiceMatchAllowed: true, onPracticeMatch })
+    renderScreen({
+      onPracticeMatch,
+      opponentNames: { weak: '板橋高中', medium: '三重高工', strong: '新莊家商' },
+    })
 
-    await user.click(screen.getByRole('radio', { name: '練習賽' }))
-    await user.selectOptions(screen.getByLabelText('對手強度'), '名門')
-    await user.click(screen.getByRole('button', { name: '執行這一週' }))
+    await user.click(screen.getByRole('button', { name: '練習賽' }))
+
+    expect(screen.getByRole('button', { name: /板橋高中/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /三重高工/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /新莊家商/ })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /新莊家商/ }))
 
     expect(onPracticeMatch).toHaveBeenCalledWith('strong')
   })
 
-  it('shows the generated opponent school name when practice mode is selected', async () => {
-    const user = userEvent.setup()
-    renderScreen({ practiceMatchAllowed: true, opponentName: '林口商工' })
-
-    await user.click(screen.getByRole('radio', { name: '練習賽' }))
-
-    expect(screen.getByText(/林口商工/)).toBeInTheDocument()
-  })
-
-  it('disables the practice match option when not allowed', () => {
+  it('disables the 練習賽 entry button when not allowed', () => {
     renderScreen({ practiceMatchAllowed: false })
-    expect(screen.getByRole('radio', { name: '練習賽' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '練習賽' })).toBeDisabled()
   })
 
   it('shows the last result message when provided', () => {
     renderScreen({ lastResult: '練習賽獲勝!' })
     expect(screen.getByText('練習賽獲勝!')).toBeInTheDocument()
-  })
-
-  it('does not submit a practice match if the gate closes after the radio was selected', async () => {
-    const user = userEvent.setup()
-    const onPracticeMatch = vi.fn()
-    const onTrain = vi.fn()
-
-    const { rerender } = renderScreen({ practiceMatchAllowed: true, onPracticeMatch, onTrain })
-    await user.click(screen.getByRole('radio', { name: '練習賽' }))
-
-    rerender(
-      <WeekScreen
-        practiceMatchAllowed={false}
-        opponentName="板橋高中"
-        onTrain={onTrain}
-        onPracticeMatch={onPracticeMatch}
-        lastResult={null}
-      />,
-    )
-
-    await user.click(screen.getByRole('button', { name: '執行這一週' }))
-
-    expect(onPracticeMatch).not.toHaveBeenCalled()
   })
 })

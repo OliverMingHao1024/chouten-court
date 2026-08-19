@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { applyTraining, applyPracticeMatch } from '../weeklyAction'
+import {
+  applyTraining,
+  applyPracticeMatch,
+  computeTrainingSuccessGain,
+  TRAINING_SUCCESS_RATE,
+} from '../weeklyAction'
 import { createInitialRoster } from '../roster'
 import { ATTRIBUTE_KEYS, type AttributeSet, type Player } from '../types'
 
@@ -15,13 +20,42 @@ function totalAttributeValue(roster: Player[]): number {
   )
 }
 
+describe('computeTrainingSuccessGain', () => {
+  it('gives a bigger gain to a personality that favours the trained attribute', () => {
+    const geniusGain = computeTrainingSuccessGain('moderate', 'three', 'genius')
+    const steadyGain = computeTrainingSuccessGain('moderate', 'three', 'steady')
+    expect(geniusGain).toBeGreaterThanOrEqual(steadyGain)
+  })
+
+  it('grows with intensity', () => {
+    expect(computeTrainingSuccessGain('light', 'three', 'steady')).toBeLessThan(
+      computeTrainingSuccessGain('moderate', 'three', 'steady'),
+    )
+    expect(computeTrainingSuccessGain('moderate', 'three', 'steady')).toBeLessThan(
+      computeTrainingSuccessGain('intense', 'three', 'steady'),
+    )
+  })
+})
+
+describe('TRAINING_SUCCESS_RATE', () => {
+  it('is higher for lower-risk intensities', () => {
+    expect(TRAINING_SUCCESS_RATE.light).toBeGreaterThan(TRAINING_SUCCESS_RATE.moderate)
+    expect(TRAINING_SUCCESS_RATE.moderate).toBeGreaterThan(TRAINING_SUCCESS_RATE.intense)
+  })
+})
+
 describe('applyTraining', () => {
-  it('raises the chosen attribute for every player and never regresses it', () => {
+  it('is deterministic for the same seed', () => {
+    const roster = createInitialRoster(1)
+    const a = applyTraining(roster, 'three', 'moderate', 42)
+    const b = applyTraining(roster, 'three', 'moderate', 42)
+    expect(a).toEqual(b)
+  })
+
+  it('never regresses the chosen attribute (failure = 0 growth, never negative)', () => {
     const roster = createInitialRoster(1)
     const before = roster.map((p) => p.attributes.three)
-
-    const after = applyTraining(roster, 'three', 'moderate')
-
+    const after = applyTraining(roster, 'three', 'intense', 999)
     after.forEach((player, index) => {
       expect(player.attributes.three).toBeGreaterThanOrEqual(before[index])
     })
@@ -29,47 +63,46 @@ describe('applyTraining', () => {
 
   it('does not change attributes other than the chosen one', () => {
     const roster = createInitialRoster(1)
-    const after = applyTraining(roster, 'three', 'moderate')
-
+    const after = applyTraining(roster, 'three', 'moderate', 42)
     roster.forEach((player, index) => {
       expect(after[index].attributes.shooting).toBe(player.attributes.shooting)
       expect(after[index].attributes.iq).toBe(player.attributes.iq)
     })
   })
 
-  it('gives a bigger boost to players whose personality favours the trained attribute', () => {
-    const roster = createInitialRoster(1)
-    const geniusIndex = roster.findIndex((p) => p.personality === 'genius')
-    const steadyIndex = roster.findIndex((p) => p.personality === 'steady')
-    if (geniusIndex === -1 || steadyIndex === -1) return // seed didn't roll both; skip rather than flake
-
-    const after = applyTraining(roster, 'three', 'moderate')
-    const geniusGain = after[geniusIndex].attributes.three - roster[geniusIndex].attributes.three
-    const steadyGain = after[steadyIndex].attributes.three - roster[steadyIndex].attributes.three
-    expect(geniusGain).toBeGreaterThanOrEqual(steadyGain)
-  })
-
   it('reduces fatigue on light/moderate intensity (net recovery), but not on intense', () => {
     const roster = createInitialRoster(1).map((p) => ({ ...p, fatigue: 40 }))
-    const light = applyTraining(roster, 'three', 'light')
-    const moderate = applyTraining(roster, 'three', 'moderate')
+    const light = applyTraining(roster, 'three', 'light', 1)
+    const moderate = applyTraining(roster, 'three', 'moderate', 1)
+    const intense = applyTraining(roster, 'three', 'intense', 1)
     light.forEach((player) => expect(player.fatigue).toBeLessThan(40))
     moderate.forEach((player) => expect(player.fatigue).toBeLessThanOrEqual(40))
+    intense.forEach((player) => expect(player.fatigue).toBeGreaterThan(40))
   })
 
-  it('grows attributes more and costs more fatigue as intensity increases', () => {
-    const roster = createInitialRoster(1).map((p) => ({ ...p, fatigue: 40, personality: 'steady' as const }))
+  it('fatigue load applies regardless of success or failure', () => {
+    const roster = createInitialRoster(1).map((p) => ({ ...p, fatigue: 40 }))
+    // Fatigue delta only depends on intensity/load, not the success roll, across many seeds.
+    const deltas = new Set(
+      Array.from({ length: 10 }, (_, seed) => applyTraining(roster, 'three', 'intense', seed)[0].fatigue),
+    )
+    expect(deltas.size).toBe(1)
+  })
 
-    const light = applyTraining(roster, 'three', 'light')
-    const moderate = applyTraining(roster, 'three', 'moderate')
-    const intense = applyTraining(roster, 'three', 'intense')
+  it('yields a higher average gain for higher-risk intensity across many rolls (higher EV)', () => {
+    const roster = withUniformAttributes(createInitialRoster(1), 40).map((p) => ({
+      ...p,
+      personality: 'steady' as const,
+    }))
+    const sampleSeeds = Array.from({ length: 200 }, (_, i) => i)
 
-    const gain = (after: Player[]) => after[0].attributes.three - roster[0].attributes.three
-    expect(gain(light)).toBeLessThan(gain(moderate))
-    expect(gain(moderate)).toBeLessThan(gain(intense))
+    const totalGain = (intensity: 'light' | 'intense') =>
+      sampleSeeds.reduce((sum, seed) => {
+        const after = applyTraining(roster, 'three', intensity, seed)
+        return sum + (after[0].attributes.three - roster[0].attributes.three)
+      }, 0)
 
-    expect(light[0].fatigue).toBeLessThan(moderate[0].fatigue)
-    expect(moderate[0].fatigue).toBeLessThan(intense[0].fatigue)
+    expect(totalGain('intense')).toBeGreaterThan(totalGain('light'))
   })
 })
 

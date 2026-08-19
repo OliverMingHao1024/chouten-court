@@ -18,6 +18,15 @@ async function buildTeam(user: ReturnType<typeof userEvent.setup>, seed?: string
   await user.click(screen.getByRole('button', { name: '建隊' }))
 }
 
+// Opens the 訓練 panel once, then trains repeatedly by clicking 照常執行 (the panel
+// stays open across weeks, so only the first click needs to open it).
+async function trainRepeatedly(user: ReturnType<typeof userEvent.setup>, times: number) {
+  await user.click(screen.getByRole('button', { name: '訓練' }))
+  for (let i = 0; i < times; i++) {
+    await user.click(screen.getByRole('button', { name: /照常執行/ }))
+  }
+}
+
 describe('App', () => {
   it('lets the player name the coach, then shows the generated roster', async () => {
     const user = userEvent.setup()
@@ -55,36 +64,32 @@ describe('App', () => {
     await buildTeam(user)
     await screen.findByText('第 1 年 第 1 週')
 
-    await user.click(screen.getByRole('radio', { name: '訓練' }))
+    await user.click(screen.getByRole('button', { name: '訓練' }))
     await user.selectOptions(screen.getByLabelText('訓練重點'), '三分')
-    await user.click(screen.getByRole('button', { name: '執行這一週' }))
+    await user.click(screen.getByRole('button', { name: /照常執行/ }))
 
     expect(await screen.findByText('第 1 年 第 2 週')).toBeInTheDocument()
-    expect(screen.getByText('本週訓練重點:三分')).toBeInTheDocument()
+    expect(screen.getByText('本週訓練重點:三分(照常執行)')).toBeInTheDocument()
   })
 
-  it('switches to the season match screen once the offseason ends, replacing the train/practice form', async () => {
+  it('switches to the season match screen once the offseason ends, replacing the train/practice panel', async () => {
     const user = userEvent.setup()
     await buildTeam(user)
 
     // Fast-forward through the 26-week offseason into the season by training every week.
-    for (let i = 0; i < 26; i++) {
-      await user.click(screen.getByRole('button', { name: '執行這一週' }))
-    }
+    await trainRepeatedly(user, 26)
 
     expect(await screen.findByText('資格賽')).toBeInTheDocument()
     expect(screen.getByText('第 1 / 4 戰')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '開打' })).toBeInTheDocument()
-    expect(screen.queryByRole('radio', { name: '練習賽' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '練習賽' })).not.toBeInTheDocument()
   })
 
   it('plays through official season games and reports each result', async () => {
     const user = userEvent.setup()
     await buildTeam(user)
 
-    for (let i = 0; i < 26; i++) {
-      await user.click(screen.getByRole('button', { name: '執行這一週' }))
-    }
+    await trainRepeatedly(user, 26)
 
     await screen.findByText('第 1 / 4 戰')
     await user.click(screen.getByRole('button', { name: '開打' }))
@@ -96,18 +101,16 @@ describe('App', () => {
     const user = userEvent.setup()
     await buildTeam(user)
 
-    await user.click(screen.getByRole('radio', { name: '練習賽' }))
+    await user.click(screen.getByRole('button', { name: '練習賽' }))
 
-    expect(screen.getByText(OPPONENT_NAME_PATTERN)).toBeInTheDocument()
+    expect(screen.getAllByText(OPPONENT_NAME_PATTERN).length).toBeGreaterThan(0)
   })
 
   it('shows a generated opponent school name and tier for an official season game', async () => {
     const user = userEvent.setup()
     await buildTeam(user)
 
-    for (let i = 0; i < 26; i++) {
-      await user.click(screen.getByRole('button', { name: '執行這一週' }))
-    }
+    await trainRepeatedly(user, 26)
     await screen.findByText('第 1 / 4 戰')
 
     expect(screen.getByText(OPPONENT_NAME_PATTERN)).toBeInTheDocument()
