@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { RosterScreen } from './RosterScreen'
 import type { Player } from '../../domain/types'
@@ -22,8 +23,29 @@ const player: Player = {
 }
 
 describe('RosterScreen', () => {
-  it('shows every attribute value for each player', () => {
+  it('shows a compact row per player with name, position, style, and overall grade', () => {
     render(<RosterScreen players={[player]} />)
+
+    expect(screen.getByText('球員01')).toBeInTheDocument()
+    expect(screen.getByText('PG')).toBeInTheDocument()
+    expect(screen.getByText('組織射手型')).toBeInTheDocument()
+    expect(screen.getByText('C')).toBeInTheDocument() // average(61,72,44,80,55,68,77) ≈ 65.3 -> C
+  })
+
+  it('does not expand the per-attribute breakdown until clicked', () => {
+    render(<RosterScreen players={[player]} />)
+    const details = screen.getByText('球員01').closest('details')
+    expect(details).not.toHaveAttribute('open')
+  })
+
+  it('reveals every attribute value after clicking the row to expand it', async () => {
+    const user = userEvent.setup()
+    render(<RosterScreen players={[player]} />)
+
+    await user.click(screen.getByText('球員01'))
+
+    const details = screen.getByText('球員01').closest('details')
+    expect(details).toHaveAttribute('open')
 
     const expected: Array<[string, number]> = [
       ['投籃', 61],
