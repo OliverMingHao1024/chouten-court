@@ -48,6 +48,18 @@ describe('computeMatchPreview', () => {
     expect(preview.roleFatigueDelta.rotation).toBeGreaterThan(preview.roleFatigueDelta.bench)
   })
 
+  it('bases the role fatigue delta estimate on the roster\'s actual average recovery rate, not a flat constant', () => {
+    const roster = createInitialRoster(1)
+    const lineup = fullLineup(roster)
+    const baseline = computeMatchPreview(roster, lineup, DEFAULT_TACTICS, 'qualifying', testAce)
+
+    // Every player one grade younger recovers faster (see RECOVERY_GRADE_DELTA), so the
+    // estimated net fatigue change after a game should be lower (less bad) than the baseline.
+    const youngerRoster = roster.map((p) => ({ ...p, grade: 1 }))
+    const younger = computeMatchPreview(youngerRoster, lineup, DEFAULT_TACTICS, 'qualifying', testAce)
+    expect(younger.roleFatigueDelta.starter).toBeLessThan(baseline.roleFatigueDelta.starter)
+  })
+
   it('flags high-fatigue players in the lineup as high risk, but not bench players', () => {
     const roster = createInitialRoster(1).map((p, i) => ({
       ...p,

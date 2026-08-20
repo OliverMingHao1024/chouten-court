@@ -1,10 +1,5 @@
 import { lineupRole, type GameLineup } from './lineup'
-import {
-  BASELINE_RECOVERY,
-  computeTeamStrength,
-  computeWinProbability,
-  HIGH_FATIGUE_RISK_THRESHOLD,
-} from './matchEngine'
+import { computeRecoveryRate, computeTeamStrength, computeWinProbability, HIGH_FATIGUE_RISK_THRESHOLD } from './matchEngine'
 import { computeAceStrengthBonus, type OpponentAce } from './opponentAce'
 import {
   isClutchPhase,
@@ -34,7 +29,8 @@ export interface MatchPreview {
   baselineWinProbability: number
   /** 目前戰術主要強化的屬性(權重 > 1 者)。 */
   boostedAttributes: AttributeKey[]
-  /** 先發/輪替/未上場三種角色,本場結束後的預估疲勞淨變化。 */
+  /** 先發/輪替/未上場三種角色,本場結束後的預估疲勞淨變化(以目前名冊的平均恢復力估算,
+   * 實際結算時每位球員仍依各自的恢復力計算,兩者可能有小幅落差)。 */
   roleFatigueDelta: RoleFatigueDelta
   /** 疲勞值已達警戒門檻、賽前應留意受傷風險的球員 id。 */
   highRiskPlayerIds: string[]
@@ -57,6 +53,7 @@ export function computeMatchPreview(
   const restedRoster = roster.map((player) => ({ ...player, fatigue: 0 }))
   const teamStrengthWithoutFatigue = computeTeamStrength(restedRoster, tacticWeights, lineup, clutchActive)
   const opponentStrength = PHASE_OPPONENT_STRENGTH[phase] + computeAceStrengthBonus(opponentAce)
+  const averageRecovery = roster.reduce((sum, player) => sum + computeRecoveryRate(player), 0) / roster.length
 
   return {
     teamStrength,
@@ -66,9 +63,9 @@ export function computeMatchPreview(
     baselineWinProbability: computeWinProbability(teamStrength, opponentStrength),
     boostedAttributes: ATTRIBUTE_KEYS.filter((key) => (tacticWeights[key] ?? 1) > 1),
     roleFatigueDelta: {
-      starter: OFFICIAL_MATCH_LOAD - BASELINE_RECOVERY,
-      rotation: ROTATION_MATCH_LOAD - BASELINE_RECOVERY,
-      bench: -BASELINE_RECOVERY,
+      starter: OFFICIAL_MATCH_LOAD - averageRecovery,
+      rotation: ROTATION_MATCH_LOAD - averageRecovery,
+      bench: -averageRecovery,
     },
     highRiskPlayerIds: roster
       .filter((player) => lineupRole(player.id, lineup) !== 'bench')
