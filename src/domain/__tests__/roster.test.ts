@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { GIVEN_NAMES, SURNAMES } from '../nameGenerator'
 import { createInitialRoster } from '../roster'
 import { POSITIONS } from '../types'
 
@@ -33,6 +34,16 @@ describe('createInitialRoster', () => {
     const a = createInitialRoster(1)
     const b = createInitialRoster(2)
     expect(a).not.toEqual(b)
+  })
+
+  it('gives every player a generated surname+given-name, not a placeholder like 球員01', () => {
+    const roster = createInitialRoster(1)
+    roster.forEach((player) => {
+      expect(player.name).not.toMatch(/^球員\d+$/)
+      const matchedSurname = SURNAMES.find((s) => player.name.startsWith(s))
+      expect(matchedSurname).toBeDefined()
+      expect(GIVEN_NAMES).toContain(player.name.slice(matchedSurname!.length))
+    })
   })
 
   it('assigns unique ids to every player', () => {

@@ -30,7 +30,6 @@ const STRENGTH_LABELS: Record<PracticeStrength, string> = {
   strong: getOpponentTier(PRACTICE_OPPONENT_STRENGTH.strong),
 }
 
-
 export function WeekScreen({
   practiceMatchAllowed,
   opponentNames,

@@ -1,4 +1,4 @@
-import { applyFatigueDelta, ATTRIBUTE_MAX, clamp, computeTeamStrength, computeWinProbability } from './matchEngine'
+import { advancePlayerWeek, ATTRIBUTE_MAX, clamp, computeTeamStrength, computeWinProbability } from './matchEngine'
 import { createSeededRng } from './rng'
 import { computeStyleTag } from './styleTag'
 import type { AttributeKey, Player, PersonalityKey } from './types'
@@ -15,11 +15,23 @@ const TRAINING_GROWTH: Record<TrainingIntensity, number> = {
   intense: 3,
 }
 
-export const TRAINING_SUCCESS_RATE: Record<TrainingIntensity, number> = {
-  light: 0.85,
-  moderate: 0.65,
-  intense: 0.45,
+// 每位球員各自擲一顆 1~6 的骰子;骰到門檻值以上才算成功,強度越高門檻越高。
+export const TRAINING_SUCCESS_ROLL_THRESHOLD: Record<TrainingIntensity, number> = {
+  light: 2,
+  moderate: 3,
+  intense: 4,
 }
+
+// 擲出全場最高的 6 點算「會心一擊」,額外多長一點(依骰子點數給訓練效果,不是純機率黑箱)。
+const CRITICAL_ROLL = 6
+const CRITICAL_BONUS_GAIN = 1
+
+export const TRAINING_SUCCESS_RATE: Record<TrainingIntensity, number> = Object.fromEntries(
+  TRAINING_INTENSITIES.map((intensity) => [
+    intensity,
+    (7 - TRAINING_SUCCESS_ROLL_THRESHOLD[intensity]) / 6,
+  ]),
+) as Record<TrainingIntensity, number>
 
 export const TRAINING_INTENSITY_LABELS: Record<TrainingIntensity, string> = {
   light: '保守應對',
@@ -72,8 +84,17 @@ export function computeTrainingSuccessGain(
   intensity: TrainingIntensity,
   attribute: AttributeKey,
   personality: PersonalityKey,
+  roll: number,
 ): number {
-  return Math.round(TRAINING_GROWTH[intensity] * personalityMultiplier(attribute, personality))
+  const base = Math.round(TRAINING_GROWTH[intensity] * personalityMultiplier(attribute, personality))
+  return base + (roll === CRITICAL_ROLL ? CRITICAL_BONUS_GAIN : 0)
+}
+
+export interface PlayerRoll {
+  playerId: string
+  roll: number
+  succeeded: boolean
+  gain: number
 }
 
 export interface TrainingResult {
@@ -81,6 +102,7 @@ export interface TrainingResult {
   successCount: number
   totalPlayers: number
   totalGain: number
+  rolls: PlayerRoll[]
 }
 
 export function applyTraining(
@@ -91,25 +113,32 @@ export function applyTraining(
 ): TrainingResult {
   const rng = createSeededRng(seed)
   const load = TRAINING_LOAD[intensity]
-  const successRate = TRAINING_SUCCESS_RATE[intensity]
+  const threshold = TRAINING_SUCCESS_ROLL_THRESHOLD[intensity]
 
   let successCount = 0
   let totalGain = 0
+  const rolls: PlayerRoll[] = []
 
   const newRoster = roster.map((player) => {
-    const succeeded = rng() < successRate
-    const gain = succeeded ? computeTrainingSuccessGain(intensity, attribute, player.personality) : 0
+    if (player.injuryStatus === 'minor' || player.injuryStatus === 'major') {
+      return advancePlayerWeek(player, 0, rng, false)
+    }
+
+    const roll = Math.floor(rng() * 6) + 1
+    const succeeded = roll >= threshold
+    const gain = succeeded ? computeTrainingSuccessGain(intensity, attribute, player.personality, roll) : 0
     if (succeeded) successCount += 1
+    rolls.push({ playerId: player.id, roll, succeeded, gain })
 
     const clampedAttribute = clamp(player.attributes[attribute] + gain, 0, ATTRIBUTE_MAX)
     totalGain += clampedAttribute - player.attributes[attribute]
 
     const attributes = { ...player.attributes, [attribute]: clampedAttribute }
     const withAttributes = { ...player, attributes, styleTag: computeStyleTag(attributes) }
-    return applyFatigueDelta(withAttributes, load)
+    return advancePlayerWeek(withAttributes, load, rng, false)
   })
 
-  return { roster: newRoster, successCount, totalPlayers: roster.length, totalGain }
+  return { roster: newRoster, successCount, totalPlayers: roster.length, totalGain, rolls }
 }
 
 export interface PracticeMatchResult {
@@ -130,15 +159,23 @@ export function applyPracticeMatch(
   const outcome: 'win' | 'loss' = rng() < winProbability ? 'win' : 'loss'
 
   const load = PRACTICE_LOAD[strength]
-  let fatiguedRoster = roster.map((player) => applyFatigueDelta(player, load))
+  let fatiguedRoster = roster.map((player) => {
+    if (player.injuryStatus === 'minor' || player.injuryStatus === 'major') {
+      return advancePlayerWeek(player, 0, rng, false)
+    }
+    return advancePlayerWeek(player, load, rng, true)
+  })
 
   const growth = outcome === 'win' ? PRACTICE_WIN_GROWTH[strength] : PRACTICE_LOSS_GROWTH[strength]
-  const beneficiaryCount = outcome === 'win' ? Math.min(2, fatiguedRoster.length) : Math.min(1, fatiguedRoster.length)
+  const eligibleIndices = fatiguedRoster
+    .map((_, index) => index)
+    .filter((index) => fatiguedRoster[index].injuryStatus !== 'minor' && fatiguedRoster[index].injuryStatus !== 'major')
+  const beneficiaryCount = Math.min(outcome === 'win' ? 2 : 1, eligibleIndices.length)
 
-  if (growth > 0) {
+  if (growth > 0 && beneficiaryCount > 0) {
     const indices = new Set<number>()
     while (indices.size < beneficiaryCount) {
-      indices.add(Math.floor(rng() * fatiguedRoster.length))
+      indices.add(eligibleIndices[Math.floor(rng() * eligibleIndices.length)])
     }
     fatiguedRoster = fatiguedRoster.map((player, index) => {
       if (!indices.has(index)) return player

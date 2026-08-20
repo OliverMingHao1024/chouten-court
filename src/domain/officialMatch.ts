@@ -1,5 +1,5 @@
 import { getPhaseWeekRange, type SeasonPhase } from './calendar'
-import { applyFatigueDelta, computeTeamStrength, computeWinProbability } from './matchEngine'
+import { advancePlayerWeek, computeTeamStrength, computeWinProbability } from './matchEngine'
 import { createSeededRng } from './rng'
 import type { Player } from './types'
 
@@ -52,7 +52,12 @@ export function simulateOfficialGame(
   const teamStrength = computeTeamStrength(roster)
   const winProbability = computeWinProbability(teamStrength, PHASE_OPPONENT_STRENGTH[phase])
   const outcome: 'win' | 'loss' = rng() < winProbability ? 'win' : 'loss'
-  const fatiguedRoster = roster.map((player) => applyFatigueDelta(player, OFFICIAL_MATCH_LOAD))
+  const fatiguedRoster = roster.map((player) => {
+    if (player.injuryStatus === 'minor' || player.injuryStatus === 'major') {
+      return advancePlayerWeek(player, 0, rng, false)
+    }
+    return advancePlayerWeek(player, OFFICIAL_MATCH_LOAD, rng, true)
+  })
   return { outcome, roster: fatiguedRoster }
 }
 

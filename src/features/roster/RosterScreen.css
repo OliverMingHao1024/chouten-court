@@ -48,6 +48,44 @@
   justify-content: center;
 }
 
+.roster-tile__injury {
+  font-size: 0.55rem;
+  font-weight: 700;
+  padding: 0 4px;
+  border-radius: 999px;
+  color: white;
+}
+
+.roster-tile__injury--minor {
+  background: var(--warning, #d97706);
+}
+
+.roster-tile__injury--major {
+  background: var(--danger, #dc2626);
+}
+
+.roster-tile__injury--returning {
+  background: var(--text-muted);
+}
+
+.roster-dialog__injury {
+  font-size: 0.8rem;
+  font-weight: 700;
+  margin-top: 4px;
+}
+
+.roster-dialog__injury--minor {
+  color: var(--warning, #d97706);
+}
+
+.roster-dialog__injury--major {
+  color: var(--danger, #dc2626);
+}
+
+.roster-dialog__injury--returning {
+  color: var(--text-muted);
+}
+
 .roster-dialog {
   border: none;
   border-radius: var(--radius);

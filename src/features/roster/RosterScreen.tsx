@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { computeOverallGrade } from '../../domain/attributeGrade'
 import { ATTRIBUTE_MAX } from '../../domain/matchEngine'
-import { ATTRIBUTE_KEYS, ATTRIBUTE_LABELS, type Player } from '../../domain/types'
+import { ATTRIBUTE_KEYS, ATTRIBUTE_LABELS, INJURY_STATUS_LABELS, type Player } from '../../domain/types'
 import { AttributeBar } from './AttributeBar'
 import { PlayerAvatar } from './PlayerAvatar'
 import './RosterScreen.css'
@@ -29,8 +29,15 @@ export function RosterScreen({ players }: RosterScreenProps) {
             >
               <PlayerAvatar seed={player.id} size={56} />
               <span className="roster-tile__name">{player.name}</span>
-              <span className="roster-tile__position">{player.position}</span>
+              <span className="roster-tile__position">
+                {player.position} · 高{player.grade}
+              </span>
               <span className="roster-tile__grade">{computeOverallGrade(player.attributes)}</span>
+              {player.injuryStatus !== 'healthy' && (
+                <span className={`roster-tile__injury roster-tile__injury--${player.injuryStatus}`}>
+                  {INJURY_STATUS_LABELS[player.injuryStatus]}
+                </span>
+              )}
             </button>
           </li>
         ))}
@@ -44,8 +51,15 @@ export function RosterScreen({ players }: RosterScreenProps) {
               <div>
                 <h3>{selectedPlayer.name}</h3>
                 <p>
-                  {selectedPlayer.position} · {selectedPlayer.styleTag.label}
+                  {selectedPlayer.position} · 高{selectedPlayer.grade} · {selectedPlayer.styleTag.label}
                 </p>
+                {selectedPlayer.injuryStatus !== 'healthy' && (
+                  <p className={`roster-dialog__injury roster-dialog__injury--${selectedPlayer.injuryStatus}`}>
+                    {INJURY_STATUS_LABELS[selectedPlayer.injuryStatus]}
+                    {selectedPlayer.injuryWeeksRemaining > 0 &&
+                      `(剩 ${selectedPlayer.injuryWeeksRemaining} 週)`}
+                  </p>
+                )}
               </div>
             </header>
             <div className="roster-dialog__attributes">
