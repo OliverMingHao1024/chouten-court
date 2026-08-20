@@ -9,6 +9,7 @@ function makePlayer(overrides: Partial<Player> = {}): Player {
     id: 'p-1',
     name: '球員01',
     position: 'PG',
+    height: 178,
     attributes: {
       shooting: 61,
       three: 72,
@@ -36,6 +37,13 @@ describe('RosterScreen', () => {
     expect(screen.getByText(/PG/)).toBeInTheDocument()
     expect(screen.getByText('C')).toBeInTheDocument() // average(61,72,44,80,55,68,77) ≈ 65.3 -> C
     expect(screen.queryByText('投籃')).not.toBeInTheDocument()
+  })
+
+  it('shows a fatigue bar below each player avatar in the grid', () => {
+    render(<RosterScreen players={[makePlayer({ fatigue: 80 })]} />)
+
+    const bar = screen.getByRole('progressbar', { name: '疲勞值' })
+    expect(bar).toHaveAttribute('aria-valuenow', '80')
   })
 
   it('opens a dialog with the full attribute breakdown when a block is clicked', async () => {

@@ -9,6 +9,7 @@ function renderScreen(overrides: Partial<React.ComponentProps<typeof WeekScreen>
       practiceMatchAllowed={true}
       opponentNames={{ weak: '板橋高中', medium: '三重高工', strong: '新莊家商' }}
       onTrain={vi.fn()}
+      onTeamRest={vi.fn()}
       onPracticeMatch={vi.fn()}
       lastResult={null}
       trainingRollResult={null}
@@ -18,34 +19,32 @@ function renderScreen(overrides: Partial<React.ComponentProps<typeof WeekScreen>
 }
 
 describe('WeekScreen', () => {
-  it('starts with the two entry buttons and no sub-options visible', () => {
+  it('always shows the attribute picker, the rest button, and the practice-match entry', () => {
     renderScreen()
-    expect(screen.getByRole('button', { name: '訓練' })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: '訓練重點' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '投籃' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '全隊休養' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '練習賽' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /保守應對/ })).not.toBeInTheDocument()
   })
 
-  it('reveals the attribute picker and 3 risk options after clicking 訓練, and submits on click', async () => {
+  it('starts training immediately when an attribute button is clicked, no extra confirmation step', async () => {
     const user = userEvent.setup()
     const onTrain = vi.fn()
     renderScreen({ onTrain })
 
-    await user.click(screen.getByRole('button', { name: '訓練' }))
-    await user.selectOptions(screen.getByLabelText('訓練重點'), '三分')
-    await user.click(screen.getByRole('button', { name: /全力一搏/ }))
+    await user.click(screen.getByRole('button', { name: '三分' }))
 
-    expect(onTrain).toHaveBeenCalledWith('three', 'intense')
+    expect(onTrain).toHaveBeenCalledWith('three')
   })
 
-  it('submits the moderate-risk option as 照常執行', async () => {
+  it('starts team rest immediately when the rest button is clicked', async () => {
     const user = userEvent.setup()
-    const onTrain = vi.fn()
-    renderScreen({ onTrain })
+    const onTeamRest = vi.fn()
+    renderScreen({ onTeamRest })
 
-    await user.click(screen.getByRole('button', { name: '訓練' }))
-    await user.click(screen.getByRole('button', { name: /照常執行/ }))
+    await user.click(screen.getByRole('button', { name: '全隊休養' }))
 
-    expect(onTrain).toHaveBeenCalledWith('three', 'moderate')
+    expect(onTeamRest).toHaveBeenCalledOnce()
   })
 
   it('reveals 3 opponent buttons, each a different school, after clicking 練習賽', async () => {

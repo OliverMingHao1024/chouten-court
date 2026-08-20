@@ -44,7 +44,7 @@ export function RecruitingScreen({ candidates, vacancies, announcement, onConfir
               >
                 <div className="recruiting-card__candidate-name">{candidate.name}</div>
                 <div className="recruiting-card__candidate-meta">
-                  {candidate.position} · {PERSONALITY_LABELS[candidate.personality]}
+                  {candidate.position} · {candidate.height}cm · {PERSONALITY_LABELS[candidate.personality]}
                 </div>
                 <ul className="recruiting-card__ranges">
                   {ATTRIBUTE_KEYS.map((key) => {

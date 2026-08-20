@@ -31,14 +31,28 @@ describe('computeSeasonAwards', () => {
 
 describe('describeSeasonRecord', () => {
   it('mentions the phase and win/loss record', () => {
-    const record: SeasonRecord = { year: 1, wins: 3, losses: 1, finalPhaseReached: 'qualifying', placement: null }
+    const record: SeasonRecord = {
+      year: 1,
+      wins: 3,
+      losses: 1,
+      finalPhaseReached: 'qualifying',
+      placement: null,
+      reputationAfter: 44,
+    }
     const text = describeSeasonRecord(record)
     expect(text).toContain('資格賽')
     expect(text).toContain('3勝1敗')
   })
 
   it('appends the final4 placement when present', () => {
-    const record: SeasonRecord = { year: 1, wins: 5, losses: 1, finalPhaseReached: 'final4', placement: 'champion' }
+    const record: SeasonRecord = {
+      year: 1,
+      wins: 5,
+      losses: 1,
+      finalPhaseReached: 'final4',
+      placement: 'champion',
+      reputationAfter: 70,
+    }
     expect(describeSeasonRecord(record)).toContain('冠軍')
   })
 })

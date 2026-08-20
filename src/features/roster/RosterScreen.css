@@ -112,6 +112,14 @@
   gap: var(--space-3);
 }
 
+.roster-dialog__avatar-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 64px;
+}
+
 .roster-dialog__header p {
   color: var(--text-muted);
   font-size: 0.85rem;

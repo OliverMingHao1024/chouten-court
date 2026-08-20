@@ -3,6 +3,7 @@ import {
   advancePlayerWeek,
   applyFatigueDelta,
   clamp,
+  computeMatchWinProbability,
   computeTeamStrength,
   computeWinProbability,
   rollForInjury,
@@ -11,6 +12,7 @@ import {
 import { createSeededRng } from '../rng'
 import { createInitialRoster } from '../roster'
 import type { Player } from '../types'
+import type { GameLineup } from '../lineup'
 
 describe('clamp', () => {
   it('keeps values within range and clips outliers', () => {
@@ -58,6 +60,16 @@ describe('computeTeamStrength', () => {
     expect(computeTeamStrength(withReturning)).toBeCloseTo(60 - (60 * 0.2) / roster.length, 5)
   })
 
+  it('reduces effective strength for a fatigued player relative to a fresh one', () => {
+    const roster = createInitialRoster(1).map((p) => ({
+      ...p,
+      attributes: { shooting: 60, three: 60, rebound: 60, pass: 60, defense: 60, athletic: 60, iq: 60 },
+    }))
+    const fresh = computeTeamStrength(roster)
+    const withFatigue = roster.map((p, i) => (i === 0 ? { ...p, fatigue: 100 } : p))
+    expect(computeTeamStrength(withFatigue)).toBeLessThan(fresh)
+  })
+
   it('falls back to the full roster if every player is sidelined', () => {
     const roster = createInitialRoster(1).map((p) => ({
       ...p,
@@ -65,6 +77,40 @@ describe('computeTeamStrength', () => {
       injuryStatus: 'major' as const,
     }))
     expect(computeTeamStrength(roster)).toBe(60)
+  })
+
+  it('excludes bench players and weights starters above rotation when a lineup is given', () => {
+    const roster = createInitialRoster(1).map((p, i) => ({
+      ...p,
+      attributes: { shooting: 0, three: 0, rebound: 0, pass: 0, defense: 0, athletic: 0, iq: i === 0 ? 90 : 0 },
+    }))
+    // Only player 0 (the one with a non-zero attribute) is in the lineup, as a starter.
+    const lineup: GameLineup = { starters: [roster[0].id], rotation: [] }
+    expect(computeTeamStrength(roster, undefined, lineup)).toBeCloseTo(90 / 7, 5)
+  })
+
+  it('gives a starter more influence than a rotation player at the same attributes', () => {
+    const roster = createInitialRoster(1).map((p) => ({
+      ...p,
+      attributes: { shooting: 60, three: 60, rebound: 60, pass: 60, defense: 60, athletic: 60, iq: 60 },
+    }))
+    const boosted = roster.map((p, i) =>
+      i === 0 ? { ...p, attributes: { ...p.attributes, iq: 99 } } : p,
+    )
+    const asStarter: GameLineup = { starters: [boosted[0].id, boosted[1].id], rotation: [boosted[2].id] }
+    const asRotation: GameLineup = { starters: [boosted[1].id, boosted[2].id], rotation: [boosted[0].id] }
+    expect(computeTeamStrength(boosted, undefined, asStarter)).toBeGreaterThan(
+      computeTeamStrength(boosted, undefined, asRotation),
+    )
+  })
+
+  it('falls back to an unweighted average when the lineup has no recognized players', () => {
+    const roster = createInitialRoster(1).map((p) => ({
+      ...p,
+      attributes: { shooting: 60, three: 60, rebound: 60, pass: 60, defense: 60, athletic: 60, iq: 60 },
+    }))
+    const emptyLineup: GameLineup = { starters: [], rotation: [] }
+    expect(computeTeamStrength(roster, undefined, emptyLineup)).toBe(60)
   })
 })
 
@@ -98,6 +144,19 @@ describe('rollForInjury', () => {
     }
     expect(sawMinor).toBe(true)
     expect(sawMajor).toBe(true)
+  })
+
+  it('respects a custom major-injury duration range', () => {
+    const roster = createInitialRoster(1)
+    const player: Player = { ...roster[0], fatigue: 100 }
+    const range = { min: 6, max: 9 }
+    for (let seed = 0; seed < 500; seed++) {
+      const result = rollForInjury(player, createSeededRng(seed), range)
+      if (result.injuryStatus === 'major') {
+        expect(result.injuryWeeksRemaining).toBeGreaterThanOrEqual(range.min)
+        expect(result.injuryWeeksRemaining).toBeLessThanOrEqual(range.max)
+      }
+    }
   })
 
   it('injures a fragile personality more often than a non-fragile one at the same fatigue', () => {
@@ -170,6 +229,55 @@ describe('advancePlayerWeek', () => {
       const result = advancePlayerWeek(player, 20, createSeededRng(seed), false)
       expect(result.injuryStatus).toBe('healthy')
     }
+  })
+})
+
+describe('computeMatchWinProbability', () => {
+  it('gives a wider outcome spread for an all-scorer roster than an all-steady roster at the same strength', () => {
+    const roster = createInitialRoster(1).map((p) => ({
+      ...p,
+      attributes: { shooting: 70, three: 70, rebound: 70, pass: 70, defense: 70, athletic: 70, iq: 70 },
+    }))
+    const scorerRoster = roster.map((p) => ({ ...p, personality: 'scorer' as const }))
+    const steadyRoster = roster.map((p) => ({ ...p, personality: 'steady' as const }))
+
+    const winProbabilities = (players: Player[]) =>
+      Array.from({ length: 200 }, (_, seed) => computeMatchWinProbability(players, 70, createSeededRng(seed)))
+
+    const spread = (values: number[]) => Math.max(...values) - Math.min(...values)
+    expect(spread(winProbabilities(scorerRoster))).toBeGreaterThan(spread(winProbabilities(steadyRoster)))
+  })
+
+  it('still centers around 0.5 when team and opponent strength are equal, on average', () => {
+    const roster = createInitialRoster(1).map((p) => ({
+      ...p,
+      attributes: { shooting: 70, three: 70, rebound: 70, pass: 70, defense: 70, athletic: 70, iq: 70 },
+    }))
+    const samples = Array.from({ length: 500 }, (_, seed) =>
+      computeMatchWinProbability(roster, 70, createSeededRng(seed)),
+    )
+    const average = samples.reduce((sum, v) => sum + v, 0) / samples.length
+    expect(average).toBeCloseTo(0.5, 1)
+  })
+
+  it('scopes the personality-driven variance to players actually in the lineup', () => {
+    const roster = createInitialRoster(1).map((p) => ({
+      ...p,
+      attributes: { shooting: 70, three: 70, rebound: 70, pass: 70, defense: 70, athletic: 70, iq: 70 },
+      personality: 'scorer' as const,
+    }))
+    // Bench everyone except one steady player: variance should match an all-steady team, not the scorer-heavy full roster.
+    const mostlyBenched = roster.map((p, i) => (i === 0 ? { ...p, personality: 'steady' as const } : p))
+    const lineup: GameLineup = { starters: [mostlyBenched[0].id], rotation: [] }
+
+    const spread = (values: number[]) => Math.max(...values) - Math.min(...values)
+    const withLineup = Array.from({ length: 200 }, (_, seed) =>
+      computeMatchWinProbability(mostlyBenched, 70, createSeededRng(seed), undefined, lineup),
+    )
+    const wholeRosterOnBench = Array.from({ length: 200 }, (_, seed) =>
+      computeMatchWinProbability(mostlyBenched, 70, createSeededRng(seed)),
+    )
+    expect(spread(withLineup)).toBeLessThan(spread(wholeRosterOnBench))
   })
 })
 

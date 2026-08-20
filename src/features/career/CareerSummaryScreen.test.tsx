@@ -5,8 +5,8 @@ import type { SeasonRecord } from '../../domain/seasonSummary'
 import { CareerSummaryScreen } from './CareerSummaryScreen'
 
 const careerLog: SeasonRecord[] = [
-  { year: 1, wins: 2, losses: 2, finalPhaseReached: 'qualifying', placement: null },
-  { year: 2, wins: 6, losses: 1, finalPhaseReached: 'final4', placement: 'champion' },
+  { year: 1, wins: 2, losses: 2, finalPhaseReached: 'qualifying', placement: null, reputationAfter: 44 },
+  { year: 2, wins: 6, losses: 1, finalPhaseReached: 'final4', placement: 'champion', reputationAfter: 66 },
 ]
 
 describe('CareerSummaryScreen', () => {
@@ -35,7 +35,9 @@ describe('CareerSummaryScreen', () => {
         teamName="淡水高中"
         coachName="山田"
         reason="insuranceCap"
-        careerLog={[{ year: 1, wins: 1, losses: 3, finalPhaseReached: 'qualifying', placement: null }]}
+        careerLog={[
+          { year: 1, wins: 1, losses: 3, finalPhaseReached: 'qualifying', placement: null, reputationAfter: 44 },
+        ]}
         graduateLog={[]}
         onNewCareer={() => {}}
       />,
@@ -43,6 +45,25 @@ describe('CareerSummaryScreen', () => {
 
     expect(screen.getByText('教練生涯屆滿,未能奪冠')).toBeInTheDocument()
     expect(screen.getByText('未曾闖進四強')).toBeInTheDocument()
+  })
+
+  it('renders one reputation-curve bar per season in careerLog', () => {
+    render(
+      <CareerSummaryScreen
+        teamName="淡水高中"
+        coachName="山田"
+        reason="champion"
+        careerLog={careerLog}
+        graduateLog={[]}
+        onNewCareer={() => {}}
+      />,
+    )
+
+    expect(screen.getByText('聲望曲線')).toBeInTheDocument()
+    expect(screen.getByText('44')).toBeInTheDocument()
+    expect(screen.getByText('66')).toBeInTheDocument()
+    expect(screen.getByText('第1年')).toBeInTheDocument()
+    expect(screen.getByText('第2年')).toBeInTheDocument()
   })
 
   it('calls onNewCareer when the button is clicked', async () => {

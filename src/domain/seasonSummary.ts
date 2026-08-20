@@ -9,6 +9,8 @@ export interface SeasonRecord {
   losses: number
   finalPhaseReached: OfficialPhase
   placement: Final4Placement | null
+  /** 該球季結算後的聲望值,用於生涯總結的聲望曲線。 */
+  reputationAfter: number
 }
 
 export interface AwardWinner {

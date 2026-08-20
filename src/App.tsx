@@ -6,8 +6,8 @@ import {
   PHASE_LABELS,
 } from './domain/calendar'
 import { generateOpponentName } from './domain/opponentName'
-import { getOpponentTier } from './domain/opponentTier'
-import { PHASE_GAME_COUNT, PHASE_OPPONENT_STRENGTH, getGameIndexForWeek } from './domain/officialMatch'
+import { generateOpponentAce, opponentAceEraIndex } from './domain/opponentAce'
+import { PHASE_GAME_COUNT, getGameIndexForWeek, type GameGrowthEntry } from './domain/officialMatch'
 import { advanceGrades, describeGraduate } from './domain/graduation'
 import { hasReachedInsuranceCap, isChampionRun, type CareerEndReason } from './domain/career'
 import {
@@ -37,11 +37,10 @@ import { computeStyleTag } from './domain/styleTag'
 import { ATTRIBUTE_LABELS, INJURY_STATUS_LABELS, type AttributeKey, type Player } from './domain/types'
 import {
   applyPracticeMatch,
+  applyTeamRest,
   applyTraining,
   PRACTICE_STRENGTHS,
-  TRAINING_INTENSITY_LABELS,
   type PracticeStrength,
-  type TrainingIntensity,
 } from './domain/weeklyAction'
 import { CareerSummaryScreen } from './features/career/CareerSummaryScreen'
 import { EventScreen } from './features/events/EventScreen'
@@ -132,6 +131,17 @@ function describeNewInjuries(before: Player[], after: Player[]): string {
   )
 }
 
+function describeGameGrowth(roster: Player[], growth: GameGrowthEntry[]): string {
+  if (growth.length === 0) return ''
+  const nameById = new Map(roster.map((player) => [player.id, player.name]))
+  return (
+    ' 實戰成長:' +
+    growth
+      .map((entry) => `${nameById.get(entry.playerId) ?? ''}(${ATTRIBUTE_LABELS[entry.attribute]}+1)`)
+      .join('、')
+  )
+}
+
 interface WeeklyEvent {
   card: EventCard
   featuredPlayer: Player
@@ -150,16 +160,15 @@ function weeklyEventForWeek(team: Team): WeeklyEvent | null {
   return { card, featuredPlayer }
 }
 
-function runTrainingWeek(team: Team, attribute: AttributeKey, intensity: TrainingIntensity) {
-  const result = applyTraining(team.players, attribute, intensity, team.seed + team.totalWeek)
+function runTrainingWeek(team: Team, attribute: AttributeKey) {
+  const result = applyTraining(team.players, attribute, team.seed + team.totalWeek)
   const playerNameById = new Map(team.players.map((player) => [player.id, player.name]))
   return {
     totalWeek: team.totalWeek + 1,
     players: result.roster,
-    lastResult: `本週訓練重點:${ATTRIBUTE_LABELS[attribute]}(${TRAINING_INTENSITY_LABELS[intensity]})`,
+    lastResult: `本週訓練重點:${ATTRIBUTE_LABELS[attribute]}`,
     trainingRollResult: {
       attributeLabel: ATTRIBUTE_LABELS[attribute],
-      intensityLabel: TRAINING_INTENSITY_LABELS[intensity],
       successCount: result.successCount,
       totalPlayers: result.totalPlayers,
       totalGain: result.totalGain,
@@ -169,6 +178,16 @@ function runTrainingWeek(team: Team, attribute: AttributeKey, intensity: Trainin
         succeeded: roll.succeeded,
       })),
     },
+  }
+}
+
+function runTeamRestWeek(team: Team) {
+  const result = applyTeamRest(team.players, team.seed + team.totalWeek)
+  return {
+    totalWeek: team.totalWeek + 1,
+    players: result.roster,
+    lastResult: '本週全隊休養,沒有成長,體力大幅恢復。',
+    trainingRollResult: null,
   }
 }
 
@@ -234,6 +253,7 @@ function App() {
   const { year, weekOfYear } = getCalendarPosition(team.totalWeek)
   const phase = getSeasonPhase(weekOfYear)
   const gameIndex = getGameIndexForWeek(phase, weekOfYear)
+  const opponentAce = generateOpponentAce(hashSeed(`${team.seed}-ace-${opponentAceEraIndex(year)}`))
   const weeklyEvent =
     phase === 'offseason' && gameIndex === null && !team.recruitingCandidates ? weeklyEventForWeek(team) : null
 
@@ -261,14 +281,19 @@ function App() {
         gameNumber={gameIndex + 1}
         totalGamesInPhase={PHASE_GAME_COUNT[phase]}
         opponentName={opponentNameForWeek(team)}
-        opponentTier={getOpponentTier(PHASE_OPPONENT_STRENGTH[phase])}
+        phase={phase}
+        opponentAce={opponentAce}
+        players={team.players}
         lastResult={team.lastResult}
-        onPlayGame={() => {
+        onPlayGame={(tactics, lineup) => {
           const result = advanceSeasonWeek(
             team.players,
             team.totalWeek,
             team.seasonGameLog,
             team.seed + team.totalWeek,
+            tactics,
+            opponentAce,
+            lineup,
           )
           let players = result.roster
           let reputation = team.reputation
@@ -278,24 +303,29 @@ function App() {
           let eraCount = team.eraCount
           let pendingSeasonSummary = team.pendingSeasonSummary
           let careerEnded: CareerEndReason | null = null
-          let message = result.message + describeNewInjuries(team.players, result.roster)
+          let message =
+            result.message +
+            describeNewInjuries(team.players, result.roster) +
+            describeGameGrowth(result.roster, result.growth)
 
           if (result.seasonEnded && result.finalPhaseReached) {
             const seasonYear = getCalendarPosition(team.totalWeek).year
             const seasonGames = [...team.seasonGameLog, result.gameLogEntry].filter(
               (entry) => getCalendarPosition(entry.totalWeek).year === seasonYear,
             )
+            const reputationDelta = computeSeasonReputationDelta(result.finalPhaseReached, result.placement)
+            reputation = applyReputationDelta(reputation, reputationDelta)
+
             const seasonRecord: SeasonRecord = {
               year: seasonYear,
               wins: seasonGames.filter((entry) => entry.outcome === 'win').length,
               losses: seasonGames.filter((entry) => entry.outcome === 'loss').length,
               finalPhaseReached: result.finalPhaseReached,
               placement: result.placement,
+              reputationAfter: reputation,
             }
             careerLog = [...careerLog, seasonRecord]
 
-            const reputationDelta = computeSeasonReputationDelta(result.finalPhaseReached, result.placement)
-            reputation = applyReputationDelta(reputation, reputationDelta)
             pendingSeasonSummary = {
               record: seasonRecord,
               reputationDelta,
@@ -353,6 +383,7 @@ function App() {
     const { card, featuredPlayer } = weeklyEvent
     actionPanel = (
       <EventScreen
+        key={team.totalWeek}
         card={card}
         featuredPlayerName={featuredPlayer.name}
         lastResult={team.lastResult}
@@ -395,8 +426,11 @@ function App() {
         opponentNames={practiceOpponentNamesForWeek(team)}
         lastResult={team.lastResult}
         trainingRollResult={team.trainingRollResult}
-        onTrain={(attribute, intensity) => {
-          setTeam({ ...team, ...runTrainingWeek(team, attribute, intensity) })
+        onTrain={(attribute) => {
+          setTeam({ ...team, ...runTrainingWeek(team, attribute) })
+        }}
+        onTeamRest={() => {
+          setTeam({ ...team, ...runTeamRestWeek(team) })
         }}
         onPracticeMatch={(strength: PracticeStrength) => {
           const result = applyPracticeMatch(team.players, strength, team.seed + team.totalWeek)

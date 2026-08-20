@@ -1,16 +1,17 @@
 .save-controls {
   display: flex;
+  flex-direction: column;
   gap: var(--space-2);
-  padding: 0 var(--space-4) var(--space-2);
-  flex-wrap: wrap;
 }
 
 .save-controls__button {
-  font-size: 0.75rem;
-  padding: 4px 10px;
+  width: 100%;
+  text-align: left;
+  font-size: 0.8rem;
+  padding: var(--space-2) var(--space-3);
   border-radius: var(--radius);
   border: 1px solid var(--border);
-  background: var(--bg-elevated);
+  background: var(--bg);
   color: var(--text-muted);
   cursor: pointer;
 }

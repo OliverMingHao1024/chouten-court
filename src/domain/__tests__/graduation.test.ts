@@ -11,7 +11,7 @@ function withAttributes(player: Player, value: number): Player {
 
 describe('advanceGrades', () => {
   it('increments every player grade by 1', () => {
-    const roster = createInitialRoster(1) // all grade 1
+    const roster = createInitialRoster(1).map((p) => ({ ...p, grade: 1 }))
     const { roster: advanced } = advanceGrades(roster)
     advanced.forEach((player, index) => expect(player.grade).toBe(roster[index].grade + 1))
   })

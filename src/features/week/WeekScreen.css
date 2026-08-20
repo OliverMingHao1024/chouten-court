@@ -43,9 +43,27 @@
   margin-top: var(--space-3);
 }
 
-.week-card__panel label {
+.week-card__panel-label {
   font-size: 0.85rem;
   color: var(--text-muted);
+  margin: 0;
+}
+
+.week-card__attribute-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.week-card__attribute-button {
+  flex: 1 1 calc(33% - var(--space-2));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: inherit;
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.85rem;
+  cursor: pointer;
 }
 
 .week-card__options {

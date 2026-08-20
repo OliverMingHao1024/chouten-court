@@ -5,7 +5,7 @@ import { SeasonSummaryDialog, type SeasonSummaryResult } from './SeasonSummaryDi
 
 function makeResult(overrides: Partial<SeasonSummaryResult> = {}): SeasonSummaryResult {
   return {
-    record: { year: 1, wins: 3, losses: 1, finalPhaseReached: 'qualifying', placement: null },
+    record: { year: 1, wins: 3, losses: 1, finalPhaseReached: 'qualifying', placement: null, reputationAfter: 44 },
     reputationDelta: -6,
     reputationAfter: 44,
     awards: [

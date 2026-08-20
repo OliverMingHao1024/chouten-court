@@ -11,6 +11,7 @@ describe('RecruitingScreen', () => {
 
     candidates.forEach((candidate) => {
       expect(screen.getByText(candidate.name)).toBeInTheDocument()
+      expect(screen.getByText(new RegExp(`${candidate.height}cm`))).toBeInTheDocument()
     })
     expect(screen.getAllByText(/投籃 \d+~\d+/)).toHaveLength(candidates.length)
   })

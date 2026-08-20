@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GIVEN_NAMES, SURNAMES } from '../nameGenerator'
-import { createInitialRoster } from '../roster'
+import { createInitialRoster, HEIGHT_RANGE_BY_POSITION } from '../roster'
 import { POSITIONS } from '../types'
 
 describe('createInitialRoster', () => {
@@ -56,5 +56,27 @@ describe('createInitialRoster', () => {
     const firstPositions = Array.from({ length: 20 }, (_, seed) => createInitialRoster(seed)[0].position)
     const distinctFirstPositions = new Set(firstPositions)
     expect(distinctFirstPositions.size).toBeGreaterThan(1)
+  })
+
+  it('interspersed grades 1~3 evenly across the roster instead of everyone starting at grade 1', () => {
+    const roster = createInitialRoster(1)
+    const countByGrade = { 1: 0, 2: 0, 3: 0 } as Record<1 | 2 | 3, number>
+    for (const player of roster) {
+      expect([1, 2, 3]).toContain(player.grade)
+      countByGrade[player.grade as 1 | 2 | 3] += 1
+    }
+    // 12 players split evenly across 3 grades -> 4 each, so no cohort ever graduates all at once.
+    expect(countByGrade[1]).toBe(4)
+    expect(countByGrade[2]).toBe(4)
+    expect(countByGrade[3]).toBe(4)
+  })
+
+  it('gives every player a height within the range for their position', () => {
+    const roster = createInitialRoster(1)
+    for (const player of roster) {
+      const { min, max } = HEIGHT_RANGE_BY_POSITION[player.position]
+      expect(player.height).toBeGreaterThanOrEqual(min)
+      expect(player.height).toBeLessThanOrEqual(max)
+    }
   })
 })

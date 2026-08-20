@@ -3,6 +3,7 @@ import { computeOverallGrade } from '../../domain/attributeGrade'
 import { ATTRIBUTE_MAX } from '../../domain/matchEngine'
 import { ATTRIBUTE_KEYS, ATTRIBUTE_LABELS, INJURY_STATUS_LABELS, type Player } from '../../domain/types'
 import { AttributeBar } from './AttributeBar'
+import { FatigueBar } from './FatigueBar'
 import { PlayerAvatar } from './PlayerAvatar'
 import './RosterScreen.css'
 
@@ -28,6 +29,7 @@ export function RosterScreen({ players }: RosterScreenProps) {
               }}
             >
               <PlayerAvatar seed={player.id} size={56} />
+              <FatigueBar fatigue={player.fatigue} />
               <span className="roster-tile__name">{player.name}</span>
               <span className="roster-tile__position">
                 {player.position} · 高{player.grade}
@@ -47,11 +49,15 @@ export function RosterScreen({ players }: RosterScreenProps) {
         {selectedPlayer && (
           <div className="roster-dialog__content">
             <header className="roster-dialog__header">
-              <PlayerAvatar seed={selectedPlayer.id} size={64} />
+              <div className="roster-dialog__avatar-column">
+                <PlayerAvatar seed={selectedPlayer.id} size={64} />
+                <FatigueBar fatigue={selectedPlayer.fatigue} />
+              </div>
               <div>
                 <h3>{selectedPlayer.name}</h3>
                 <p>
-                  {selectedPlayer.position} · 高{selectedPlayer.grade} · {selectedPlayer.styleTag.label}
+                  {selectedPlayer.position} · 高{selectedPlayer.grade} · {selectedPlayer.height}cm ·{' '}
+                  {selectedPlayer.styleTag.label}
                 </p>
                 {selectedPlayer.injuryStatus !== 'healthy' && (
                   <p className={`roster-dialog__injury roster-dialog__injury--${selectedPlayer.injuryStatus}`}>

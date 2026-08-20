@@ -50,3 +50,119 @@
   font-size: 0.8rem;
 }
 
+.matchup-card__tactics {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.matchup-card__tactic-group {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: center;
+}
+
+.matchup-card__tactic-button {
+  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  color: inherit;
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.matchup-card__tactic-button--active {
+  border-color: var(--accent-strong);
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.matchup-card__ace {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.matchup-card__preview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--space-3);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.8rem;
+  text-align: left;
+}
+
+.matchup-card__preview p {
+  margin: 0;
+}
+
+.matchup-card__risk-warning {
+  color: var(--danger, #dc2626);
+  font-weight: 700;
+}
+
+.matchup-card__lineup-player-meta {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+.matchup-card__lineup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.matchup-card__lineup-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.matchup-card__lineup-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+}
+
+.matchup-card__lineup-player {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: inherit;
+  padding: var(--space-2);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.matchup-card__lineup-player-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.matchup-card__lineup-player-role {
+  font-size: 0.65rem;
+  color: var(--accent-strong);
+  font-weight: 700;
+  min-height: 1em;
+}
+
+.matchup-card__lineup-player--starter {
+  border-color: var(--accent-strong);
+}
+
+.matchup-card__lineup-player--rotation {
+  border-color: var(--border);
+  opacity: 0.85;
+}
+

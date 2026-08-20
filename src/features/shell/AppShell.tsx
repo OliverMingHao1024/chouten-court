@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import './AppShell.css'
 
 export interface AppShellProps {
@@ -22,6 +22,8 @@ export function AppShell({
   actions,
   children,
 }: AppShellProps) {
+  const [menuOpen, setMenuOpen] = useState(false)
+
   return (
     <div className="app-shell">
       <header className="app-shell__hud">
@@ -37,8 +39,26 @@ export function AppShell({
           </p>
           <p className="app-shell__phase">{phaseLabel}</p>
         </div>
+        {actions && (
+          <div className="app-shell__menu">
+            <button
+              type="button"
+              className="app-shell__menu-toggle"
+              aria-haspopup="true"
+              aria-expanded={menuOpen}
+              aria-label="更多選項"
+              onClick={() => setMenuOpen((open) => !open)}
+            >
+              ⋯
+            </button>
+            {menuOpen && (
+              <div className="app-shell__menu-panel" onClick={() => setMenuOpen(false)}>
+                {actions}
+              </div>
+            )}
+          </div>
+        )}
       </header>
-      {actions}
       <main className="app-shell__content">{children}</main>
     </div>
   )

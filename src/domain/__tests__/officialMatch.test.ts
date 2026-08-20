@@ -1,33 +1,62 @@
 import { describe, expect, it } from 'vitest'
 import {
   PHASE_GAME_COUNT,
+  PHASE_MAJOR_INJURY_WEEKS,
   simulateOfficialGame,
   didAdvancePhase,
   getFinal4Placement,
   getGameIndexForWeek,
 } from '../officialMatch'
 import { getPhaseWeekRange } from '../calendar'
+import { STARTER_COUNT, ROTATION_COUNT, type GameLineup } from '../lineup'
+import { generateOpponentAce } from '../opponentAce'
 import { createInitialRoster } from '../roster'
+import { DEFAULT_TACTICS } from '../tactics'
+import type { Player } from '../types'
+
+const testAce = generateOpponentAce(1)
+
+function fullLineup(roster: Player[]): GameLineup {
+  return {
+    starters: roster.slice(0, STARTER_COUNT).map((p) => p.id),
+    rotation: roster.slice(STARTER_COUNT, STARTER_COUNT + ROTATION_COUNT).map((p) => p.id),
+  }
+}
 
 describe('simulateOfficialGame', () => {
-  it('returns a win/loss outcome and a fatigued roster', () => {
+  it('returns a win/loss outcome and fatigues starters/rotation but not bench players', () => {
     const roster = createInitialRoster(1)
-    const result = simulateOfficialGame(roster, 'qualifying', 7)
+    const lineup = fullLineup(roster)
+    const result = simulateOfficialGame(roster, 'qualifying', 7, DEFAULT_TACTICS, testAce, lineup)
     expect(['win', 'loss']).toContain(result.outcome)
+
     result.roster.forEach((player, index) => {
       // A minor injury force-resets fatigue to 0, so a healthy player is the only case
       // guaranteed to have strictly higher fatigue after playing a game.
-      if (player.injuryStatus === 'healthy') {
+      if (lineup.starters.includes(player.id) && player.injuryStatus === 'healthy') {
         expect(player.fatigue).toBeGreaterThan(roster[index].fatigue)
+      }
+      if (!lineup.starters.includes(player.id) && !lineup.rotation.includes(player.id)) {
+        expect(player.fatigue).toBe(roster[index].fatigue) // bench: fresh at 0, net recovery clamps at 0
       }
     })
   })
 
+  it('gives a starter more match load than a rotation player', () => {
+    const roster = createInitialRoster(1)
+    const lineup: GameLineup = { starters: [roster[0].id], rotation: [roster[1].id] }
+    const result = simulateOfficialGame(roster, 'qualifying', 7, DEFAULT_TACTICS, testAce, lineup)
+    const starterFatigue = result.roster.find((p) => p.id === roster[0].id)!.fatigue
+    const rotationFatigue = result.roster.find((p) => p.id === roster[1].id)!.fatigue
+    expect(starterFatigue).toBeGreaterThan(rotationFatigue)
+  })
+
   it('can trigger a new injury for a player who plays the game', () => {
     const roster = createInitialRoster(1).map((p) => ({ ...p, fatigue: 100 }))
+    const lineup = fullLineup(roster)
     let sawInjury = false
     for (let seed = 0; seed < 200 && !sawInjury; seed++) {
-      const result = simulateOfficialGame(roster, 'qualifying', seed)
+      const result = simulateOfficialGame(roster, 'qualifying', seed, DEFAULT_TACTICS, testAce, lineup)
       sawInjury = result.roster.some((player) => player.injuryStatus !== 'healthy')
     }
     expect(sawInjury).toBe(true)
@@ -37,7 +66,8 @@ describe('simulateOfficialGame', () => {
     const roster = createInitialRoster(1).map((p, i) =>
       i === 0 ? { ...p, injuryStatus: 'minor' as const, injuryWeeksRemaining: 2, fatigue: 50 } : p,
     )
-    const result = simulateOfficialGame(roster, 'qualifying', 7)
+    const lineup = fullLineup(roster)
+    const result = simulateOfficialGame(roster, 'qualifying', 7, DEFAULT_TACTICS, testAce, lineup)
     expect(result.roster[0].injuryStatus).toBe('minor')
     expect(result.roster[0].injuryWeeksRemaining).toBe(1)
     expect(result.roster[0].fatigue).toBeLessThan(50)
@@ -45,17 +75,110 @@ describe('simulateOfficialGame', () => {
 
   it('is deterministic for the same seed', () => {
     const roster = createInitialRoster(1)
-    const a = simulateOfficialGame(roster, 'final4', 42)
-    const b = simulateOfficialGame(roster, 'final4', 42)
+    const lineup = fullLineup(roster)
+    const a = simulateOfficialGame(roster, 'final4', 42, DEFAULT_TACTICS, testAce, lineup)
+    const b = simulateOfficialGame(roster, 'final4', 42, DEFAULT_TACTICS, testAce, lineup)
     expect(a).toEqual(b)
   })
 
-  it('does not grant attribute growth (official games are not training)', () => {
+  it('never grants in-game growth to a bench player (not in the lineup)', () => {
     const roster = createInitialRoster(1)
-    const result = simulateOfficialGame(roster, 'qualifying', 7)
-    result.roster.forEach((player, index) => {
-      expect(player.attributes).toEqual(roster[index].attributes)
-    })
+    const lineup = fullLineup(roster)
+    const benchIds = new Set(roster.map((p) => p.id).filter((id) => !lineup.starters.includes(id) && !lineup.rotation.includes(id)))
+    for (let seed = 0; seed < 100; seed++) {
+      const result = simulateOfficialGame(roster, 'qualifying', seed, DEFAULT_TACTICS, testAce, lineup)
+      expect(result.growth.every((entry) => !benchIds.has(entry.playerId))).toBe(true)
+      result.roster.forEach((player, index) => {
+        if (benchIds.has(player.id)) expect(player.attributes).toEqual(roster[index].attributes)
+      })
+    }
+  })
+})
+
+describe('in-game growth from playing time', () => {
+  it('gives a starter a higher growth rate than a rotation player, across many games', () => {
+    const roster = createInitialRoster(1)
+    const lineup: GameLineup = { starters: [roster[0].id], rotation: [roster[1].id] }
+
+    const trials = 500
+    let starterGrowthCount = 0
+    let rotationGrowthCount = 0
+    for (let seed = 0; seed < trials; seed++) {
+      const result = simulateOfficialGame(roster, 'qualifying', seed, DEFAULT_TACTICS, testAce, lineup)
+      if (result.growth.some((entry) => entry.playerId === roster[0].id)) starterGrowthCount += 1
+      if (result.growth.some((entry) => entry.playerId === roster[1].id)) rotationGrowthCount += 1
+    }
+    expect(starterGrowthCount).toBeGreaterThan(rotationGrowthCount)
+  })
+
+  it('recomputes the style tag when a player gets in-game growth', () => {
+    const roster = createInitialRoster(1)
+    const lineup = fullLineup(roster)
+    let sawGrowth = false
+    for (let seed = 0; seed < 200 && !sawGrowth; seed++) {
+      const result = simulateOfficialGame(roster, 'qualifying', seed, DEFAULT_TACTICS, testAce, lineup)
+      const grown = result.growth[0]
+      if (grown) {
+        sawGrowth = true
+        const player = result.roster.find((p) => p.id === grown.playerId)!
+        const before = roster.find((p) => p.id === grown.playerId)!
+        expect(player.attributes[grown.attribute]).toBe(before.attributes[grown.attribute] + 1)
+      }
+    }
+    expect(sawGrowth).toBe(true)
+  })
+
+  it('is deterministic for the same seed', () => {
+    const roster = createInitialRoster(1)
+    const lineup = fullLineup(roster)
+    const a = simulateOfficialGame(roster, 'qualifying', 7, DEFAULT_TACTICS, testAce, lineup)
+    const b = simulateOfficialGame(roster, 'qualifying', 7, DEFAULT_TACTICS, testAce, lineup)
+    expect(a.growth).toEqual(b.growth)
+  })
+})
+
+describe('opponent ace strength bonus', () => {
+  it('makes a stronger ace harder to beat than a weaker one, all else equal', () => {
+    const roster = createInitialRoster(1)
+    const lineup = fullLineup(roster)
+    const weakAce = { name: '弱王牌', scoring: 70, shooting: 60 }
+    const strongAce = { name: '強王牌', scoring: 99, shooting: 95 }
+
+    let winsAgainstWeak = 0
+    let winsAgainstStrong = 0
+    for (let seed = 0; seed < 300; seed++) {
+      if (simulateOfficialGame(roster, 'qualifying', seed, DEFAULT_TACTICS, weakAce, lineup).outcome === 'win') {
+        winsAgainstWeak += 1
+      }
+      if (simulateOfficialGame(roster, 'qualifying', seed, DEFAULT_TACTICS, strongAce, lineup).outcome === 'win') {
+        winsAgainstStrong += 1
+      }
+    }
+    expect(winsAgainstWeak).toBeGreaterThan(winsAgainstStrong)
+  })
+})
+
+describe('PHASE_MAJOR_INJURY_WEEKS', () => {
+  it('grows the major-injury recovery window from qualifying to final4', () => {
+    expect(PHASE_MAJOR_INJURY_WEEKS.qualifying.min).toBeLessThan(PHASE_MAJOR_INJURY_WEEKS.final4.min)
+    expect(PHASE_MAJOR_INJURY_WEEKS.qualifying.max).toBeLessThan(PHASE_MAJOR_INJURY_WEEKS.final4.max)
+  })
+
+  it('produces major-injury durations within the phase-specific range', () => {
+    const roster = createInitialRoster(1).map((p) => ({ ...p, fatigue: 100 }))
+    const lineup = fullLineup(roster)
+    const range = PHASE_MAJOR_INJURY_WEEKS.final4
+    let sawMajor = false
+    for (let seed = 0; seed < 500; seed++) {
+      const result = simulateOfficialGame(roster, 'final4', seed, DEFAULT_TACTICS, testAce, lineup)
+      const injured = result.roster.find((p) => p.injuryStatus === 'major')
+      if (injured) {
+        sawMajor = true
+        expect(injured.injuryWeeksRemaining).toBeGreaterThanOrEqual(range.min)
+        expect(injured.injuryWeeksRemaining).toBeLessThanOrEqual(range.max)
+      }
+    }
+    expect(sawMajor).toBe(true)
   })
 })
 

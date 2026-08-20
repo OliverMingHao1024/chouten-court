@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { ATTRIBUTE_MAX } from '../matchEngine'
 import { generateCandidatePool, signCandidates } from '../recruiting'
 import { INITIAL_REPUTATION } from '../reputation'
+import { HEIGHT_RANGE_BY_POSITION } from '../roster'
 import { ATTRIBUTE_KEYS } from '../types'
 
 describe('generateCandidatePool', () => {
@@ -28,6 +29,22 @@ describe('generateCandidatePool', () => {
         expect(min).toBeLessThanOrEqual(trueValue)
         expect(max).toBeGreaterThanOrEqual(trueValue)
       }
+    }
+  })
+
+  it('makes the genius personality rare relative to a uniform 1/6 draw', () => {
+    const pool = generateCandidatePool(INITIAL_REPUTATION, 2000, 123)
+    const geniusShare = pool.filter((c) => c.personality === 'genius').length / pool.length
+    expect(geniusShare).toBeLessThan(0.12)
+    expect(geniusShare).toBeGreaterThan(0.02)
+  })
+
+  it('gives every candidate a height within the range for their position', () => {
+    const pool = generateCandidatePool(INITIAL_REPUTATION, 20, 5)
+    for (const candidate of pool) {
+      const { min, max } = HEIGHT_RANGE_BY_POSITION[candidate.position]
+      expect(candidate.height).toBeGreaterThanOrEqual(min)
+      expect(candidate.height).toBeLessThanOrEqual(max)
     }
   })
 
@@ -60,9 +77,10 @@ describe('signCandidates', () => {
     expect(signed.map((p) => p.name)).toEqual([pool[0].name, pool[2].name])
   })
 
-  it('gives the signed player exactly the candidate true attributes', () => {
+  it('gives the signed player exactly the candidate true attributes and height', () => {
     const pool = generateCandidatePool(INITIAL_REPUTATION, 3, 3)
     const [signed] = signCandidates(pool, [pool[0].id])
     expect(signed.attributes).toEqual(pool[0].trueAttributes)
+    expect(signed.height).toBe(pool[0].height)
   })
 })

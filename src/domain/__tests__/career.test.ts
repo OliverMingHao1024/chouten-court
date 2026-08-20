@@ -25,9 +25,9 @@ describe('hasReachedInsuranceCap', () => {
 
 describe('summarizeCareer', () => {
   const records: SeasonRecord[] = [
-    { year: 1, wins: 2, losses: 2, finalPhaseReached: 'qualifying', placement: null },
-    { year: 2, wins: 4, losses: 1, finalPhaseReached: 'final4', placement: 'runnerUp' },
-    { year: 3, wins: 5, losses: 2, finalPhaseReached: 'final4', placement: 'fourth' },
+    { year: 1, wins: 2, losses: 2, finalPhaseReached: 'qualifying', placement: null, reputationAfter: 44 },
+    { year: 2, wins: 4, losses: 1, finalPhaseReached: 'final4', placement: 'runnerUp', reputationAfter: 60 },
+    { year: 3, wins: 5, losses: 2, finalPhaseReached: 'final4', placement: 'fourth', reputationAfter: 68 },
   ]
 
   it('totals wins and losses across every season', () => {
@@ -44,7 +44,7 @@ describe('summarizeCareer', () => {
 
   it('reports null bestPlacement when no season ever reached final4', () => {
     const noFinal4: SeasonRecord[] = [
-      { year: 1, wins: 1, losses: 3, finalPhaseReached: 'qualifying', placement: null },
+      { year: 1, wins: 1, losses: 3, finalPhaseReached: 'qualifying', placement: null, reputationAfter: 44 },
     ]
     expect(summarizeCareer(noFinal4, 'insuranceCap').bestPlacement).toBeNull()
   })

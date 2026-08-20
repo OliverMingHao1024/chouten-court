@@ -1,49 +1,23 @@
-import { advancePlayerWeek, ATTRIBUTE_MAX, clamp, computeTeamStrength, computeWinProbability } from './matchEngine'
+import { advancePlayerWeek, ATTRIBUTE_MAX, clamp, computeMatchWinProbability } from './matchEngine'
 import { createSeededRng } from './rng'
 import { computeStyleTag } from './styleTag'
 import type { AttributeKey, Player, PersonalityKey } from './types'
 
-export type TrainingIntensity = 'light' | 'moderate' | 'intense'
-
-export const TRAINING_INTENSITIES: TrainingIntensity[] = ['light', 'moderate', 'intense']
-
-// 風險越高,成功時單週成長越多,但成功機率越低、消耗的體力也越多
-// (原創數值,概念參考「保守應對/照常執行/全力一搏」這種三檔風險賭博機制,實際機率/數值皆自行設計)。
-const TRAINING_GROWTH: Record<TrainingIntensity, number> = {
-  light: 1,
-  moderate: 2,
-  intense: 3,
+// 訓練不再分風險強度,單一動作、固定負荷;成長量直接依骰子點數對應,不是另外判定成功/失敗
+// (原創數值,待調校):1點不成長,2~3點小幅成長,4~5點中幅成長,6點(會心一擊)成長最多。
+const ROLL_GROWTH: Record<number, number> = {
+  1: 0,
+  2: 1,
+  3: 1,
+  4: 2,
+  5: 2,
+  6: 3,
 }
 
-// 每位球員各自擲一顆 1~6 的骰子;骰到門檻值以上才算成功,強度越高門檻越高。
-export const TRAINING_SUCCESS_ROLL_THRESHOLD: Record<TrainingIntensity, number> = {
-  light: 2,
-  moderate: 3,
-  intense: 4,
-}
+const TRAINING_LOAD = 8
 
-// 擲出全場最高的 6 點算「會心一擊」,額外多長一點(依骰子點數給訓練效果,不是純機率黑箱)。
-const CRITICAL_ROLL = 6
-const CRITICAL_BONUS_GAIN = 1
-
-export const TRAINING_SUCCESS_RATE: Record<TrainingIntensity, number> = Object.fromEntries(
-  TRAINING_INTENSITIES.map((intensity) => [
-    intensity,
-    (7 - TRAINING_SUCCESS_ROLL_THRESHOLD[intensity]) / 6,
-  ]),
-) as Record<TrainingIntensity, number>
-
-export const TRAINING_INTENSITY_LABELS: Record<TrainingIntensity, string> = {
-  light: '保守應對',
-  moderate: '照常執行',
-  intense: '全力一搏',
-}
-
-const TRAINING_LOAD: Record<TrainingIntensity, number> = {
-  light: 4,
-  moderate: 8,
-  intense: 16,
-}
+// 全隊休養:不練習、沒有成長,換取確定且比訓練更大的體力恢復(原創數值,待調校)。
+const TEAM_REST_LOAD = -10
 
 export type PracticeStrength = 'weak' | 'medium' | 'strong'
 
@@ -80,14 +54,8 @@ function personalityMultiplier(attribute: AttributeKey, personality: Personality
   return 1.0
 }
 
-export function computeTrainingSuccessGain(
-  intensity: TrainingIntensity,
-  attribute: AttributeKey,
-  personality: PersonalityKey,
-  roll: number,
-): number {
-  const base = Math.round(TRAINING_GROWTH[intensity] * personalityMultiplier(attribute, personality))
-  return base + (roll === CRITICAL_ROLL ? CRITICAL_BONUS_GAIN : 0)
+export function computeTrainingRollGain(attribute: AttributeKey, personality: PersonalityKey, roll: number): number {
+  return Math.round(ROLL_GROWTH[roll] * personalityMultiplier(attribute, personality))
 }
 
 export interface PlayerRoll {
@@ -105,15 +73,8 @@ export interface TrainingResult {
   rolls: PlayerRoll[]
 }
 
-export function applyTraining(
-  roster: Player[],
-  attribute: AttributeKey,
-  intensity: TrainingIntensity,
-  seed: number,
-): TrainingResult {
+export function applyTraining(roster: Player[], attribute: AttributeKey, seed: number): TrainingResult {
   const rng = createSeededRng(seed)
-  const load = TRAINING_LOAD[intensity]
-  const threshold = TRAINING_SUCCESS_ROLL_THRESHOLD[intensity]
 
   let successCount = 0
   let totalGain = 0
@@ -124,9 +85,10 @@ export function applyTraining(
       return advancePlayerWeek(player, 0, rng, false)
     }
 
+    // 每位可訓練球員各自擲一顆 1~6 的骰子,成長量直接依點數對應,不是額外判定成功/失敗。
     const roll = Math.floor(rng() * 6) + 1
-    const succeeded = roll >= threshold
-    const gain = succeeded ? computeTrainingSuccessGain(intensity, attribute, player.personality, roll) : 0
+    const gain = computeTrainingRollGain(attribute, player.personality, roll)
+    const succeeded = gain > 0
     if (succeeded) successCount += 1
     rolls.push({ playerId: player.id, roll, succeeded, gain })
 
@@ -135,10 +97,26 @@ export function applyTraining(
 
     const attributes = { ...player.attributes, [attribute]: clampedAttribute }
     const withAttributes = { ...player, attributes, styleTag: computeStyleTag(attributes) }
-    return advancePlayerWeek(withAttributes, load, rng, false)
+    return advancePlayerWeek(withAttributes, TRAINING_LOAD, rng, false)
   })
 
   return { roster: newRoster, successCount, totalPlayers: roster.length, totalGain, rolls }
+}
+
+export interface TeamRestResult {
+  roster: Player[]
+}
+
+/** 全隊休養:不練習、沒有成長,換取確定且比訓練更大的體力恢復。 */
+export function applyTeamRest(roster: Player[], seed: number): TeamRestResult {
+  const rng = createSeededRng(seed)
+  const newRoster = roster.map((player) => {
+    if (player.injuryStatus === 'minor' || player.injuryStatus === 'major') {
+      return advancePlayerWeek(player, 0, rng, false)
+    }
+    return advancePlayerWeek(player, TEAM_REST_LOAD, rng, false)
+  })
+  return { roster: newRoster }
 }
 
 export interface PracticeMatchResult {
@@ -153,9 +131,8 @@ export function applyPracticeMatch(
 ): PracticeMatchResult {
   const rng = createSeededRng(seed)
 
-  const teamStrength = computeTeamStrength(roster)
   const opponentStrength = PRACTICE_OPPONENT_STRENGTH[strength]
-  const winProbability = computeWinProbability(teamStrength, opponentStrength)
+  const winProbability = computeMatchWinProbability(roster, opponentStrength, rng)
   const outcome: 'win' | 'loss' = rng() < winProbability ? 'win' : 'loss'
 
   const load = PRACTICE_LOAD[strength]

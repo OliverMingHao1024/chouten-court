@@ -6,8 +6,12 @@ import {
   getGameIndexForWeek,
   simulateOfficialGame,
   type Final4Placement,
+  type GameGrowthEntry,
   type OfficialPhase,
 } from './officialMatch'
+import type { GameLineup } from './lineup'
+import type { OpponentAce } from './opponentAce'
+import type { GameTactics } from './tactics'
 import type { Player } from './types'
 
 export interface SeasonGameLogEntry {
@@ -27,6 +31,8 @@ export interface AdvanceSeasonWeekResult {
   finalPhaseReached: OfficialPhase | null
   /** 只有打進四強賽才會有名次,其他階段止步一律為 null。 */
   placement: Final4Placement | null
+  /** 本場依出賽角色取得實戰成長的球員清單。 */
+  growth: GameGrowthEntry[]
 }
 
 export const FINAL4_PLACEMENT_LABEL: Record<ReturnType<typeof getFinal4Placement>, string> = {
@@ -46,6 +52,9 @@ export function advanceSeasonWeek(
   totalWeek: number,
   gameLog: SeasonGameLogEntry[],
   seed: number,
+  tactics: GameTactics,
+  opponentAce: OpponentAce,
+  lineup: GameLineup,
 ): AdvanceSeasonWeekResult {
   const { year, weekOfYear } = getCalendarPosition(totalWeek)
   const phase = getSeasonPhase(weekOfYear)
@@ -57,7 +66,14 @@ export function advanceSeasonWeek(
     throw new Error(`week ${weekOfYear} has no official game scheduled in phase ${phase}`)
   }
 
-  const { outcome, roster: fatiguedRoster } = simulateOfficialGame(roster, phase, seed)
+  const { outcome, roster: fatiguedRoster, growth } = simulateOfficialGame(
+    roster,
+    phase,
+    seed,
+    tactics,
+    opponentAce,
+    lineup,
+  )
   const gameLogEntry: SeasonGameLogEntry = { totalWeek, phase, outcome }
 
   const isLastGameOfPhase = gameIndex === PHASE_GAME_COUNT[phase] - 1
@@ -71,6 +87,7 @@ export function advanceSeasonWeek(
       seasonEnded: false,
       finalPhaseReached: null,
       placement: null,
+      growth,
     }
   }
 
@@ -89,6 +106,7 @@ export function advanceSeasonWeek(
       seasonEnded: true,
       finalPhaseReached: phase,
       placement,
+      growth,
     }
   }
 
@@ -106,5 +124,6 @@ export function advanceSeasonWeek(
     seasonEnded: !advanced,
     finalPhaseReached: advanced ? null : phase,
     placement: null,
+    growth,
   }
 }

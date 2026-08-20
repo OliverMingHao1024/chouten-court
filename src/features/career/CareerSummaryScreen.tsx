@@ -53,6 +53,24 @@ export function CareerSummaryScreen({
         </div>
       </dl>
 
+      {careerLog.length > 0 && (
+        <div className="career-summary__reputation-curve">
+          <h2>聲望曲線</h2>
+          <ol>
+            {careerLog.map((record) => {
+              const height = Math.max(4, Math.round((record.reputationAfter / 100) * 100))
+              return (
+                <li key={record.year}>
+                  <span className="career-summary__reputation-bar" style={{ height: `${height}%` }} />
+                  <span className="career-summary__reputation-value">{record.reputationAfter}</span>
+                  <span className="career-summary__reputation-year">第{record.year}年</span>
+                </li>
+              )
+            })}
+          </ol>
+        </div>
+      )}
+
       {graduateLog.length > 0 && (
         <div className="career-summary__hall-of-fame">
           <h2>畢業生後日談精華</h2>

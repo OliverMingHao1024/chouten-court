@@ -6,7 +6,7 @@ import type { SeasonRecord, SeasonSummaryResult } from './seasonSummary'
 import { ATTRIBUTE_KEYS, INJURY_STATUSES, PERSONALITY_KEYS, POSITIONS, STYLE_KEYS, type Player } from './types'
 
 export const SAVE_STORAGE_KEY = 'chouten-court:save'
-export const SAVE_FORMAT_VERSION = 5
+export const SAVE_FORMAT_VERSION = 7
 
 const OFFICIAL_PHASES = Object.keys(PHASE_GAME_COUNT)
 const FINAL4_PLACEMENTS = ['champion', 'runnerUp', 'third', 'fourth']
@@ -39,6 +39,7 @@ function isValidPlayer(value: unknown): value is Player {
   if (!isPlainObject(value)) return false
   if (typeof value.id !== 'string' || typeof value.name !== 'string') return false
   if (typeof value.position !== 'string' || !(POSITIONS as readonly string[]).includes(value.position)) return false
+  if (typeof value.height !== 'number') return false
 
   if (!isPlainObject(value.attributes)) return false
   for (const key of ATTRIBUTE_KEYS) {
@@ -74,6 +75,7 @@ function isValidCandidate(value: unknown): value is Candidate {
   if (!isPlainObject(value)) return false
   if (typeof value.id !== 'string' || typeof value.name !== 'string') return false
   if (typeof value.position !== 'string' || !(POSITIONS as readonly string[]).includes(value.position)) return false
+  if (typeof value.height !== 'number') return false
   if (typeof value.personality !== 'string' || !(PERSONALITY_KEYS as readonly string[]).includes(value.personality)) {
     return false
   }
@@ -105,6 +107,7 @@ function isValidSeasonRecord(value: unknown): value is SeasonRecord {
   if (typeof value.wins !== 'number' || typeof value.losses !== 'number') return false
   if (typeof value.finalPhaseReached !== 'string' || !OFFICIAL_PHASES.includes(value.finalPhaseReached)) return false
   if (value.placement !== null && !FINAL4_PLACEMENTS.includes(value.placement as string)) return false
+  if (typeof value.reputationAfter !== 'number') return false
   return true
 }
 

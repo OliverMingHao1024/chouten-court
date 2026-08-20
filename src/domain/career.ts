@@ -1,9 +1,10 @@
 import type { Final4Placement } from './officialMatch'
 import type { SeasonRecord } from './seasonSummary'
 
-// spec 原文寫「6屆(約18年,約650週)」為粗略 flavor 敘述;實作以「屆數」(每次全隊畢業算一屆)
-// 為準,與批次畢業/招生的機制邊界一致,不追週數精算。
-export const INSURANCE_MAX_ERAS = 6
+// spec 原文寫「6屆(約18年,約650週)」為粗略 flavor 敘述。名冊高一到高三交錯分佈(不留級)後,
+// 畢業不再是全隊同批發生,而是幾乎每年都有球員畢業;因此「屆」改為「只要當年有人畢業就算一屆」,
+// 上限也對應從 6 調整為 18,延續原本「約 18 年」的生涯長度精神,不追週數精算。
+export const INSURANCE_MAX_ERAS = 18
 
 export type CareerEndReason = 'champion' | 'insuranceCap'
 

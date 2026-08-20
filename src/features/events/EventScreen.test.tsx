@@ -37,4 +37,18 @@ describe('EventScreen', () => {
     await user.click(screen.getByText(card.choices[1].label))
     expect(onChoose).toHaveBeenCalledWith(card.choices[1].risk)
   })
+
+  it('locks all choices after the first one is picked, so a fast double-click cannot resolve the same event twice', async () => {
+    const user = userEvent.setup()
+    const onChoose = vi.fn()
+    render(<EventScreen card={card} featuredPlayerName="小明" lastResult={null} onChoose={onChoose} />)
+
+    const firstChoice = screen.getByRole('button', { name: new RegExp(card.choices[0].label) })
+    await user.click(firstChoice)
+    await user.click(firstChoice)
+    await user.click(screen.getByRole('button', { name: new RegExp(card.choices[1].label) }))
+
+    expect(onChoose).toHaveBeenCalledOnce()
+    screen.getAllByRole('button').forEach((button) => expect(button).toBeDisabled())
+  })
 })

@@ -71,6 +71,8 @@ export interface Player {
   id: string
   name: string
   position: Position
+  /** 身高(公分),純展示用資訊,不影響任何屬性/比賽計算。 */
+  height: number
   attributes: AttributeSet
   personality: PersonalityKey
   fatigue: number

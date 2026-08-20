@@ -3,11 +3,15 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { getCalendarPosition } from './domain/calendar'
+import { INSURANCE_MAX_ERAS } from './domain/career'
 import { simulateOfficialGame } from './domain/officialMatch'
+import { generateOpponentAce, opponentAceEraIndex } from './domain/opponentAce'
 import { REGIONS, SUFFIXES } from './domain/opponentName'
 import { OPPONENT_TIERS } from './domain/opponentTier'
+import { hashSeed } from './domain/rng'
 import { createInitialRoster, ROSTER_SIZE } from './domain/roster'
 import { SAVE_FORMAT_VERSION, SAVE_STORAGE_KEY } from './domain/saveData'
+import { DEFAULT_TACTICS } from './domain/tactics'
 import { ATTRIBUTE_KEYS, type AttributeSet } from './domain/types'
 
 const OPPONENT_NAME_PATTERN = new RegExp(`(${REGIONS.join('|')})(${SUFFIXES.join('|')})`)
@@ -64,7 +68,7 @@ async function resolveLeadingEvents(user: ReturnType<typeof userEvent.setup>) {
   }
 }
 
-// Advances exactly `times` weeks by training (照常執行) every week, transparently
+// Advances exactly `times` weeks by training (三分) every week, transparently
 // resolving any random event that appears instead of the train/practice panel on a
 // given week (an event still consumes that week, same as training does).
 async function trainRepeatedly(user: ReturnType<typeof userEvent.setup>, times: number) {
@@ -74,12 +78,7 @@ async function trainRepeatedly(user: ReturnType<typeof userEvent.setup>, times: 
       await user.click(eventChoice)
       continue
     }
-    // Each risk tier now renders two buttons (run now / add to plan); the run-now
-    // button is the one whose accessible name also shows the success rate.
-    if (!screen.queryByRole('button', { name: /照常執行/ })) {
-      await user.click(screen.getByRole('button', { name: '訓練' }))
-    }
-    await user.click(screen.getByRole('button', { name: /照常執行/ }))
+    await user.click(screen.getByRole('button', { name: '三分' }))
   }
 }
 
@@ -120,11 +119,19 @@ describe('App', () => {
     await buildTeam(user)
     await resolveLeadingEvents(user)
 
-    await user.click(screen.getByRole('button', { name: '訓練' }))
-    await user.selectOptions(screen.getByLabelText('訓練重點'), '三分')
-    await user.click(screen.getByRole('button', { name: /照常執行/ }))
+    await user.click(screen.getByRole('button', { name: '三分' }))
 
-    expect(screen.getByText('本週訓練重點:三分(照常執行)')).toBeInTheDocument()
+    expect(screen.getByText('本週訓練重點:三分')).toBeInTheDocument()
+  })
+
+  it('advances the week and reports the result after a team-rest week', async () => {
+    const user = userEvent.setup()
+    await buildTeam(user)
+    await resolveLeadingEvents(user)
+
+    await user.click(screen.getByRole('button', { name: '全隊休養' }))
+
+    expect(screen.getByText('本週全隊休養,沒有成長,體力大幅恢復。')).toBeInTheDocument()
   })
 
   it('switches to the season match screen once the offseason ends, replacing the train/practice panel', async () => {
@@ -191,6 +198,7 @@ describe('App', () => {
     const user = userEvent.setup()
     const { unmount } = await buildTeam(user)
 
+    await user.click(screen.getByRole('button', { name: '更多選項' }))
     await user.click(screen.getByRole('button', { name: '重新開始' }))
 
     expect(await screen.findByLabelText('教練名稱')).toBeInTheDocument()
@@ -205,6 +213,7 @@ describe('App', () => {
     const user = userEvent.setup()
     await buildTeam(user)
 
+    await user.click(screen.getByRole('button', { name: '更多選項' }))
     await user.click(screen.getByRole('button', { name: '重新開始' }))
 
     expect(screen.queryByLabelText('教練名稱')).not.toBeInTheDocument()
@@ -232,7 +241,7 @@ describe('App', () => {
 
     expect(screen.queryByRole('heading', { name: `招生 — 選出 ${ROSTER_SIZE} 名新生` })).not.toBeInTheDocument()
     expect(await screen.findByText('第 4 年 第 1 週')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '訓練' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '全隊休養' })).toBeInTheDocument()
   })
 
   it('ends the career and shows the champion summary when the team wins the final4 final', async () => {
@@ -241,8 +250,23 @@ describe('App', () => {
 
     // find a `teamSeed` (= save.seed + LAST_YEAR3_FINAL4_WEEK) that resolves the deciding
     // final4 game as a win, so the semifinal-win-already-logged scenario ends in a championship.
+    // The opponent ace is derived purely from (team seed, career year) — year is always 3 here
+    // (fixed by LAST_YEAR3_FINAL4_WEEK), so it must be recomputed for each candidate team seed.
+    const aceEraIndex = opponentAceEraIndex(getCalendarPosition(LAST_YEAR3_FINAL4_WEEK).year)
+    const lineup = {
+      starters: players.slice(0, 5).map((p) => p.id),
+      rotation: players.slice(5, 8).map((p) => p.id),
+    }
     let engineSeed = 0
-    while (simulateOfficialGame(players, 'final4', engineSeed).outcome !== 'win') engineSeed++
+    let teamSeed = engineSeed - LAST_YEAR3_FINAL4_WEEK
+    let opponentAce = generateOpponentAce(hashSeed(`${teamSeed}-ace-${aceEraIndex}`))
+    while (
+      simulateOfficialGame(players, 'final4', engineSeed, DEFAULT_TACTICS, opponentAce, lineup).outcome !== 'win'
+    ) {
+      engineSeed++
+      teamSeed = engineSeed - LAST_YEAR3_FINAL4_WEEK
+      opponentAce = generateOpponentAce(hashSeed(`${teamSeed}-ace-${aceEraIndex}`))
+    }
 
     window.localStorage.setItem(
       SAVE_STORAGE_KEY,
@@ -250,7 +274,7 @@ describe('App', () => {
         version: SAVE_FORMAT_VERSION,
         teamName: '淡水高中',
         coachName: '山田',
-        seed: engineSeed - LAST_YEAR3_FINAL4_WEEK,
+        seed: teamSeed,
         totalWeek: LAST_YEAR3_FINAL4_WEEK,
         players,
         lastResult: null,
@@ -296,7 +320,7 @@ describe('App', () => {
         graduateLog: [],
         recruitingCandidates: null,
         careerLog: [],
-        eraCount: 5,
+        eraCount: INSURANCE_MAX_ERAS - 1,
         pendingSeasonSummary: null,
         careerEnded: null,
       }),

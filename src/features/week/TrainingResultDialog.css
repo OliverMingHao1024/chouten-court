@@ -4,7 +4,7 @@
   padding: 0;
   background: var(--bg-elevated);
   color: var(--text);
-  max-width: min(90vw, 360px);
+  max-width: min(90vw, 380px);
 }
 
 .training-result-dialog::backdrop {
@@ -25,52 +25,121 @@
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 4px;
-  max-width: 260px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-2) 6px;
+  max-width: 320px;
 }
 
-.training-result-dialog__die {
-  font-size: 1.6rem;
-  line-height: 1;
-  text-align: center;
+.training-result-dialog__die-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.training-result-dialog__die-name {
+  font-size: 0.6rem;
   color: var(--text-muted);
-  opacity: 0.55;
-  animation: training-result-dice-roll 0.4s ease-out;
-  animation-fill-mode: backwards;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
-.training-result-dialog__die--success {
+.training-result-dialog__die-slot--success .training-result-dialog__die-name {
   color: var(--accent-strong);
-  opacity: 1;
+  font-weight: 700;
 }
 
-.training-result-dialog__dice-grid li:nth-child(1) {
-  animation-delay: 0.02s;
-}
-.training-result-dialog__dice-grid li:nth-child(2) {
-  animation-delay: 0.04s;
-}
-.training-result-dialog__dice-grid li:nth-child(3) {
-  animation-delay: 0.06s;
-}
-.training-result-dialog__dice-grid li:nth-child(4) {
-  animation-delay: 0.08s;
-}
-.training-result-dialog__dice-grid li:nth-child(5) {
-  animation-delay: 0.1s;
-}
-.training-result-dialog__dice-grid li:nth-child(6) {
-  animation-delay: 0.12s;
+/* 立體塑膠骰子質感:漸層底色 + 內外陰影營造浮凸感,不隨主題變色,貼近現實骰子的白色觀感。 */
+.training-result-dialog__die {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  background: linear-gradient(155deg, #fbfbfa 0%, #dcdcd8 100%);
+  box-shadow:
+    inset 0 1px 2px rgba(255, 255, 255, 0.9),
+    inset 0 -3px 5px rgba(0, 0, 0, 0.18),
+    0 3px 6px rgba(0, 0, 0, 0.3);
+  transform-style: preserve-3d;
 }
 
-@keyframes training-result-dice-roll {
+.training-result-dialog__die-face {
+  width: 100%;
+  height: 100%;
+  padding: 6px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 1.5px;
+  box-sizing: border-box;
+}
+
+.training-result-dialog__pip {
+  visibility: hidden;
+  justify-self: center;
+  align-self: center;
+  width: 90%;
+  height: 90%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #4a4a4a, #111111);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.25);
+}
+
+.training-result-dialog__pip--visible {
+  visibility: visible;
+}
+
+/* 參考 yakyulife 的骰子滾動節奏:换面同時做 3D 翻滾,比平面旋轉更接近現實骰子落地前的動態。 */
+.training-result-dialog__die--rolling {
+  animation: training-result-die-tumble 0.5s linear infinite;
+}
+
+@keyframes training-result-die-tumble {
   0% {
-    transform: rotate(-20deg) scale(0.6);
-    opacity: 0;
+    transform: rotateX(0deg) rotateY(0deg) translateY(0);
+  }
+  50% {
+    transform: rotateX(180deg) rotateY(90deg) translateY(-3px);
   }
   100% {
-    transform: rotate(0deg) scale(1);
+    transform: rotateX(360deg) rotateY(180deg) translateY(0);
+  }
+}
+
+/* 停止時做一個輕微回彈,模擬骰子落地的手感。 */
+.training-result-dialog__die:not(.training-result-dialog__die--rolling) {
+  animation: training-result-die-land 0.25s ease-out;
+}
+
+@keyframes training-result-die-land {
+  0% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* 骰到全場最高的 6 點算「會心一擊」,參考 yakyulife 停止時的高亮閃爍效果。 */
+.training-result-dialog__die--critical {
+  animation: training-result-die-flash 0.6s ease;
+}
+
+@keyframes training-result-die-flash {
+  0%,
+  100% {
+    box-shadow:
+      inset 0 1px 2px rgba(255, 255, 255, 0.9),
+      inset 0 -3px 5px rgba(0, 0, 0, 0.18),
+      0 3px 6px rgba(0, 0, 0, 0.3);
+  }
+  45% {
+    box-shadow:
+      inset 0 1px 2px rgba(255, 255, 255, 0.9),
+      inset 0 -3px 5px rgba(0, 0, 0, 0.18),
+      0 0 14px var(--accent-strong),
+      0 0 4px var(--accent-strong);
   }
 }
 
@@ -84,11 +153,4 @@
   margin: 0;
   color: var(--text-muted);
   font-size: 0.9rem;
-}
-
-.training-result-dialog__gain {
-  margin: 0;
-  font-weight: 700;
-  font-size: 1.3rem;
-  color: var(--accent-strong);
 }

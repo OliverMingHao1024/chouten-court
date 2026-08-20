@@ -67,6 +67,12 @@ describe('parseSaveData', () => {
     expect(parseSaveData({ ...data, players: [brokenPlayer, ...data.players.slice(1)] })).toBeNull()
   })
 
+  it('rejects a player missing height', () => {
+    const data = makeSaveData()
+    const { height: _height, ...brokenPlayer } = data.players[0]
+    expect(parseSaveData({ ...data, players: [brokenPlayer, ...data.players.slice(1)] })).toBeNull()
+  })
+
   it('rejects a player with an invalid enum value', () => {
     const data = makeSaveData()
     const brokenPlayer = { ...data.players[0], injuryStatus: 'deceased' }
