@@ -1,3 +1,5 @@
+import { ATTRIBUTE_KEYS, type Player, type Position } from './types'
+
 export const STARTER_COUNT = 5
 export const ROTATION_COUNT = 3
 
@@ -25,22 +27,27 @@ export function lineupWeight(playerId: string, lineup: GameLineup): number {
   return 0
 }
 
+function overallAttributeAverage(player: Player): number {
+  return ATTRIBUTE_KEYS.reduce((sum, key) => sum + player.attributes[key], 0) / ATTRIBUTE_KEYS.length
+}
+
 /**
  * 依可上場球員名單,把玩家手動選擇的先發/輪替補滿到上限:可上場人數不足 8 人時
- * (例如傷兵潮),沒有明確指定的名額直接依序自動填入,不會卡住流程或阻擋開打。
+ * (例如傷兵潮),沒有明確指定的名額直接補上。自動補滿的排序規則是「綜合屬性由高到低」,
+ * 而非單純依名冊陣列順序,確保結果可以說明(優先補進較強的可用球員)。
  */
-export function completeLineup(
-  availablePlayerIds: string[],
-  starters: string[],
-  rotation: string[],
-): GameLineup {
-  const chosenStarters = starters.filter((id) => availablePlayerIds.includes(id)).slice(0, STARTER_COUNT)
+export function completeLineup(availablePlayers: Player[], starters: string[], rotation: string[]): GameLineup {
+  const availableIds = availablePlayers.map((player) => player.id)
+  const chosenStarters = starters.filter((id) => availableIds.includes(id)).slice(0, STARTER_COUNT)
   const chosenRotation = rotation
-    .filter((id) => availablePlayerIds.includes(id) && !chosenStarters.includes(id))
+    .filter((id) => availableIds.includes(id) && !chosenStarters.includes(id))
     .slice(0, ROTATION_COUNT)
 
   const chosen = new Set([...chosenStarters, ...chosenRotation])
-  const remaining = availablePlayerIds.filter((id) => !chosen.has(id))
+  const remaining = availablePlayers
+    .filter((player) => !chosen.has(player.id))
+    .sort((a, b) => overallAttributeAverage(b) - overallAttributeAverage(a))
+    .map((player) => player.id)
 
   const filledStarters = [...chosenStarters]
   while (filledStarters.length < STARTER_COUNT && remaining.length > 0) {
@@ -53,4 +60,61 @@ export function completeLineup(
   }
 
   return { starters: filledStarters, rotation: filledRotation }
+}
+
+/** 把已存的陣容依目前可上場名單過濾:排除已受傷、畢業或轉隊等已不存在的球員。 */
+export function sanitizeLineup(lineup: GameLineup | null, availablePlayers: Player[]): GameLineup {
+  if (!lineup) return { starters: [], rotation: [] }
+  const availableIds = new Set(availablePlayers.map((player) => player.id))
+  return {
+    starters: lineup.starters.filter((id) => availableIds.has(id)),
+    rotation: lineup.rotation.filter((id) => availableIds.has(id)),
+  }
+}
+
+export type LineupSuggestionStrategy = 'bestStrength' | 'lowFatigue' | 'developRookies'
+
+const SUGGESTION_COMPARATORS: Record<LineupSuggestionStrategy, (a: Player, b: Player) => number> = {
+  bestStrength: (a, b) => overallAttributeAverage(b) - overallAttributeAverage(a),
+  lowFatigue: (a, b) => a.fatigue - b.fatigue || overallAttributeAverage(b) - overallAttributeAverage(a),
+  developRookies: (a, b) => a.grade - b.grade || overallAttributeAverage(b) - overallAttributeAverage(a),
+}
+
+/** 依策略對可上場球員排序後,取前 5 名為先發、接下來 3 名為主要輪替的一鍵建議陣容。 */
+export function suggestLineup(availablePlayers: Player[], strategy: LineupSuggestionStrategy): GameLineup {
+  const sorted = [...availablePlayers].sort(SUGGESTION_COMPARATORS[strategy])
+  return {
+    starters: sorted.slice(0, STARTER_COUNT).map((player) => player.id),
+    rotation: sorted.slice(STARTER_COUNT, STARTER_COUNT + ROTATION_COUNT).map((player) => player.id),
+  }
+}
+
+export interface LineupCompositionWarnings {
+  missingBallHandler: boolean
+  missingInterior: boolean
+  overconcentrated: boolean
+}
+
+const BALL_HANDLER_POSITIONS: Position[] = ['PG']
+const INTERIOR_POSITIONS: Position[] = ['C', 'PF']
+// 8 個上場名額中,單一位置佔 4 個(含)以上視為過度集中(原創門檻,待調校)。
+const OVERCONCENTRATION_THRESHOLD = 4
+
+/**
+ * MVP 不強制固定位置組合(避免傷病時無法開打),但提示缺主要持球者、缺內線、
+ * 或位置過度集中,供玩家參考,不阻擋開打。
+ */
+export function analyzeLineupComposition(roster: Player[], lineup: GameLineup): LineupCompositionWarnings {
+  const ids = new Set([...lineup.starters, ...lineup.rotation])
+  const players = roster.filter((player) => ids.has(player.id))
+  const counts = players.reduce<Partial<Record<Position, number>>>((acc, player) => {
+    acc[player.position] = (acc[player.position] ?? 0) + 1
+    return acc
+  }, {})
+
+  return {
+    missingBallHandler: !BALL_HANDLER_POSITIONS.some((position) => (counts[position] ?? 0) > 0),
+    missingInterior: !INTERIOR_POSITIONS.some((position) => (counts[position] ?? 0) > 0),
+    overconcentrated: Object.values(counts).some((count) => (count ?? 0) >= OVERCONCENTRATION_THRESHOLD),
+  }
 }

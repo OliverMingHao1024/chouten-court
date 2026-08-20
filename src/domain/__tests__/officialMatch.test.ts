@@ -6,6 +6,7 @@ import {
   didAdvancePhase,
   getFinal4Placement,
   getGameIndexForWeek,
+  isClutchPhase,
 } from '../officialMatch'
 import { getPhaseWeekRange } from '../calendar'
 import { STARTER_COUNT, ROTATION_COUNT, type GameLineup } from '../lineup'
@@ -92,6 +93,16 @@ describe('simulateOfficialGame', () => {
         if (benchIds.has(player.id)) expect(player.attributes).toEqual(roster[index].attributes)
       })
     }
+  })
+})
+
+describe('isClutchPhase', () => {
+  it('is only true for the quarterfinal and final4 phases', () => {
+    expect(isClutchPhase('qualifying')).toBe(false)
+    expect(isClutchPhase('preliminary')).toBe(false)
+    expect(isClutchPhase('group')).toBe(false)
+    expect(isClutchPhase('quarterfinal')).toBe(true)
+    expect(isClutchPhase('final4')).toBe(true)
   })
 })
 

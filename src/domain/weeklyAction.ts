@@ -48,14 +48,20 @@ const PRACTICE_LOSS_GROWTH: Record<PracticeStrength, number> = {
   strong: 1,
 }
 
-function personalityMultiplier(attribute: AttributeKey, personality: PersonalityKey): number {
+// 玻璃體質(fragile)受傷機率較高,骰面達 4~6(中幅以上成長)時提供額外成長收益作為風險
+// 補償,不提高全域屬性上限(原創數值,待調校)。
+const FRAGILE_HIGH_ROLL_MULTIPLIER = 1.25
+const FRAGILE_HIGH_ROLL_THRESHOLD = 4
+
+function personalityMultiplier(attribute: AttributeKey, personality: PersonalityKey, roll: number): number {
   if (personality === 'genius') return 1.3
   if (personality === 'scorer' && (attribute === 'shooting' || attribute === 'three')) return 1.3
+  if (personality === 'fragile' && roll >= FRAGILE_HIGH_ROLL_THRESHOLD) return FRAGILE_HIGH_ROLL_MULTIPLIER
   return 1.0
 }
 
 export function computeTrainingRollGain(attribute: AttributeKey, personality: PersonalityKey, roll: number): number {
-  return Math.round(ROLL_GROWTH[roll] * personalityMultiplier(attribute, personality))
+  return Math.round(ROLL_GROWTH[roll] * personalityMultiplier(attribute, personality, roll))
 }
 
 export interface PlayerRoll {

@@ -15,6 +15,11 @@ import { ATTRIBUTE_KEYS, type AttributeKey, type Player } from './types'
 
 export type OfficialPhase = Exclude<SeasonPhase, 'offseason'>
 
+/** 抗壓型(clutch)個性只在八強與四強階段生效。 */
+export function isClutchPhase(phase: OfficialPhase): boolean {
+  return phase === 'quarterfinal' || phase === 'final4'
+}
+
 // 每階段我方視角要打的場次:資格賽/預賽/複賽/準決賽對應原始 HBL 分組單循環的場次數,
 // 四強賽只算「我方會打到的場次」(準決賽 + 冠軍賽或季軍賽,不含另一半對戰組合)。
 export const PHASE_GAME_COUNT: Record<OfficialPhase, number> = {
@@ -98,6 +103,7 @@ export function simulateOfficialGame(
     rng,
     computeTacticAttributeWeights(tactics),
     lineup,
+    isClutchPhase(phase),
   )
   const outcome: 'win' | 'loss' = rng() < winProbability ? 'win' : 'loss'
   const majorInjuryWeeks = PHASE_MAJOR_INJURY_WEEKS[phase]

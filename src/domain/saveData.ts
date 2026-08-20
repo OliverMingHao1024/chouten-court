@@ -1,4 +1,5 @@
 import type { CareerEndReason } from './career'
+import type { GameLineup } from './lineup'
 import { PHASE_GAME_COUNT } from './officialMatch'
 import type { Candidate } from './recruiting'
 import type { SeasonGameLogEntry } from './season'
@@ -6,7 +7,7 @@ import type { SeasonRecord, SeasonSummaryResult } from './seasonSummary'
 import { ATTRIBUTE_KEYS, INJURY_STATUSES, PERSONALITY_KEYS, POSITIONS, STYLE_KEYS, type Player } from './types'
 
 export const SAVE_STORAGE_KEY = 'chouten-court:save'
-export const SAVE_FORMAT_VERSION = 7
+export const SAVE_FORMAT_VERSION = 8
 
 const OFFICIAL_PHASES = Object.keys(PHASE_GAME_COUNT)
 const FINAL4_PLACEMENTS = ['champion', 'runnerUp', 'third', 'fourth']
@@ -29,6 +30,7 @@ export interface SaveData {
   eraCount: number
   pendingSeasonSummary: SeasonSummaryResult | null
   careerEnded: CareerEndReason | null
+  lastLineup: GameLineup | null
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -111,6 +113,12 @@ function isValidSeasonRecord(value: unknown): value is SeasonRecord {
   return true
 }
 
+function isValidGameLineup(value: unknown): value is GameLineup {
+  if (!isPlainObject(value)) return false
+  const isStringArray = (v: unknown): v is string[] => Array.isArray(v) && v.every((id) => typeof id === 'string')
+  return isStringArray(value.starters) && isStringArray(value.rotation)
+}
+
 function isValidAwardWinner(value: unknown): boolean {
   if (!isPlainObject(value)) return false
   return typeof value.title === 'string' && typeof value.playerName === 'string'
@@ -150,6 +158,7 @@ export function parseSaveData(raw: unknown): SaveData | null {
   if (typeof raw.eraCount !== 'number') return null
   if (raw.pendingSeasonSummary !== null && !isValidSeasonSummaryResult(raw.pendingSeasonSummary)) return null
   if (raw.careerEnded !== null && !CAREER_END_REASONS.includes(raw.careerEnded as string)) return null
+  if (raw.lastLineup !== null && !isValidGameLineup(raw.lastLineup)) return null
 
   return {
     version: raw.version,
@@ -168,6 +177,7 @@ export function parseSaveData(raw: unknown): SaveData | null {
     eraCount: raw.eraCount,
     pendingSeasonSummary: raw.pendingSeasonSummary as SeasonSummaryResult | null,
     careerEnded: raw.careerEnded as CareerEndReason | null,
+    lastLineup: raw.lastLineup as GameLineup | null,
   }
 }
 

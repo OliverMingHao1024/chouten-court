@@ -166,7 +166,7 @@
 
 不得顯示看似精確、實際包含隱藏亂數的誤導數字。
 
-## 6. 第三階段：陣容管理體驗
+## 6. 第三階段：陣容管理體驗(已實作)
 
 ### Outcome
 
@@ -174,15 +174,35 @@
 
 ### Acceptance criteria
 
-- [ ] 最近一次正式賽陣容保存於隊伍狀態。
-- [ ] 下一場正式賽預設沿用上一次陣容。
-- [ ] 已受傷或不可上場球員自動移除。
-- [ ] 陣容有空缺時明確提示。
-- [ ] 提供「最佳戰力」一鍵建議。
-- [ ] 提供「低疲勞」一鍵建議。
-- [ ] 提供「培養新人」一鍵建議。
-- [ ] 自動建議結果仍可由玩家手動調整。
-- [ ] 明顯失衡的陣容顯示提示，但不阻擋開打。
+- [x] 最近一次正式賽陣容保存於隊伍狀態。
+- [x] 下一場正式賽預設沿用上一次陣容。
+- [x] 已受傷或不可上場球員自動移除。
+- [x] 陣容有空缺時明確提示。
+- [x] 提供「最佳戰力」一鍵建議。
+- [x] 提供「低疲勞」一鍵建議。
+- [x] 提供「培養新人」一鍵建議。
+- [x] 自動建議結果仍可由玩家手動調整。
+- [x] 明顯失衡的陣容顯示提示，但不阻擋開打。
+
+### Implementation notes(已完成)
+
+- `Team`/`SaveData` 新增 `lastLineup: GameLineup | null`;`App.tsx` 在每場正式賽結算後把實際使用的(已補滿的)陣容存回 `lastLineup`,`SAVE_FORMAT_VERSION` 隨欄位新增遞增到 8。
+- `lineup.ts` 新增 `sanitizeLineup(lineup, availablePlayers)`:用上一場陣容當初始狀態,過濾掉已受傷/離隊的球員 id;`SeasonMatchScreen` 用 `useState(() => sanitizeLineup(initialLineup, availablePlayers))` 只在掛載時套用一次,之後交給玩家或建議按鈕調整。
+- `lineup.ts` 的 `completeLineup` 簽章改吃 `Player[]`(不再是純 id 陣列),自動補滿時依「剩餘可上場球員的綜合屬性由高到低」排序後依序填入,取代原本單純依名冊陣列順序的作法,補滿結果因此可以說明。
+- 新增 `suggestLineup(availablePlayers, strategy)`,三種策略(`bestStrength`/`lowFatigue`/`developRookies`)各自用不同排序規則取前 5+3 名;`SeasonMatchScreen` 提供三顆對應按鈕,套用建議後仍可用既有的點擊循環手動調整。
+- 新增 `analyzeLineupComposition(roster, lineup)`,回傳「缺主要持球者(無PG)」「缺內線(無C/PF)」「單一位置佔 8 席中 4 席以上過度集中」三個非阻擋性警告旗標,顯示於陣容區塊上方。
+- 陣容選擇提示文字依是否選滿動態調整(未選滿時提示「將自動補上可上場球員」)。
+
+### Testing decisions(已完成)
+
+- `lineup.test.ts`:`completeLineup` 改用 `Player[]` 後的自動補滿排序規則、`sanitizeLineup` 過濾邏輯、三種 `suggestLineup` 策略、`analyzeLineupComposition` 四種情境(缺持球者/缺內線/過度集中/正常)。
+- `SeasonMatchScreen.test.tsx`:預設沿用上一場陣容、傷兵自動被排除、空缺提示文字、三顆建議按鈕、套用建議後仍可手動調整、位置警告文字。
+- `saveData.test.ts`:`lastLineup` 欄位驗證(合法值可還原、格式錯誤拒絕載入)。
+- `App.test.tsx` 既有的正式賽相關固定樣板(存檔 JSON)同步補上 `lastLineup: null`。
+
+### References
+
+- `docs/spec.md` §7(已同步更新)
 
 ### 位置提示
 
@@ -194,7 +214,7 @@ MVP 不強制要求固定位置組合，避免傷病時無法開打，但應提�
 
 自動補滿不得只依名冊陣列順序，必須使用可說明的排序規則。
 
-## 7. 第四階段：賽後摘要
+## 7. 第四階段：賽後摘要(已實作)
 
 ### Outcome
 
@@ -202,12 +222,12 @@ MVP 不強制要求固定位置組合，避免傷病時無法開打，但應提�
 
 ### Acceptance criteria
 
-- [ ] 顯示本場先發與主要輪替。
-- [ ] 顯示每名球員的疲勞增減。
-- [ ] 顯示取得實戰成長的球員。
-- [ ] 顯示新傷勢及發生時的疲勞程度。
-- [ ] 顯示比賽前後球隊有效戰力差異。
-- [ ] 摘要在玩家確認後才進入下一週。
+- [x] 顯示本場先發與主要輪替。
+- [x] 顯示每名球員的疲勞增減。
+- [x] 顯示取得實戰成長的球員。
+- [x] 顯示新傷勢及發生時的疲勞程度。
+- [x] 顯示比賽前後球隊有效戰力差異。
+- [x] 摘要在玩家確認後才進入下一週。
 
 ### Out of scope
 
@@ -215,7 +235,23 @@ MVP 不強制要求固定位置組合，避免傷病時無法開打，但應提�
 - 完整個人得分、助攻與籃板數據。
 - 比賽中途換人。
 
-## 8. 第五階段：補完球員個性
+### Implementation notes(已完成)
+
+- 新增 `src/features/season/GameSummaryDialog.tsx`(搭配 `GameSummaryDialog.css`),顯示勝負標題、球隊有效戰力賽前→賽後差異、先發與主要輪替的每人疲勞增減與成長屬性、以及新發生傷勢(狀態、預計缺賽週數、受傷前疲勞值)清單;點擊「繼續」或點擊背景才會關閉並觸發 `onConfirm`。
+- `Team` 新增 `pendingGameSummary: { display: GameSummaryResult; nextTeamState: Team } | null` 欄位,採「延後提交」模式:`SeasonMatchScreen` 的 `onPlayGame` 觸發時,原本會直接 `setTeam(nextTeamState)` 的完整結算(含season/畢業/招生/生涯結束等既有邏輯)改為先算出完整的 `nextTeamState`,連同用 `buildGameSummaryDisplay()` 算好的摘要資料一起存進 `pendingGameSummary`,`totalWeek`/`players` 等欄位維持不變,畫面因此停留在原本的比賽畫面直到玩家確認。
+- `GameSummaryDialog` 的 `onConfirm` 呼叫 `setTeam(team.pendingGameSummary!.nextTeamState)`,把預先算好的下一狀態(可能已包含 `pendingSeasonSummary`/`careerEnded`)正式提交;與既有的賽季結算彈窗、生涯結束流程不需要額外特殊處理即可正確銜接。
+- `buildGameSummaryDisplay(before, after, lineup, tactics, growth, outcome)` 用比賽前後的球員陣列(依 id 比對)算出每位先發/輪替球員的疲勞增減與是否成長,並用既有的「逐一比對受傷狀態」技巧偵測新傷勢;新傷勢的「受傷前疲勞值」用賽前疲勞值代替(因輕傷會把疲勞重設為 0,無法用賽後數值回推)。
+
+### Testing decisions(已完成)
+
+- `GameSummaryDialog.test.tsx`:對話框開關生命週期(無結果時不開、有結果時開、確認後關閉、換一個內容相同的新結果仍會重新開啟)、勝負標題、戰力增減文字、每位球員的疲勞增減與成長屬性顯示、有/無新傷勢兩種情境、點擊「繼續」才觸發 `onConfirm`。
+- `App.test.tsx`:新增 `confirmGameSummary()` 輔助函式,在既有涉及「開打」的測試(例行正式賽、畢業招生、四強冠軍、保險上限)中,於點擊「開打」後先確認賽後摘要對話框,才能繼續斷言後續的畫面狀態。
+
+### References
+
+- `docs/spec.md` §7(已同步更新)
+
+## 8. 第五階段：補完球員個性(已實作)
 
 ### 隊長型
 
@@ -237,12 +273,30 @@ MVP 不強制要求固定位置組合，避免傷病時無法開打，但應提�
 
 ### Acceptance criteria
 
-- [ ] 個性效果只在對應條件成立時生效。
-- [ ] 所有效果保持輕量且集中設定。
-- [ ] 個性效果可由測試獨立驗證。
-- [ ] 介面能說明個性目前是否生效。
+- [x] 個性效果只在對應條件成立時生效。
+- [x] 所有效果保持輕量且集中設定。
+- [x] 個性效果可由測試獨立驗證。
+- [x] 介面能說明個性目前是否生效。
 
-## 9. 第六階段：恢復能力與個別差異
+### Implementation notes(已完成)
+
+- `matchEngine.ts` 新增 `CAPTAIN_STRENGTH_BONUS`(隊長型)與 `CLUTCH_PERFORMANCE_BONUS`(抗壓型)兩個原創數值常數。`computeTeamStrength(roster, attributeWeights?, lineup?, clutchActive?)` 新增 `clutchActive` 參數:有 `lineup` 時,只要先發(`lineup.starters`)中存在 `personality === 'captain'` 的球員,就在加權平均結果上加一次 `CAPTAIN_STRENGTH_BONUS`(用 `.some(...)` 判斷,天生不重複疊加);`effectiveAttributeAverage` 新增 `clutchActive` 參數,`clutchActive` 為真且該球員 `personality === 'clutch'` 時,對其個人有效屬性平均乘上 `1 + CLUTCH_PERFORMANCE_BONUS`,不修改 `attributes` 本身。
+- `officialMatch.ts` 新增 `isClutchPhase(phase)`(僅 `quarterfinal`/`final4` 回傳 `true`),`simulateOfficialGame` 呼叫 `computeMatchWinProbability` 時代入 `isClutchPhase(phase)`。`matchPreview.ts` 與 `App.tsx` 的 `buildGameSummaryDisplay` 都比照代入,讓賽前預覽與賽後摘要顯示的戰力和實際模擬一致。
+- `weeklyAction.ts` 的 `personalityMultiplier` 新增 `roll` 參數:`personality === 'fragile'` 且 `roll >= 4` 時,套用 `FRAGILE_HIGH_ROLL_MULTIPLIER = 1.25`(原創數值),疊加在既有的骰面成長量上,不改動屬性上限 `ATTRIBUTE_MAX`。
+- `matchPreview.ts` 的 `MatchPreview` 新增 `captainBonusActive`/`clutchBonusActive` 兩個布林欄位;`SeasonMatchScreen.tsx` 在賽前預覽區塊新增一行文字提示(「隊長效果生效中」/「抗壓機制生效中」),滿足「介面能說明個性目前是否生效」;玻璃體質的效果條件(骰面 4~6)已直接對應訓練彈窗既有的骰子點數顯示,不需要額外介面。
+
+### Testing decisions(已完成)
+
+- `matchEngine.test.ts`:`computeTeamStrength` 新增案例驗證隊長加成(單一隊長生效、兩名隊長不重複疊加、隊長只在輪替時不生效)與抗壓加成(`clutchActive` 為 false/true 時的戰力差異);既有的兩個精確數值案例補上 `personality: 'steady'` 避免被預設名冊中的隨機隊長/抗壓型球員干擾。
+- `officialMatch.test.ts`:新增 `isClutchPhase` 案例驗證只有八強/四強回傳 `true`。
+- `matchPreview.test.ts`:新增案例驗證 `captainBonusActive`/`clutchBonusActive` 依陣容與賽制階段正確切換。
+- `weeklyAction.test.ts`:`computeTrainingRollGain` 新增案例驗證玻璃體質只在骰面 4 以上才有額外成長。
+
+### References
+
+- `docs/spec.md` §9(個性系統)
+
+## 9. 第六階段：恢復能力與個別差異(已實作)
 
 在增加第二條疲勞前，先評估較小的差異化方案：
 
@@ -253,10 +307,26 @@ MVP 不強制要求固定位置組合，避免傷病時無法開打，但應提�
 
 ### Acceptance criteria
 
-- [ ] 不同球員在相同休息條件下可以有小幅恢復差異。
-- [ ] 恢復量可在賽前或名冊畫面預覽。
-- [ ] 恢復能力不與受傷抗性混為同一概念。
-- [ ] 差異不應大到使特定球員必然無法擔任主力。
+- [x] 不同球員在相同休息條件下可以有小幅恢復差異。
+- [x] 恢復量可在賽前或名冊畫面預覽。
+- [x] 恢復能力不與受傷抗性混為同一概念。
+- [x] 差異不應大到使特定球員必然無法擔任主力。
+
+### Implementation notes(已完成)
+
+- `matchEngine.ts` 新增 `computeRecoveryRate(player)`:以 `hashSeed(player.id)` 對球員 id 做確定性雜湊,取得該球員終身固定、範圍 `±RECOVERY_INDIVIDUAL_VARIANCE`(原創數值 2)的個人恢復差異,再疊加 `RECOVERY_GRADE_DELTA`(原創數值:高一 +1、高二 0、高三 -1)的年級差異,最終疊加在 `BASELINE_RECOVERY`(10)之上。刻意不讀取 `personality`/`injuryStatus`,與玻璃體質既有的受傷機率效果(`FRAGILE_INJURY_MULTIPLIER`)完全獨立,避免混為同一概念。
+- `applyFatigueDelta(player, load)` 改用 `computeRecoveryRate(player)` 取代原本寫死的 `BASELINE_RECOVERY`,所有透過 `advancePlayerWeek`(訓練、全隊休養、比賽)結算的每週恢復都自動套用個別差異,不需要另外修改呼叫端。
+- 差異刻意壓在 ±3(個人差異 ±2、年級 ±1 的加總範圍)之內,相對於 `OFFICIAL_MATCH_LOAD`(20)等負荷量級很小,不足以讓特定球員必然無法或必然適合擔任主力。
+- `RosterScreen.tsx` 的球員詳細資料彈窗新增「每週體力恢復 X 點」一行,滿足「恢復量可在名冊畫面預覽」。
+
+### Testing decisions(已完成)
+
+- `matchEngine.test.ts`:新增 `computeRecoveryRate` 案例驗證同一 id 恆定不變、差異落在宣告的個人差異範圍內、低年級恢復優於高年級、以及不受 `personality` 影響(與受傷抗性獨立);`applyFatigueDelta` 既有的精確數值案例改用 `computeRecoveryRate` 算出期望值,不再假設固定的 10。
+- `RosterScreen.test.tsx`:新增案例驗證彈窗內顯示的恢復量文字與 `computeRecoveryRate` 算出的數值一致。
+
+### References
+
+- `docs/spec.md` §11(疲勞與受傷)
 
 ## 10. 暫緩：拆分兩種疲勞
 

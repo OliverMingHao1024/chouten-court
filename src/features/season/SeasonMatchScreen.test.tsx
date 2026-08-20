@@ -5,9 +5,13 @@ import { createInitialRoster } from '../../domain/roster'
 import { SeasonMatchScreen } from './SeasonMatchScreen'
 
 const players = createInitialRoster(1)
-const autoLineup = {
-  starters: players.slice(0, 5).map((p) => p.id),
-  rotation: players.slice(5, 8).map((p) => p.id),
+
+function expectFullAutoFilledLineup(lineup: { starters: string[]; rotation: string[] }) {
+  expect(lineup.starters).toHaveLength(5)
+  expect(lineup.rotation).toHaveLength(3)
+  const all = [...lineup.starters, ...lineup.rotation]
+  expect(new Set(all).size).toBe(all.length)
+  all.forEach((id) => expect(players.map((p) => p.id)).toContain(id))
 }
 
 function renderScreen(overrides: Partial<React.ComponentProps<typeof SeasonMatchScreen>> = {}) {
@@ -19,6 +23,7 @@ function renderScreen(overrides: Partial<React.ComponentProps<typeof SeasonMatch
       phase="qualifying"
       opponentAce={{ name: '陳志明', scoring: 90, shooting: 80 }}
       players={players}
+      initialLineup={null}
       lastResult={null}
       onPlayGame={vi.fn()}
       {...overrides}
@@ -44,7 +49,10 @@ describe('SeasonMatchScreen', () => {
     const onPlayGame = vi.fn()
     renderScreen({ onPlayGame })
     await user.click(screen.getByRole('button', { name: '開打' }))
-    expect(onPlayGame).toHaveBeenCalledWith({ offense: 'fast', defense: 'manToMan' }, autoLineup)
+    expect(onPlayGame).toHaveBeenCalledTimes(1)
+    const [tactics, lineup] = onPlayGame.mock.calls[0]
+    expect(tactics).toEqual({ offense: 'fast', defense: 'manToMan' })
+    expectFullAutoFilledLineup(lineup)
   })
 
   it('calls onPlayGame with the selected tactics', async () => {
@@ -54,7 +62,10 @@ describe('SeasonMatchScreen', () => {
     await user.click(screen.getByRole('button', { name: '半場陣地戰' }))
     await user.click(screen.getByRole('button', { name: '聯防' }))
     await user.click(screen.getByRole('button', { name: '開打' }))
-    expect(onPlayGame).toHaveBeenCalledWith({ offense: 'halfcourt', defense: 'zone' }, autoLineup)
+    expect(onPlayGame).toHaveBeenCalledTimes(1)
+    const [tactics, lineup] = onPlayGame.mock.calls[0]
+    expect(tactics).toEqual({ offense: 'halfcourt', defense: 'zone' })
+    expectFullAutoFilledLineup(lineup)
   })
 
   it('shows the opponent ace name and key stats', () => {
@@ -117,11 +128,61 @@ describe('SeasonMatchScreen', () => {
         phase="qualifying"
         opponentAce={{ name: '陳志明', scoring: 90, shooting: 80 }}
         players={tiredPlayers}
+        initialLineup={null}
         lastResult={null}
         onPlayGame={vi.fn()}
       />,
     )
     await user.click(screen.getByRole('button', { name: new RegExp(tiredPlayers[0].name) }))
     expect(screen.getByText(/高受傷風險/)).toBeInTheDocument()
+  })
+
+  it('defaults to the initial lineup (from the previous game) instead of starting empty', () => {
+    const initialLineup = {
+      starters: players.slice(0, 5).map((p) => p.id),
+      rotation: players.slice(5, 8).map((p) => p.id),
+    }
+    renderScreen({ initialLineup })
+    expect(screen.getByText('先發 5/5・主要輪替 3/3')).toBeInTheDocument()
+  })
+
+  it('drops an injured player from the restored initial lineup', () => {
+    const initialLineup = {
+      starters: players.slice(0, 5).map((p) => p.id),
+      rotation: players.slice(5, 8).map((p) => p.id),
+    }
+    const withInjury = players.map((p, i) => (i === 0 ? { ...p, injuryStatus: 'minor' as const } : p))
+    renderScreen({ players: withInjury, initialLineup })
+    // Player 0 (now injured) drops out, leaving only 4 of the 5 restored starters.
+    expect(screen.getByText(/先發 4\/5/)).toBeInTheDocument()
+  })
+
+  it('shows a vacancy hint when the lineup is not full', () => {
+    renderScreen()
+    expect(screen.getByText(/尚有空缺/)).toBeInTheDocument()
+  })
+
+  it('fills the lineup via the "最佳戰力" suggestion button', async () => {
+    const user = userEvent.setup()
+    renderScreen()
+    await user.click(screen.getByRole('button', { name: '最佳戰力' }))
+    expect(screen.getByText('先發 5/5・主要輪替 3/3')).toBeInTheDocument()
+  })
+
+  it('lets the coach adjust the lineup after applying a suggestion', async () => {
+    const user = userEvent.setup()
+    renderScreen()
+    await user.click(screen.getByRole('button', { name: '低疲勞' }))
+    const firstPlayer = players[0]
+    const button = screen.getByRole('button', { name: new RegExp(firstPlayer.name) })
+    const roleBefore = button.textContent
+    await user.click(button)
+    expect(button.textContent).not.toBe(roleBefore)
+  })
+
+  it('warns when the lineup is missing a primary ball handler (no PG)', () => {
+    const noPg = players.map((p) => (p.position === 'PG' ? { ...p, position: 'SF' as const } : p))
+    renderScreen({ players: noPg })
+    expect(screen.getByText(/缺少主要持球者/)).toBeInTheDocument()
   })
 })

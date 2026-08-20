@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { computeOverallGrade } from '../../domain/attributeGrade'
-import { ATTRIBUTE_MAX } from '../../domain/matchEngine'
+import { ATTRIBUTE_MAX, computeRecoveryRate } from '../../domain/matchEngine'
 import { ATTRIBUTE_KEYS, ATTRIBUTE_LABELS, INJURY_STATUS_LABELS, type Player } from '../../domain/types'
 import { AttributeBar } from './AttributeBar'
 import { FatigueBar } from './FatigueBar'
@@ -58,6 +58,9 @@ export function RosterScreen({ players }: RosterScreenProps) {
                 <p>
                   {selectedPlayer.position} · 高{selectedPlayer.grade} · {selectedPlayer.height}cm ·{' '}
                   {selectedPlayer.styleTag.label}
+                </p>
+                <p className="roster-dialog__recovery">
+                  每週體力恢復 {computeRecoveryRate(selectedPlayer)} 點
                 </p>
                 {selectedPlayer.injuryStatus !== 'healthy' && (
                   <p className={`roster-dialog__injury roster-dialog__injury--${selectedPlayer.injuryStatus}`}>

@@ -68,4 +68,29 @@ describe('computeMatchPreview', () => {
     const strong = computeMatchPreview(roster, lineup, DEFAULT_TACTICS, 'qualifying', strongAce)
     expect(strong.opponentStrength).toBeGreaterThan(weak.opponentStrength)
   })
+
+  it('reports whether the captain bonus is active based on the starting lineup', () => {
+    const roster = createInitialRoster(1).map((p) => ({ ...p, personality: 'steady' as const }))
+    const lineup = fullLineup(roster)
+    const withoutCaptain = computeMatchPreview(roster, lineup, DEFAULT_TACTICS, 'qualifying', testAce)
+    expect(withoutCaptain.captainBonusActive).toBe(false)
+
+    const withCaptainStarter = roster.map((p, i) => (i === 0 ? { ...p, personality: 'captain' as const } : p))
+    const withCaptain = computeMatchPreview(withCaptainStarter, lineup, DEFAULT_TACTICS, 'qualifying', testAce)
+    expect(withCaptain.captainBonusActive).toBe(true)
+    expect(withCaptain.teamStrength).toBeGreaterThan(withoutCaptain.teamStrength)
+
+    const withCaptainOnBench = roster.map((p, i) => (i === 7 ? { ...p, personality: 'captain' as const } : p))
+    expect(computeMatchPreview(withCaptainOnBench, lineup, DEFAULT_TACTICS, 'qualifying', testAce).captainBonusActive).toBe(
+      false,
+    )
+  })
+
+  it('reports whether the clutch bonus is active based on the season phase', () => {
+    const roster = createInitialRoster(1)
+    const lineup = fullLineup(roster)
+    expect(computeMatchPreview(roster, lineup, DEFAULT_TACTICS, 'qualifying', testAce).clutchBonusActive).toBe(false)
+    expect(computeMatchPreview(roster, lineup, DEFAULT_TACTICS, 'quarterfinal', testAce).clutchBonusActive).toBe(true)
+    expect(computeMatchPreview(roster, lineup, DEFAULT_TACTICS, 'final4', testAce).clutchBonusActive).toBe(true)
+  })
 })

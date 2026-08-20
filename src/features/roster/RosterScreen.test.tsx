@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { RosterScreen } from './RosterScreen'
+import { computeRecoveryRate } from '../../domain/matchEngine'
 import type { Player } from '../../domain/types'
 
 function makePlayer(overrides: Partial<Player> = {}): Player {
@@ -68,6 +69,17 @@ describe('RosterScreen', () => {
       expect(within_.getByText(label)).toBeInTheDocument()
       expect(within_.getByText(String(value))).toBeInTheDocument()
     }
+  })
+
+  it('shows the player-specific weekly recovery rate in the dialog', async () => {
+    const user = userEvent.setup()
+    const player = makePlayer()
+    render(<RosterScreen players={[player]} />)
+
+    await user.click(screen.getByRole('button', { name: /球員01/ }))
+
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText(`每週體力恢復 ${computeRecoveryRate(player)} 點`)).toBeInTheDocument()
   })
 
   it('shows the right player when a different block is clicked', async () => {

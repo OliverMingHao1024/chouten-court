@@ -7,7 +7,16 @@ import {
 } from './domain/calendar'
 import { generateOpponentName } from './domain/opponentName'
 import { generateOpponentAce, opponentAceEraIndex } from './domain/opponentAce'
-import { PHASE_GAME_COUNT, getGameIndexForWeek, type GameGrowthEntry } from './domain/officialMatch'
+import {
+  getGameIndexForWeek,
+  isClutchPhase,
+  PHASE_GAME_COUNT,
+  type GameGrowthEntry,
+  type OfficialPhase,
+} from './domain/officialMatch'
+import type { GameLineup } from './domain/lineup'
+import { computeTeamStrength } from './domain/matchEngine'
+import { computeTacticAttributeWeights, type GameTactics } from './domain/tactics'
 import { advanceGrades, describeGraduate } from './domain/graduation'
 import { hasReachedInsuranceCap, isChampionRun, type CareerEndReason } from './domain/career'
 import {
@@ -46,6 +55,7 @@ import { CareerSummaryScreen } from './features/career/CareerSummaryScreen'
 import { EventScreen } from './features/events/EventScreen'
 import { RecruitingScreen } from './features/recruiting/RecruitingScreen'
 import { RosterScreen } from './features/roster/RosterScreen'
+import { GameSummaryDialog, type GameSummaryResult } from './features/season/GameSummaryDialog'
 import { SeasonMatchScreen } from './features/season/SeasonMatchScreen'
 import { SeasonSummaryDialog, type SeasonSummaryResult } from './features/season/SeasonSummaryDialog'
 import { SetupScreen } from './features/setup/SetupScreen'
@@ -71,6 +81,18 @@ interface Team {
   eraCount: number
   pendingSeasonSummary: SeasonSummaryResult | null
   careerEnded: CareerEndReason | null
+  /** 最近一次正式賽使用的陣容,做為下一場的預設起點;尚未打過正式賽時為 null。 */
+  lastLineup: GameLineup | null
+  /**
+   * 賽後摘要待確認:比賽結果已算好,但要等玩家確認摘要後才會真正套用(進入下一週)。
+   * 純執行期狀態,不寫入存檔(比照 trainingRollResult)。
+   */
+  pendingGameSummary: PendingGameSummary | null
+}
+
+interface PendingGameSummary {
+  display: GameSummaryResult
+  nextTeamState: Team
 }
 
 function teamToSaveData(team: Team): SaveData {
@@ -91,11 +113,12 @@ function teamToSaveData(team: Team): SaveData {
     eraCount: team.eraCount,
     pendingSeasonSummary: team.pendingSeasonSummary,
     careerEnded: team.careerEnded,
+    lastLineup: team.lastLineup,
   }
 }
 
 function saveDataToTeam(data: SaveData): Team {
-  return { ...data, trainingRollResult: null }
+  return { ...data, trainingRollResult: null, pendingGameSummary: null }
 }
 
 function loadInitialTeam(): Team | null {
@@ -140,6 +163,67 @@ function describeGameGrowth(roster: Player[], growth: GameGrowthEntry[]): string
       .map((entry) => `${nameById.get(entry.playerId) ?? ''}(${ATTRIBUTE_LABELS[entry.attribute]}+1)`)
       .join('、')
   )
+}
+
+/**
+ * 組出賽後摘要彈窗的顯示資料:先發/輪替疲勞增減與成長、新傷勢與受傷前疲勞值、
+ * 比賽前後(以同一套戰術/陣容權重計算)的球隊有效戰力差異。before/after 陣列由
+ * simulateOfficialGame 的 roster.map 產生,索引一一對應。
+ */
+function buildGameSummaryDisplay(
+  before: Player[],
+  after: Player[],
+  lineup: GameLineup,
+  tactics: GameTactics,
+  growth: GameGrowthEntry[],
+  outcome: 'win' | 'loss',
+  phase: OfficialPhase,
+): GameSummaryResult {
+  const afterById = new Map(after.map((player) => [player.id, player]))
+  const growthById = new Map(growth.map((entry) => [entry.playerId, entry.attribute]))
+
+  const roleEntries: Array<{ id: string; role: 'starter' | 'rotation' }> = [
+    ...lineup.starters.map((id) => ({ id, role: 'starter' as const })),
+    ...lineup.rotation.map((id) => ({ id, role: 'rotation' as const })),
+  ]
+
+  const players = roleEntries
+    .map(({ id, role }) => {
+      const beforePlayer = before.find((player) => player.id === id)
+      const afterPlayer = afterById.get(id)
+      if (!beforePlayer || !afterPlayer) return null
+      return {
+        playerId: id,
+        playerName: afterPlayer.name,
+        role,
+        fatigueBefore: beforePlayer.fatigue,
+        fatigueAfter: afterPlayer.fatigue,
+        grewAttribute: growthById.get(id) ?? null,
+      }
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
+
+  const newInjuries = after
+    .map((player, index) => ({ player, beforePlayer: before[index] }))
+    .filter(
+      ({ player, beforePlayer }) => player.injuryStatus !== 'healthy' && beforePlayer.injuryStatus === 'healthy',
+    )
+    .map(({ player, beforePlayer }) => ({
+      playerName: player.name,
+      status: player.injuryStatus as 'minor' | 'major',
+      weeksRemaining: player.injuryWeeksRemaining,
+      fatigueBeforeGame: beforePlayer.fatigue,
+    }))
+
+  const tacticWeights = computeTacticAttributeWeights(tactics)
+  const clutchActive = isClutchPhase(phase)
+  return {
+    outcome,
+    strengthBefore: computeTeamStrength(before, tacticWeights, lineup, clutchActive),
+    strengthAfter: computeTeamStrength(after, tacticWeights, lineup, clutchActive),
+    players,
+    newInjuries,
+  }
 }
 
 interface WeeklyEvent {
@@ -228,6 +312,8 @@ function App() {
             eraCount: 0,
             pendingSeasonSummary: null,
             careerEnded: null,
+            lastLineup: null,
+            pendingGameSummary: null,
           })
         }}
       />
@@ -284,6 +370,7 @@ function App() {
         phase={phase}
         opponentAce={opponentAce}
         players={team.players}
+        initialLineup={team.lastLineup}
         lastResult={team.lastResult}
         onPlayGame={(tactics, lineup) => {
           const result = advanceSeasonWeek(
@@ -362,7 +449,7 @@ function App() {
             }
           }
 
-          setTeam({
+          const nextTeamState: Team = {
             ...team,
             totalWeek: result.nextTotalWeek,
             players,
@@ -373,8 +460,27 @@ function App() {
             eraCount,
             pendingSeasonSummary,
             careerEnded,
+            lastLineup: lineup,
             lastResult: message,
             seasonGameLog: [...team.seasonGameLog, result.gameLogEntry],
+            pendingGameSummary: null,
+          }
+
+          // 賽後摘要待玩家確認後才真正套用(進入下一週);在那之前畫面維持原本這場比賽的狀態。
+          setTeam({
+            ...team,
+            pendingGameSummary: {
+              display: buildGameSummaryDisplay(
+                team.players,
+                result.roster,
+                lineup,
+                tactics,
+                result.growth,
+                result.gameLogEntry.outcome,
+                phase,
+              ),
+              nextTeamState,
+            },
           })
         }}
       />
@@ -485,6 +591,10 @@ function App() {
         />
       }
     >
+      <GameSummaryDialog
+        result={team.pendingGameSummary?.display ?? null}
+        onConfirm={() => setTeam(team.pendingGameSummary!.nextTeamState)}
+      />
       <SeasonSummaryDialog result={team.pendingSeasonSummary} />
       {actionPanel}
       <RosterScreen players={team.players} />

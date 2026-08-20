@@ -1,11 +1,26 @@
 import { lineupWeight, type GameLineup } from './lineup'
-import type { Rng } from './rng'
+import { hashSeed, type Rng } from './rng'
 import type { AttributeKey, Player } from './types'
 
 export const FATIGUE_MIN = 0
 export const FATIGUE_MAX = 100
 export const ATTRIBUTE_MAX = 99
 export const BASELINE_RECOVERY = 10
+// 恢復能力的個別差異(原創數值,待調校):與受傷抗性(玻璃體質的高受傷機率)是各自獨立的概念,
+// 差異幅度刻意壓低,不足以讓特定球員必然無法或必然適合擔任主力。由球員 id 雜湊決定,終身固定。
+export const RECOVERY_INDIVIDUAL_VARIANCE = 2
+// 年級造成的恢復差異(原創數值,待調校):低年級體力回復略快,高三略慢。
+export const RECOVERY_GRADE_DELTA: Record<number, number> = { 1: 1, 2: 0, 3: -1 }
+
+/**
+ * 單一球員的每週體力恢復量:基準值疊加「終身固定、由 id 雜湊決定」的個人差異,再疊加年級
+ * 差異。刻意不讓個性或傷勢狀態影響恢復速度,避免和玻璃體質既有的受傷機率效果混為一談。
+ */
+export function computeRecoveryRate(player: Player): number {
+  const individual = (hashSeed(player.id) % (RECOVERY_INDIVIDUAL_VARIANCE * 2 + 1)) - RECOVERY_INDIVIDUAL_VARIANCE
+  const gradeDelta = RECOVERY_GRADE_DELTA[player.grade] ?? 0
+  return BASELINE_RECOVERY + individual + gradeDelta
+}
 
 // 受傷機率隨疲勞值線性上升(原創數值,待調校):疲勞 0 時約 2%,疲勞 100 時約 20%。
 export const INJURY_BASE_PROBABILITY = 0.02
@@ -21,6 +36,12 @@ export const FATIGUE_PERFORMANCE_PENALTY = 0.15
 // 賽前預覽用的「高受傷風險」門檻(原創數值,待調校):僅作為警示用的簡單門檻,不對外
 // 顯示精確機率,避免暗示比實際更精準的預測。
 export const HIGH_FATIGUE_RISK_THRESHOLD = 70
+// 隊長型(captain)僅列為先發時提供小幅團隊有效戰力加成(原創數值,待調校);多名隊長同時
+// 先發也不重複疊加,只取一次效果。
+export const CAPTAIN_STRENGTH_BONUS = 3
+// 抗壓型(clutch)僅在八強/四強階段生效,提高該球員的有效比賽表現;不修改永久屬性
+// (原創數值,待調校)。
+export const CLUTCH_PERFORMANCE_BONUS = 0.1
 
 export interface InjuryDurationRange {
   min: number
@@ -35,7 +56,7 @@ export function clamp(value: number, min: number, max: number): number {
 }
 
 export function applyFatigueDelta(player: Player, load: number): Player {
-  const fatigue = clamp(player.fatigue + load - BASELINE_RECOVERY, FATIGUE_MIN, FATIGUE_MAX)
+  const fatigue = clamp(player.fatigue + load - computeRecoveryRate(player), FATIGUE_MIN, FATIGUE_MAX)
   return { ...player, fatigue }
 }
 
@@ -92,11 +113,12 @@ function weightedAttributeAverage(attributes: Player['attributes'], weights?: At
   return weightedSum / weightTotal
 }
 
-function effectiveAttributeAverage(player: Player, weights?: AttributeWeights): number {
+function effectiveAttributeAverage(player: Player, weights?: AttributeWeights, clutchActive = false): number {
   const average = weightedAttributeAverage(player.attributes, weights)
   const fatigueMultiplier = 1 - (player.fatigue / FATIGUE_MAX) * FATIGUE_PERFORMANCE_PENALTY
   const returningMultiplier = player.injuryStatus === 'returning' ? RETURNING_ATTRIBUTE_MULTIPLIER : 1
-  return average * fatigueMultiplier * returningMultiplier
+  const clutchMultiplier = clutchActive && player.personality === 'clutch' ? 1 + CLUTCH_PERFORMANCE_BONUS : 1
+  return average * fatigueMultiplier * returningMultiplier * clutchMultiplier
 }
 
 /**
@@ -124,28 +146,43 @@ export function advancePlayerWeek(
  * 隊伍戰力:未提供 lineup 時,對「可上場」球員(排除輕傷/重傷)做簡單平均,沿用練習賽等
  * 沒有先發/輪替概念的場合。提供 lineup 時,改依先發/輪替權重(先發6:輪替3:未上場0)
  * 做加權平均,未列入陣容的球員完全不計入戰力;若加權後總權重為 0(例如陣容剛好是空的),
- * 安全退回未加權平均,避免除以 0。
+ * 安全退回未加權平均,避免除以 0。clutchActive 為 true 時(八強/四強階段),抗壓型球員的
+ * 有效表現額外加成;有 lineup 且先發中有隊長型球員時,額外加上一次性的團隊戰力加成
+ * (多名隊長同時先發不重複疊加)。
  */
 export function computeTeamStrength(
   roster: Player[],
   attributeWeights?: AttributeWeights,
   lineup?: GameLineup,
+  clutchActive = false,
 ): number {
   const available = roster.filter((player) => player.injuryStatus !== 'minor' && player.injuryStatus !== 'major')
   const pool = available.length > 0 ? available : roster
+  const hasCaptainStarter = lineup
+    ? lineup.starters.some((id) => roster.find((player) => player.id === id)?.personality === 'captain')
+    : false
+  const captainBonus = hasCaptainStarter ? CAPTAIN_STRENGTH_BONUS : 0
 
   if (lineup) {
     const weighted = pool.map((player) => ({ player, weight: lineupWeight(player.id, lineup) }))
     const totalWeight = weighted.reduce((sum, { weight }) => sum + weight, 0)
     if (totalWeight > 0) {
       return (
-        weighted.reduce((sum, { player, weight }) => sum + effectiveAttributeAverage(player, attributeWeights) * weight, 0) /
-        totalWeight
+        weighted.reduce(
+          (sum, { player, weight }) => sum + effectiveAttributeAverage(player, attributeWeights, clutchActive) * weight,
+          0,
+        ) /
+          totalWeight +
+        captainBonus
       )
     }
   }
 
-  return pool.reduce((sum, player) => sum + effectiveAttributeAverage(player, attributeWeights), 0) / pool.length
+  return (
+    pool.reduce((sum, player) => sum + effectiveAttributeAverage(player, attributeWeights, clutchActive), 0) /
+      pool.length +
+    captainBonus
+  )
 }
 
 export function computeWinProbability(teamStrength: number, opponentStrength: number): number {
@@ -180,8 +217,9 @@ export function computeMatchWinProbability(
   rng: Rng,
   attributeWeights?: AttributeWeights,
   lineup?: GameLineup,
+  clutchActive = false,
 ): number {
-  const baseStrength = computeTeamStrength(roster, attributeWeights, lineup)
+  const baseStrength = computeTeamStrength(roster, attributeWeights, lineup, clutchActive)
   const range = computePerformanceVarianceRange(roster, lineup)
   const noise = (rng() * 2 - 1) * range
   return computeWinProbability(baseStrength + noise, opponentStrength)

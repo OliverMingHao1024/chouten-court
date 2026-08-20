@@ -35,6 +35,16 @@ describe('computeTrainingRollGain', () => {
   it('gives no growth at all on the lowest roll', () => {
     expect(computeTrainingRollGain('three', 'steady', 1)).toBe(0)
   })
+
+  it('gives a fragile personality extra growth only on rolls of 4 and above', () => {
+    expect(computeTrainingRollGain('rebound', 'fragile', 3)).toBe(computeTrainingRollGain('rebound', 'steady', 3))
+    expect(computeTrainingRollGain('rebound', 'fragile', 4)).toBeGreaterThan(
+      computeTrainingRollGain('rebound', 'steady', 4),
+    )
+    expect(computeTrainingRollGain('rebound', 'fragile', 6)).toBeGreaterThan(
+      computeTrainingRollGain('rebound', 'steady', 6),
+    )
+  })
 })
 
 describe('applyTraining', () => {

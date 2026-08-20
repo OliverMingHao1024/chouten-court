@@ -6,7 +6,13 @@ import {
   HIGH_FATIGUE_RISK_THRESHOLD,
 } from './matchEngine'
 import { computeAceStrengthBonus, type OpponentAce } from './opponentAce'
-import { OFFICIAL_MATCH_LOAD, PHASE_OPPONENT_STRENGTH, ROTATION_MATCH_LOAD, type OfficialPhase } from './officialMatch'
+import {
+  isClutchPhase,
+  OFFICIAL_MATCH_LOAD,
+  PHASE_OPPONENT_STRENGTH,
+  ROTATION_MATCH_LOAD,
+  type OfficialPhase,
+} from './officialMatch'
 import { getOpponentTier, type OpponentTier } from './opponentTier'
 import { computeTacticAttributeWeights, type GameTactics } from './tactics'
 import { ATTRIBUTE_KEYS, type AttributeKey, type Player } from './types'
@@ -32,6 +38,10 @@ export interface MatchPreview {
   roleFatigueDelta: RoleFatigueDelta
   /** 疲勞值已達警戒門檻、賽前應留意受傷風險的球員 id。 */
   highRiskPlayerIds: string[]
+  /** 先發陣容中是否有隊長型球員(團隊戰力加成是否生效)。 */
+  captainBonusActive: boolean
+  /** 目前賽制階段是否讓抗壓型球員的加成生效(僅八強/四強)。 */
+  clutchBonusActive: boolean
 }
 
 export function computeMatchPreview(
@@ -42,9 +52,10 @@ export function computeMatchPreview(
   opponentAce: OpponentAce,
 ): MatchPreview {
   const tacticWeights = computeTacticAttributeWeights(tactics)
-  const teamStrength = computeTeamStrength(roster, tacticWeights, lineup)
+  const clutchActive = isClutchPhase(phase)
+  const teamStrength = computeTeamStrength(roster, tacticWeights, lineup, clutchActive)
   const restedRoster = roster.map((player) => ({ ...player, fatigue: 0 }))
-  const teamStrengthWithoutFatigue = computeTeamStrength(restedRoster, tacticWeights, lineup)
+  const teamStrengthWithoutFatigue = computeTeamStrength(restedRoster, tacticWeights, lineup, clutchActive)
   const opponentStrength = PHASE_OPPONENT_STRENGTH[phase] + computeAceStrengthBonus(opponentAce)
 
   return {
@@ -63,5 +74,9 @@ export function computeMatchPreview(
       .filter((player) => lineupRole(player.id, lineup) !== 'bench')
       .filter((player) => player.fatigue >= HIGH_FATIGUE_RISK_THRESHOLD)
       .map((player) => player.id),
+    captainBonusActive: lineup.starters.some(
+      (id) => roster.find((player) => player.id === id)?.personality === 'captain',
+    ),
+    clutchBonusActive: clutchActive,
   }
 }

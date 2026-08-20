@@ -4,8 +4,10 @@ import {
   applyFatigueDelta,
   clamp,
   computeMatchWinProbability,
+  computeRecoveryRate,
   computeTeamStrength,
   computeWinProbability,
+  RECOVERY_INDIVIDUAL_VARIANCE,
   rollForInjury,
   tickInjuryRecovery,
 } from '../matchEngine'
@@ -23,12 +25,40 @@ describe('clamp', () => {
 })
 
 describe('applyFatigueDelta', () => {
-  it('adds load and subtracts the baseline recovery, clamped to [0,100]', () => {
+  it('adds load and subtracts the player-specific recovery rate, clamped to [0,100]', () => {
     const roster = createInitialRoster(1)
     const player = { ...roster[0], fatigue: 50 }
-    expect(applyFatigueDelta(player, 20).fatigue).toBe(60) // 50 + 20 - 10
+    const recovery = computeRecoveryRate(player)
+    expect(applyFatigueDelta(player, 20).fatigue).toBe(50 + 20 - recovery)
     expect(applyFatigueDelta({ ...player, fatigue: 0 }, 0).fatigue).toBe(0)
     expect(applyFatigueDelta({ ...player, fatigue: 95 }, 30).fatigue).toBe(100)
+  })
+})
+
+describe('computeRecoveryRate', () => {
+  it('is deterministic and stable for the same player id', () => {
+    const roster = createInitialRoster(1)
+    expect(computeRecoveryRate(roster[0])).toBe(computeRecoveryRate(roster[0]))
+  })
+
+  it('stays within the declared individual variance band around the baseline', () => {
+    const roster = createInitialRoster(1)
+    for (const player of roster) {
+      expect(computeRecoveryRate({ ...player, grade: 2 })).toBeGreaterThanOrEqual(10 - RECOVERY_INDIVIDUAL_VARIANCE)
+      expect(computeRecoveryRate({ ...player, grade: 2 })).toBeLessThanOrEqual(10 + RECOVERY_INDIVIDUAL_VARIANCE)
+    }
+  })
+
+  it('gives lower grades a small recovery edge over higher grades, all else equal', () => {
+    const player = createInitialRoster(1)[0]
+    expect(computeRecoveryRate({ ...player, grade: 1 })).toBeGreaterThan(computeRecoveryRate({ ...player, grade: 3 }))
+  })
+
+  it('is not affected by personality (kept independent from injury resistance)', () => {
+    const player = createInitialRoster(1)[0]
+    const fragile = { ...player, personality: 'fragile' as const }
+    const steady = { ...player, personality: 'steady' as const }
+    expect(computeRecoveryRate(fragile)).toBe(computeRecoveryRate(steady))
   })
 })
 
@@ -83,6 +113,7 @@ describe('computeTeamStrength', () => {
     const roster = createInitialRoster(1).map((p, i) => ({
       ...p,
       attributes: { shooting: 0, three: 0, rebound: 0, pass: 0, defense: 0, athletic: 0, iq: i === 0 ? 90 : 0 },
+      personality: 'steady' as const, // avoid the captain-in-starters bonus interfering with the exact value below
     }))
     // Only player 0 (the one with a non-zero attribute) is in the lineup, as a starter.
     const lineup: GameLineup = { starters: [roster[0].id], rotation: [] }
@@ -111,6 +142,49 @@ describe('computeTeamStrength', () => {
     }))
     const emptyLineup: GameLineup = { starters: [], rotation: [] }
     expect(computeTeamStrength(roster, undefined, emptyLineup)).toBe(60)
+  })
+
+  it('gives a flat bonus when a captain personality is among the starters, but does not stack multiple captains', () => {
+    const roster = createInitialRoster(1).map((p) => ({
+      ...p,
+      attributes: { shooting: 60, three: 60, rebound: 60, pass: 60, defense: 60, athletic: 60, iq: 60 },
+      personality: 'steady' as const,
+    }))
+    const lineup: GameLineup = { starters: roster.slice(0, 5).map((p) => p.id), rotation: roster.slice(5, 8).map((p) => p.id) }
+    const baseline = computeTeamStrength(roster, undefined, lineup)
+
+    const oneCaptain = roster.map((p, i) => (i === 0 ? { ...p, personality: 'captain' as const } : p))
+    const twoCaptains = roster.map((p, i) => (i === 0 || i === 1 ? { ...p, personality: 'captain' as const } : p))
+
+    expect(computeTeamStrength(oneCaptain, undefined, lineup)).toBeGreaterThan(baseline)
+    expect(computeTeamStrength(twoCaptains, undefined, lineup)).toBe(computeTeamStrength(oneCaptain, undefined, lineup))
+  })
+
+  it('does not grant the captain bonus when the captain is only in the rotation', () => {
+    const roster = createInitialRoster(1).map((p) => ({
+      ...p,
+      attributes: { shooting: 60, three: 60, rebound: 60, pass: 60, defense: 60, athletic: 60, iq: 60 },
+      personality: 'steady' as const,
+    }))
+    const lineup: GameLineup = { starters: roster.slice(0, 5).map((p) => p.id), rotation: roster.slice(5, 8).map((p) => p.id) }
+    const baseline = computeTeamStrength(roster, undefined, lineup)
+
+    const captainInRotation = roster.map((p, i) => (i === 5 ? { ...p, personality: 'captain' as const } : p))
+    expect(computeTeamStrength(captainInRotation, undefined, lineup)).toBe(baseline)
+  })
+
+  it('boosts a clutch player only when clutchActive is true', () => {
+    const roster = createInitialRoster(1).map((p) => ({
+      ...p,
+      attributes: { shooting: 60, three: 60, rebound: 60, pass: 60, defense: 60, athletic: 60, iq: 60 },
+      personality: 'steady' as const,
+    }))
+    const clutch = roster.map((p, i) => (i === 0 ? { ...p, personality: 'clutch' as const } : p))
+
+    expect(computeTeamStrength(clutch, undefined, undefined, false)).toBe(computeTeamStrength(roster, undefined, undefined, false))
+    expect(computeTeamStrength(clutch, undefined, undefined, true)).toBeGreaterThan(
+      computeTeamStrength(clutch, undefined, undefined, false),
+    )
   })
 })
 

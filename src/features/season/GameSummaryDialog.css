@@ -1,0 +1,89 @@
+.game-summary-dialog {
+  border: none;
+  border-radius: var(--radius);
+  padding: 0;
+  background: var(--bg-elevated);
+  color: var(--text);
+  max-width: min(90vw, 400px);
+  max-height: 85vh;
+}
+
+.game-summary-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.game-summary-dialog__content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  text-align: left;
+  overflow-y: auto;
+}
+
+.game-summary-dialog__content h2 {
+  margin: 0;
+  text-align: center;
+}
+
+.game-summary-dialog__content h3 {
+  margin: var(--space-2) 0 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.game-summary-dialog__strength {
+  margin: 0;
+  text-align: center;
+  font-weight: 700;
+  color: var(--accent-strong);
+}
+
+.game-summary-dialog__players,
+.game-summary-dialog__injuries {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
+}
+
+.game-summary-dialog__players li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.game-summary-dialog__player-role {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--accent-strong);
+  border: 1px solid var(--accent-strong);
+  border-radius: 999px;
+  padding: 0 6px;
+}
+
+.game-summary-dialog__player-name {
+  font-weight: 600;
+}
+
+.game-summary-dialog__player-fatigue {
+  color: var(--text-muted);
+}
+
+.game-summary-dialog__player-growth {
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.game-summary-dialog__injuries li {
+  color: var(--danger, #dc2626);
+}
+
+.game-summary-dialog__content .button-primary {
+  align-self: center;
+  margin-top: var(--space-2);
+}

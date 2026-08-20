@@ -1,6 +1,15 @@
 import { useState } from 'react'
 import { computeOverallGrade } from '../../domain/attributeGrade'
-import { completeLineup, ROTATION_COUNT, STARTER_COUNT, type GameLineup } from '../../domain/lineup'
+import {
+  analyzeLineupComposition,
+  completeLineup,
+  ROTATION_COUNT,
+  sanitizeLineup,
+  STARTER_COUNT,
+  suggestLineup,
+  type GameLineup,
+  type LineupSuggestionStrategy,
+} from '../../domain/lineup'
 import { computeMatchPreview } from '../../domain/matchPreview'
 import type { OfficialPhase } from '../../domain/officialMatch'
 import type { OpponentAce } from '../../domain/opponentAce'
@@ -24,8 +33,16 @@ export interface SeasonMatchScreenProps {
   phase: OfficialPhase
   opponentAce: OpponentAce
   players: Player[]
+  /** 上一場正式賽使用的陣容,做為本場的預設起點;沒有上一場紀錄時為 null。 */
+  initialLineup: GameLineup | null
   lastResult: string | null
   onPlayGame: (tactics: GameTactics, lineup: GameLineup) => void
+}
+
+const SUGGESTION_LABELS: Record<LineupSuggestionStrategy, string> = {
+  bestStrength: '最佳戰力',
+  lowFatigue: '低疲勞',
+  developRookies: '培養新人',
 }
 
 function describeWinChance(probability: number): string {
@@ -46,37 +63,56 @@ export function SeasonMatchScreen({
   phase,
   opponentAce,
   players,
+  initialLineup,
   lastResult,
   onPlayGame,
 }: SeasonMatchScreenProps) {
   const [offense, setOffense] = useState<OffenseTactic>(DEFAULT_TACTICS.offense)
   const [defense, setDefense] = useState<DefenseTactic>(DEFAULT_TACTICS.defense)
-  const [starters, setStarters] = useState<string[]>([])
-  const [rotation, setRotation] = useState<string[]>([])
 
   const availablePlayers = players.filter(
     (player) => player.injuryStatus !== 'minor' && player.injuryStatus !== 'major',
   )
-  const availableIds = availablePlayers.map((player) => player.id)
-  const previewLineup = completeLineup(availableIds, starters, rotation)
+
+  // 預設沿用上一場陣容(已受傷/不可上場的球員會被自動排除);只在掛載時計算一次,
+  // 之後改由玩家手動調整或使用一鍵建議。
+  const [lineupState, setLineupState] = useState(() => sanitizeLineup(initialLineup, availablePlayers))
+  const { starters, rotation } = lineupState
+
+  const previewLineup = completeLineup(availablePlayers, starters, rotation)
   const tactics: GameTactics = { offense, defense }
   const preview = computeMatchPreview(players, previewLineup, tactics, phase, opponentAce)
+  const composition = analyzeLineupComposition(players, previewLineup)
+  const hasVacancy = starters.length < STARTER_COUNT || rotation.length < ROTATION_COUNT
 
   function togglePlayer(playerId: string) {
     if (starters.includes(playerId)) {
-      setStarters((current) => current.filter((id) => id !== playerId))
-      if (rotation.length < ROTATION_COUNT) setRotation((current) => [...current, playerId])
+      setLineupState((current) => {
+        const nextStarters = current.starters.filter((id) => id !== playerId)
+        if (current.rotation.length < ROTATION_COUNT) {
+          return { starters: nextStarters, rotation: [...current.rotation, playerId] }
+        }
+        return { starters: nextStarters, rotation: current.rotation }
+      })
       return
     }
     if (rotation.includes(playerId)) {
-      setRotation((current) => current.filter((id) => id !== playerId))
+      setLineupState((current) => ({ ...current, rotation: current.rotation.filter((id) => id !== playerId) }))
       return
     }
-    if (starters.length < STARTER_COUNT) {
-      setStarters((current) => [...current, playerId])
-    } else if (rotation.length < ROTATION_COUNT) {
-      setRotation((current) => [...current, playerId])
-    }
+    setLineupState((current) => {
+      if (current.starters.length < STARTER_COUNT) {
+        return { ...current, starters: [...current.starters, playerId] }
+      }
+      if (current.rotation.length < ROTATION_COUNT) {
+        return { ...current, rotation: [...current.rotation, playerId] }
+      }
+      return current
+    })
+  }
+
+  function applySuggestion(strategy: LineupSuggestionStrategy) {
+    setLineupState(suggestLineup(availablePlayers, strategy))
   }
 
   return (
@@ -125,13 +161,39 @@ export function SeasonMatchScreen({
               .join('、')}
           </p>
         )}
+        {(preview.captainBonusActive || preview.clutchBonusActive) && (
+          <p className="matchup-card__personality-status">
+            {preview.captainBonusActive && '隊長效果生效中(先發含隊長型)。'}
+            {preview.clutchBonusActive && '抗壓機制生效中(八強/四強階段)。'}
+          </p>
+        )}
       </div>
 
       <div className="matchup-card__lineup">
+        <div className="matchup-card__suggestions" role="group" aria-label="一鍵建議陣容">
+          {(Object.keys(SUGGESTION_LABELS) as LineupSuggestionStrategy[]).map((strategy) => (
+            <button
+              key={strategy}
+              type="button"
+              className="matchup-card__suggestion-button"
+              onClick={() => applySuggestion(strategy)}
+            >
+              {SUGGESTION_LABELS[strategy]}
+            </button>
+          ))}
+        </div>
+
         <p className="matchup-card__lineup-hint">
           先發 {starters.length}/{STARTER_COUNT}・主要輪替 {rotation.length}/{ROTATION_COUNT}
-          (未選滿會自動補上剩餘可上場球員)
+          {hasVacancy ? '(尚有空缺,開打時將自動補上可上場球員)' : ''}
         </p>
+        {(composition.missingBallHandler || composition.missingInterior || composition.overconcentrated) && (
+          <p className="matchup-card__composition-warning">
+            {composition.missingBallHandler && '缺少主要持球者(PG)。'}
+            {composition.missingInterior && '缺少內線球員(C/PF)。'}
+            {composition.overconcentrated && '陣容位置過度集中。'}
+          </p>
+        )}
         <div className="matchup-card__lineup-grid" role="group" aria-label="先發與主要輪替">
           {availablePlayers.map((player) => {
             const role = starters.includes(player.id)
@@ -192,11 +254,7 @@ export function SeasonMatchScreen({
       </div>
 
       {lastResult && <p className="result-banner">{lastResult}</p>}
-      <button
-        className="button-primary"
-        type="button"
-        onClick={() => onPlayGame(tactics, previewLineup)}
-      >
+      <button className="button-primary" type="button" onClick={() => onPlayGame(tactics, previewLineup)}>
         開打
       </button>
     </section>

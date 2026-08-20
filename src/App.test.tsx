@@ -43,6 +43,7 @@ function seedSaveAtGraduationEve() {
       eraCount: 0,
       pendingSeasonSummary: null,
       careerEnded: null,
+      lastLineup: null,
     }),
   )
 }
@@ -80,6 +81,12 @@ async function trainRepeatedly(user: ReturnType<typeof userEvent.setup>, times: 
     }
     await user.click(screen.getByRole('button', { name: '三分' }))
   }
+}
+
+// Clicking 開打 now only computes the result and shows a game-summary dialog; the week
+// only actually advances once the coach confirms it via "繼續".
+async function confirmGameSummary(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole('button', { name: '繼續' }))
 }
 
 describe('App', () => {
@@ -155,6 +162,7 @@ describe('App', () => {
 
     await screen.findByText('第 1 / 4 戰')
     await user.click(screen.getByRole('button', { name: '開打' }))
+    await confirmGameSummary(user)
 
     expect(await screen.findByText('第 2 / 4 戰')).toBeInTheDocument()
   })
@@ -227,6 +235,7 @@ describe('App', () => {
 
     expect(await screen.findByText('第 2 / 2 戰')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '開打' }))
+    await confirmGameSummary(user)
 
     expect(await screen.findByText(/畢業 12 人/)).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: `招生 — 選出 ${ROSTER_SIZE} 名新生` })).toBeInTheDocument()
@@ -287,6 +296,7 @@ describe('App', () => {
         eraCount: 0,
         pendingSeasonSummary: null,
         careerEnded: null,
+        lastLineup: null,
       }),
     )
 
@@ -295,6 +305,7 @@ describe('App', () => {
 
     expect(await screen.findByText('第 2 / 2 戰')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '開打' }))
+    await confirmGameSummary(user)
 
     expect(await screen.findByText('恭喜奪冠!教練生涯圓滿落幕')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '開始新生涯' })).toBeInTheDocument()
@@ -323,6 +334,7 @@ describe('App', () => {
         eraCount: INSURANCE_MAX_ERAS - 1,
         pendingSeasonSummary: null,
         careerEnded: null,
+        lastLineup: null,
       }),
     )
 
@@ -331,6 +343,7 @@ describe('App', () => {
 
     expect(await screen.findByText('第 2 / 2 戰')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '開打' }))
+    await confirmGameSummary(user)
 
     expect(await screen.findByText('教練生涯屆滿,未能奪冠')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: `招生 — 選出 ${ROSTER_SIZE} 名新生` })).not.toBeInTheDocument()

@@ -30,6 +30,7 @@ function makeSaveData(overrides: Partial<SaveData> = {}): SaveData {
     eraCount: 0,
     pendingSeasonSummary: null,
     careerEnded: null,
+    lastLineup: null,
     ...overrides,
   }
 }
@@ -111,6 +112,12 @@ describe('parseSaveData', () => {
     expect(parseSaveData(withoutReputation)).toBeNull()
     const { graduateLog: _graduateLog, ...withoutGraduateLog } = makeSaveData()
     expect(parseSaveData(withoutGraduateLog)).toBeNull()
+  })
+
+  it('accepts a non-null lastLineup and rejects a malformed one', () => {
+    const withLineup = makeSaveData({ lastLineup: { starters: ['p1'], rotation: ['p2'] } })
+    expect(parseSaveData(JSON.parse(serializeSaveData(withLineup)))).toEqual(withLineup)
+    expect(parseSaveData(makeSaveData({ lastLineup: { starters: ['p1'] } as never }))).toBeNull()
   })
 
   it('rejects a save format version older than the current one (e.g. a pre-recruiting save)', () => {
