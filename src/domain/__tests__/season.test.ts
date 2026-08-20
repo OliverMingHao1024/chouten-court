@@ -20,6 +20,9 @@ describe('advanceSeasonWeek', () => {
     expect(result.gameLogEntry.phase).toBe('qualifying')
     expect(result.gameLogEntry.outcome).toBe('win')
     expect(result.nextTotalWeek).toBe(qualifyingStart + 1)
+    expect(result.seasonEnded).toBe(false)
+    expect(result.finalPhaseReached).toBeNull()
+    expect(result.placement).toBeNull()
   })
 
   it('lets the team continue into the next phase when it wins enough of the phase to advance', () => {
@@ -35,6 +38,9 @@ describe('advanceSeasonWeek', () => {
     expect(result.gameLogEntry.outcome).toBe('win')
     expect(result.nextTotalWeek).toBe(lastGameWeek + 1)
     expect(result.message).toContain('晉級')
+    expect(result.seasonEnded).toBe(false)
+    expect(result.finalPhaseReached).toBeNull()
+    expect(result.placement).toBeNull()
   })
 
   it('jumps straight to next year when eliminated at the end of a phase', () => {
@@ -49,6 +55,9 @@ describe('advanceSeasonWeek', () => {
     expect(result.gameLogEntry.outcome).toBe('loss')
     expect(result.nextTotalWeek).toBe(WEEKS_PER_YEAR + 1)
     expect(result.message).toContain('球季')
+    expect(result.seasonEnded).toBe(true)
+    expect(result.finalPhaseReached).toBe('qualifying')
+    expect(result.placement).toBeNull()
   })
 
   it('crowns a champion when the team wins both final4 games', () => {
@@ -63,6 +72,9 @@ describe('advanceSeasonWeek', () => {
     expect(result.gameLogEntry.outcome).toBe('win')
     expect(result.nextTotalWeek).toBe(WEEKS_PER_YEAR + 1)
     expect(result.message).toContain('冠軍')
+    expect(result.seasonEnded).toBe(true)
+    expect(result.finalPhaseReached).toBe('final4')
+    expect(result.placement).toBe('champion')
   })
 
   it('lands on fourth place when the team loses both final4 games', () => {
@@ -77,5 +89,8 @@ describe('advanceSeasonWeek', () => {
     expect(result.gameLogEntry.outcome).toBe('loss')
     expect(result.nextTotalWeek).toBe(WEEKS_PER_YEAR + 1)
     expect(result.message).toContain('殿軍')
+    expect(result.seasonEnded).toBe(true)
+    expect(result.finalPhaseReached).toBe('final4')
+    expect(result.placement).toBe('fourth')
   })
 })

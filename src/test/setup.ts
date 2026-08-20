@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom'
+import { beforeEach } from 'vitest'
 
 // jsdom doesn't implement HTMLDialogElement.showModal()/close() yet; shim them so
 // components using the native <dialog> element are testable. Production code still
@@ -12,3 +13,9 @@ if (typeof HTMLDialogElement !== 'undefined' && !HTMLDialogElement.prototype.sho
     this.dispatchEvent(new Event('close'))
   }
 }
+
+// The save system persists to localStorage; without this, a save written by one test
+// would leak into the next test's fresh render.
+beforeEach(() => {
+  window.localStorage.clear()
+})

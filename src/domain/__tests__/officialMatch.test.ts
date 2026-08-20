@@ -15,8 +15,32 @@ describe('simulateOfficialGame', () => {
     const result = simulateOfficialGame(roster, 'qualifying', 7)
     expect(['win', 'loss']).toContain(result.outcome)
     result.roster.forEach((player, index) => {
-      expect(player.fatigue).toBeGreaterThan(roster[index].fatigue)
+      // A minor injury force-resets fatigue to 0, so a healthy player is the only case
+      // guaranteed to have strictly higher fatigue after playing a game.
+      if (player.injuryStatus === 'healthy') {
+        expect(player.fatigue).toBeGreaterThan(roster[index].fatigue)
+      }
     })
+  })
+
+  it('can trigger a new injury for a player who plays the game', () => {
+    const roster = createInitialRoster(1).map((p) => ({ ...p, fatigue: 100 }))
+    let sawInjury = false
+    for (let seed = 0; seed < 200 && !sawInjury; seed++) {
+      const result = simulateOfficialGame(roster, 'qualifying', seed)
+      sawInjury = result.roster.some((player) => player.injuryStatus !== 'healthy')
+    }
+    expect(sawInjury).toBe(true)
+  })
+
+  it('does not apply match load to a sidelined player and lets their injury count down', () => {
+    const roster = createInitialRoster(1).map((p, i) =>
+      i === 0 ? { ...p, injuryStatus: 'minor' as const, injuryWeeksRemaining: 2, fatigue: 50 } : p,
+    )
+    const result = simulateOfficialGame(roster, 'qualifying', 7)
+    expect(result.roster[0].injuryStatus).toBe('minor')
+    expect(result.roster[0].injuryWeeksRemaining).toBe(1)
+    expect(result.roster[0].fatigue).toBeLessThan(50)
   })
 
   it('is deterministic for the same seed', () => {

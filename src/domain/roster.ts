@@ -1,3 +1,4 @@
+import { generatePersonName } from './nameGenerator'
 import { createSeededRng, type Rng } from './rng'
 import { computeStyleTag } from './styleTag'
 import {
@@ -9,7 +10,7 @@ import {
   type Position,
 } from './types'
 
-const ROSTER_SIZE = 12
+export const ROSTER_SIZE = 12
 const ATTRIBUTE_MIN = 40
 const ATTRIBUTE_MAX = 75
 
@@ -42,21 +43,36 @@ function assignPositions(size: number, rng: Rng): Position[] {
   return assignments
 }
 
+const NAME_RETRY_LIMIT = 5
+
+function generateUniquePlayerName(rng: Rng, usedNames: Set<string>): string {
+  let name = generatePersonName(rng)
+  for (let attempt = 0; attempt < NAME_RETRY_LIMIT && usedNames.has(name); attempt++) {
+    name = generatePersonName(rng)
+  }
+  usedNames.add(name)
+  return name
+}
+
 export function createInitialRoster(seed: number, size: number = ROSTER_SIZE): Player[] {
   const rng = createSeededRng(seed)
   const positions = assignPositions(size, rng)
+  const usedNames = new Set<string>()
 
   return Array.from({ length: size }, (_, index) => {
     const attributes = randomAttributes(rng)
     const personality = PERSONALITY_KEYS[randomInt(rng, 0, PERSONALITY_KEYS.length - 1)]
     return {
       id: `player-${seed}-${index}`,
-      name: `球員${String(index + 1).padStart(2, '0')}`,
+      name: generateUniquePlayerName(rng, usedNames),
       position: positions[index],
       attributes,
       personality,
       fatigue: 0,
       styleTag: computeStyleTag(attributes),
+      injuryStatus: 'healthy',
+      injuryWeeksRemaining: 0,
+      grade: 1,
     }
   })
 }

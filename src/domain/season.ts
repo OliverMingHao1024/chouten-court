@@ -5,6 +5,7 @@ import {
   getFinal4Placement,
   getGameIndexForWeek,
   simulateOfficialGame,
+  type Final4Placement,
   type OfficialPhase,
 } from './officialMatch'
 import type { Player } from './types'
@@ -20,9 +21,15 @@ export interface AdvanceSeasonWeekResult {
   gameLogEntry: SeasonGameLogEntry
   nextTotalWeek: number
   message: string
+  /** true 代表本季已經結束(晉級失敗或四強賽打完),下週會進入新學年的非賽季。 */
+  seasonEnded: boolean
+  /** 本季最終打到的階段;只有 seasonEnded 為 true 時才會有值。 */
+  finalPhaseReached: OfficialPhase | null
+  /** 只有打進四強賽才會有名次,其他階段止步一律為 null。 */
+  placement: Final4Placement | null
 }
 
-const FINAL4_PLACEMENT_LABEL: Record<ReturnType<typeof getFinal4Placement>, string> = {
+export const FINAL4_PLACEMENT_LABEL: Record<ReturnType<typeof getFinal4Placement>, string> = {
   champion: '冠軍',
   runnerUp: '亞軍',
   third: '季軍',
@@ -61,6 +68,9 @@ export function advanceSeasonWeek(
       gameLogEntry,
       nextTotalWeek: totalWeek + 1,
       message: `${PHASE_LABELS[phase]} 第 ${gameIndex + 1} 戰:${outcome === 'win' ? '獲勝' : '落敗'}`,
+      seasonEnded: false,
+      finalPhaseReached: null,
+      placement: null,
     }
   }
 
@@ -76,6 +86,9 @@ export function advanceSeasonWeek(
       gameLogEntry,
       nextTotalWeek: nextYearStart(totalWeek),
       message: `球季結束——最終戰績:${FINAL4_PLACEMENT_LABEL[placement]}!`,
+      seasonEnded: true,
+      finalPhaseReached: phase,
+      placement,
     }
   }
 
@@ -90,5 +103,8 @@ export function advanceSeasonWeek(
     message: advanced
       ? `${PHASE_LABELS[phase]} 戰績 ${wins}勝${losses}敗,晉級下一階段!`
       : `${PHASE_LABELS[phase]} 戰績 ${wins}勝${losses}敗,球季提前結束。`,
+    seasonEnded: !advanced,
+    finalPhaseReached: advanced ? null : phase,
+    placement: null,
   }
 }

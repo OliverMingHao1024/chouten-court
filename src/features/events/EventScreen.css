@@ -1,0 +1,61 @@
+.event-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+}
+
+.event-card__last-result {
+  margin-bottom: var(--space-3);
+}
+
+.event-card__category {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.event-card__title {
+  margin: 4px 0 var(--space-2);
+}
+
+.event-card__prompt {
+  margin: 0 0 var(--space-3);
+  color: var(--text-muted);
+}
+
+.event-card__choices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.event-card__choice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+  cursor: pointer;
+  color: inherit;
+  text-align: left;
+}
+
+.event-card__choice-risk {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--accent-strong);
+}
+
+.event-card__choice-label {
+  font-weight: 700;
+}
+
+.event-card__choice-rate {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}

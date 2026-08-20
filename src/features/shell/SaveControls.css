@@ -1,0 +1,25 @@
+.save-controls {
+  display: flex;
+  gap: var(--space-2);
+  padding: 0 var(--space-4) var(--space-2);
+  flex-wrap: wrap;
+}
+
+.save-controls__button {
+  font-size: 0.75rem;
+  padding: 4px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.save-controls__button--danger {
+  color: var(--danger, #dc2626);
+  border-color: var(--danger, #dc2626);
+}
+
+.save-controls__file-input {
+  display: none;
+}

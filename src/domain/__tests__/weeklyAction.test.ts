@@ -4,6 +4,7 @@ import {
   applyPracticeMatch,
   computeTrainingSuccessGain,
   TRAINING_SUCCESS_RATE,
+  TRAINING_SUCCESS_ROLL_THRESHOLD,
 } from '../weeklyAction'
 import { createInitialRoster } from '../roster'
 import { ATTRIBUTE_KEYS, type AttributeSet, type Player } from '../types'
@@ -22,18 +23,24 @@ function totalAttributeValue(roster: Player[]): number {
 
 describe('computeTrainingSuccessGain', () => {
   it('gives a bigger gain to a personality that favours the trained attribute', () => {
-    const geniusGain = computeTrainingSuccessGain('moderate', 'three', 'genius')
-    const steadyGain = computeTrainingSuccessGain('moderate', 'three', 'steady')
+    const geniusGain = computeTrainingSuccessGain('moderate', 'three', 'genius', 3)
+    const steadyGain = computeTrainingSuccessGain('moderate', 'three', 'steady', 3)
     expect(geniusGain).toBeGreaterThanOrEqual(steadyGain)
   })
 
   it('grows with intensity', () => {
-    expect(computeTrainingSuccessGain('light', 'three', 'steady')).toBeLessThan(
-      computeTrainingSuccessGain('moderate', 'three', 'steady'),
+    expect(computeTrainingSuccessGain('light', 'three', 'steady', 3)).toBeLessThan(
+      computeTrainingSuccessGain('moderate', 'three', 'steady', 3),
     )
-    expect(computeTrainingSuccessGain('moderate', 'three', 'steady')).toBeLessThan(
-      computeTrainingSuccessGain('intense', 'three', 'steady'),
+    expect(computeTrainingSuccessGain('moderate', 'three', 'steady', 3)).toBeLessThan(
+      computeTrainingSuccessGain('intense', 'three', 'steady', 3),
     )
+  })
+
+  it('gives a critical bonus only when the roll is a 6', () => {
+    const normal = computeTrainingSuccessGain('moderate', 'three', 'steady', 3)
+    const critical = computeTrainingSuccessGain('moderate', 'three', 'steady', 6)
+    expect(critical).toBe(normal + 1)
   })
 })
 
@@ -102,6 +109,54 @@ describe('applyTraining', () => {
     expect(totalGain('intense')).toBeGreaterThan(totalGain('light'))
   })
 
+  it('never rolls a new injury during training, even at max fatigue', () => {
+    const roster = createInitialRoster(1).map((p) => ({ ...p, fatigue: 100 }))
+    for (let seed = 0; seed < 200; seed++) {
+      const result = applyTraining(roster, 'three', 'intense', seed)
+      result.roster.forEach((player) => expect(player.injuryStatus).toBe('healthy'))
+    }
+  })
+
+  it('rolls an actual 1~6 die per trained player, matching succeeded to the intensity threshold', () => {
+    const roster = createInitialRoster(1)
+    const result = applyTraining(roster, 'three', 'moderate', 7)
+
+    expect(result.rolls).toHaveLength(roster.length)
+    result.rolls.forEach((roll) => {
+      expect(roll.roll).toBeGreaterThanOrEqual(1)
+      expect(roll.roll).toBeLessThanOrEqual(6)
+      expect(roll.succeeded).toBe(roll.roll >= TRAINING_SUCCESS_ROLL_THRESHOLD.moderate)
+    })
+  })
+
+  it('gives a rolled 6 a critical bonus over the same intensity at a lower successful roll', () => {
+    // Fix personality to 'steady' so the personality multiplier can't coincidentally
+    // make a non-critical roll's gain match the critical bonus.
+    const roster = createInitialRoster(1).map((p) => ({ ...p, personality: 'steady' as const }))
+    let sawCritical = false
+    for (let seed = 0; seed < 200 && !sawCritical; seed++) {
+      const result = applyTraining(roster, 'three', 'moderate', seed)
+      const critical = result.rolls.find((roll) => roll.roll === 6)
+      const plainSuccess = result.rolls.find((roll) => roll.succeeded && roll.roll < 6)
+      if (critical && plainSuccess) {
+        expect(critical.gain).toBeGreaterThan(plainSuccess.gain)
+        sawCritical = true
+      }
+    }
+    expect(sawCritical).toBe(true)
+  })
+
+  it('excludes a sidelined player from training load and growth', () => {
+    const roster = createInitialRoster(1).map((p, i) =>
+      i === 0 ? { ...p, injuryStatus: 'minor' as const, injuryWeeksRemaining: 2, fatigue: 50 } : p,
+    )
+    const result = applyTraining(roster, 'three', 'intense', 7)
+    expect(result.roster[0].injuryStatus).toBe('minor')
+    expect(result.roster[0].injuryWeeksRemaining).toBe(1)
+    expect(result.roster[0].fatigue).toBeLessThan(50)
+    expect(result.roster[0].attributes).toEqual(roster[0].attributes)
+  })
+
   it('reports successCount and totalGain consistent with the roster outcome', () => {
     const roster = withUniformAttributes(createInitialRoster(1), 40).map((p) => ({
       ...p,
@@ -134,8 +189,33 @@ describe('applyPracticeMatch', () => {
     const roster = createInitialRoster(1)
     const result = applyPracticeMatch(roster, 'medium', 7)
     result.roster.forEach((player, index) => {
-      expect(player.fatigue).toBeGreaterThan(roster[index].fatigue)
+      // A minor injury force-resets fatigue to 0, so only a still-healthy player is
+      // guaranteed to have strictly higher fatigue after playing.
+      if (player.injuryStatus === 'healthy') {
+        expect(player.fatigue).toBeGreaterThan(roster[index].fatigue)
+      }
     })
+  })
+
+  it('can trigger a new injury for a player who plays the match', () => {
+    const roster = createInitialRoster(1).map((p) => ({ ...p, fatigue: 100 }))
+    let sawInjury = false
+    for (let seed = 0; seed < 200 && !sawInjury; seed++) {
+      const result = applyPracticeMatch(roster, 'strong', seed)
+      sawInjury = result.roster.some((player) => player.injuryStatus !== 'healthy')
+    }
+    expect(sawInjury).toBe(true)
+  })
+
+  it('excludes a sidelined player from match load and growth eligibility', () => {
+    const roster = createInitialRoster(1).map((p, i) =>
+      i === 0 ? { ...p, injuryStatus: 'major' as const, injuryWeeksRemaining: 3, fatigue: 50 } : p,
+    )
+    const result = applyPracticeMatch(roster, 'strong', 7)
+    expect(result.roster[0].injuryStatus).toBe('major')
+    expect(result.roster[0].injuryWeeksRemaining).toBe(2)
+    expect(result.roster[0].fatigue).toBeLessThan(50)
+    expect(result.roster[0].attributes).toEqual(roster[0].attributes)
   })
 
   it('is deterministic for the same seed', () => {

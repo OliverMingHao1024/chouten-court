@@ -20,10 +20,48 @@
   text-align: center;
 }
 
-.training-result-dialog__dice {
-  font-size: 2.5rem;
+.training-result-dialog__dice-grid {
+  list-style: none;
   margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+  max-width: 260px;
+}
+
+.training-result-dialog__die {
+  font-size: 1.6rem;
+  line-height: 1;
+  text-align: center;
+  color: var(--text-muted);
+  opacity: 0.55;
   animation: training-result-dice-roll 0.4s ease-out;
+  animation-fill-mode: backwards;
+}
+
+.training-result-dialog__die--success {
+  color: var(--accent-strong);
+  opacity: 1;
+}
+
+.training-result-dialog__dice-grid li:nth-child(1) {
+  animation-delay: 0.02s;
+}
+.training-result-dialog__dice-grid li:nth-child(2) {
+  animation-delay: 0.04s;
+}
+.training-result-dialog__dice-grid li:nth-child(3) {
+  animation-delay: 0.06s;
+}
+.training-result-dialog__dice-grid li:nth-child(4) {
+  animation-delay: 0.08s;
+}
+.training-result-dialog__dice-grid li:nth-child(5) {
+  animation-delay: 0.1s;
+}
+.training-result-dialog__dice-grid li:nth-child(6) {
+  animation-delay: 0.12s;
 }
 
 @keyframes training-result-dice-roll {
@@ -33,7 +71,6 @@
   }
   100% {
     transform: rotate(0deg) scale(1);
-    opacity: 1;
   }
 }
 

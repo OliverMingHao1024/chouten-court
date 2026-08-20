@@ -29,8 +29,12 @@ export const GIVEN_NAMES = [
   '振宇',
 ] as const
 
-export function generateCoachName(rng: () => number): string {
+export function generatePersonName(rng: () => number): string {
   const surname = SURNAMES[Math.floor(rng() * SURNAMES.length)]
   const given = GIVEN_NAMES[Math.floor(rng() * GIVEN_NAMES.length)]
   return `${surname}${given}`
+}
+
+export function generateCoachName(rng: () => number): string {
+  return generatePersonName(rng)
 }

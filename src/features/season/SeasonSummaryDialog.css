@@ -1,0 +1,44 @@
+.season-summary-dialog {
+  border: none;
+  border-radius: var(--radius);
+  padding: 0;
+  background: var(--bg-elevated);
+  color: var(--text);
+  max-width: min(90vw, 360px);
+}
+
+.season-summary-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.season-summary-dialog__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  text-align: center;
+}
+
+.season-summary-dialog__record {
+  margin: 0;
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.season-summary-dialog__reputation {
+  margin: 0;
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.season-summary-dialog__awards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}

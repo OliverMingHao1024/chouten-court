@@ -21,6 +21,9 @@ function makePlayer(overrides: Partial<Player> = {}): Player {
     personality: 'steady',
     fatigue: 0,
     styleTag: { primary: 'playmaking', secondary: 'shooting', label: '組織射手型' },
+    injuryStatus: 'healthy',
+    injuryWeeksRemaining: 0,
+    grade: 1,
     ...overrides,
   }
 }
@@ -30,7 +33,7 @@ describe('RosterScreen', () => {
     render(<RosterScreen players={[makePlayer()]} />)
 
     expect(screen.getByText('球員01')).toBeInTheDocument()
-    expect(screen.getByText('PG')).toBeInTheDocument()
+    expect(screen.getByText(/PG/)).toBeInTheDocument()
     expect(screen.getByText('C')).toBeInTheDocument() // average(61,72,44,80,55,68,77) ≈ 65.3 -> C
     expect(screen.queryByText('投籃')).not.toBeInTheDocument()
   })
