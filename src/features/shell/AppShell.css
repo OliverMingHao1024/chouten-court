@@ -4,10 +4,13 @@
   min-height: 100svh;
 }
 
-.app-shell__hud {
+.app-shell__sticky-region {
   position: sticky;
   top: 0;
   z-index: 10;
+}
+
+.app-shell__hud {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -39,6 +42,31 @@
   font-size: 0.8rem;
   color: var(--accent-strong);
   font-weight: 600;
+}
+
+.app-shell__hud-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.app-shell__roster-toggle {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: inherit;
+  padding: var(--space-1) var(--space-2);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.app-shell__roster-panel {
+  border-bottom: 1px solid var(--border);
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg);
+  max-height: 60vh;
+  overflow-y: auto;
 }
 
 .app-shell__menu {

@@ -1,0 +1,58 @@
+.schedule-strip {
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.schedule-strip__next-match {
+  margin: 0 0 var(--space-1);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.schedule-strip__slots {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-2);
+}
+
+.schedule-strip__slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: var(--space-1);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  text-align: center;
+}
+
+.schedule-strip__slot-timing {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+.schedule-strip__slot-content {
+  font-size: 0.7rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.schedule-strip__slot--past {
+  opacity: 0.6;
+}
+
+.schedule-strip__slot--current {
+  border-color: var(--accent-strong);
+  background: var(--accent-bg);
+}
+
+.schedule-strip__slot--current .schedule-strip__slot-content {
+  color: var(--accent-strong);
+}

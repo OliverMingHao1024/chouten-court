@@ -6,7 +6,14 @@ import { TrainingResultDialog } from './TrainingResultDialog'
 function makeRolls(count: number, threshold: number) {
   return Array.from({ length: count }, (_, index) => {
     const roll = (index % 6) + 1
-    return { playerName: `球員${String(index + 1).padStart(2, '0')}`, roll, succeeded: roll >= threshold }
+    const succeeded = roll >= threshold
+    return {
+      playerName: `球員${String(index + 1).padStart(2, '0')}`,
+      roll,
+      succeeded,
+      gain: succeeded ? 1 : 0,
+      bonusLabel: null,
+    }
   })
 }
 
@@ -59,8 +66,8 @@ describe('TrainingResultDialog', () => {
       <TrainingResultDialog
         result={makeResult({
           rolls: [
-            { playerName: '球員01', roll: 5, succeeded: true },
-            { playerName: '球員02', roll: 1, succeeded: false },
+            { playerName: '球員01', roll: 5, succeeded: true, gain: 1, bonusLabel: null },
+            { playerName: '球員02', roll: 1, succeeded: false, gain: 0, bonusLabel: null },
           ],
         })}
       />,
@@ -69,6 +76,24 @@ describe('TrainingResultDialog', () => {
 
     expect(screen.getByTitle('球員01:5 點')).toHaveClass('training-result-dialog__die-slot--success')
     expect(screen.getByTitle('球員02:1 點')).not.toHaveClass('training-result-dialog__die-slot--success')
+  })
+
+  it("shows each player's actual attribute increment, and a personality-bonus label when one applied", () => {
+    render(
+      <TrainingResultDialog
+        result={makeResult({
+          rolls: [
+            { playerName: '球員01', roll: 6, succeeded: true, gain: 4, bonusLabel: '天才型加成' },
+            { playerName: '球員02', roll: 1, succeeded: false, gain: 0, bonusLabel: null },
+          ],
+        })}
+      />,
+    )
+    act(() => vi.runAllTimers())
+
+    expect(screen.getByText('+4')).toBeInTheDocument()
+    expect(screen.getByText('天才型加成')).toBeInTheDocument()
+    expect(screen.getByText('+0')).toBeInTheDocument()
   })
 
   it('stays closed when there is no result yet', () => {

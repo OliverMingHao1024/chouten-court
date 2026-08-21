@@ -55,4 +55,43 @@ describe('AppShell', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
     expect(screen.getByRole('button', { name: '重新開始' })).toBeInTheDocument()
   })
+
+  it('does not show a roster toggle when no roster is provided', () => {
+    render(
+      <AppShell teamName="頂點高中" coachName="山田" reputation={50} year={1} weekOfYear={5} phaseLabel="非賽季">
+        <p>content here</p>
+      </AppShell>,
+    )
+
+    expect(screen.queryByRole('button', { name: '名冊' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the roster collapsed until the 名冊 toggle in the header is clicked', async () => {
+    const user = userEvent.setup()
+    render(
+      <AppShell
+        teamName="頂點高中"
+        coachName="山田"
+        reputation={50}
+        year={1}
+        weekOfYear={5}
+        phaseLabel="非賽季"
+        roster={<p>球員名冊內容</p>}
+      >
+        <p>content here</p>
+      </AppShell>,
+    )
+
+    expect(screen.queryByText('球員名冊內容')).not.toBeInTheDocument()
+
+    const toggle = screen.getByRole('button', { name: '名冊' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+
+    await user.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('球員名冊內容')).toBeInTheDocument()
+
+    await user.click(toggle)
+    expect(screen.queryByText('球員名冊內容')).not.toBeInTheDocument()
+  })
 })

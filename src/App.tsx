@@ -31,6 +31,7 @@ import { generateCandidatePool, signCandidates, type Candidate } from './domain/
 import { applyReputationDelta, computeSeasonReputationDelta, INITIAL_REPUTATION } from './domain/reputation'
 import { createInitialRoster, ROSTER_SIZE } from './domain/roster'
 import { createSeededRng, hashSeed } from './domain/rng'
+import { computeScheduleStrip, weeksUntilNextOfficialMatch } from './domain/schedule'
 import {
   clearSaveFromStorage,
   loadSaveFromStorage,
@@ -52,6 +53,7 @@ import {
   type PracticeStrength,
 } from './domain/weeklyAction'
 import { CareerSummaryScreen } from './features/career/CareerSummaryScreen'
+import { EventResultDialog, type EventRevealResult } from './features/events/EventResultDialog'
 import { EventScreen } from './features/events/EventScreen'
 import { RecruitingScreen } from './features/recruiting/RecruitingScreen'
 import { RosterScreen } from './features/roster/RosterScreen'
@@ -61,6 +63,7 @@ import { SeasonSummaryDialog, type SeasonSummaryResult } from './features/season
 import { SetupScreen } from './features/setup/SetupScreen'
 import { AppShell } from './features/shell/AppShell'
 import { SaveControls } from './features/shell/SaveControls'
+import { ScheduleStrip } from './features/shell/ScheduleStrip'
 import { WeekScreen } from './features/week/WeekScreen'
 import type { TrainingRollResult } from './features/week/TrainingResultDialog'
 
@@ -74,6 +77,8 @@ interface Team {
   practiceMatchTotalWeeks: number[]
   seasonGameLog: SeasonGameLogEntry[]
   trainingRollResult: TrainingRollResult | null
+  /** 事件揭曉:非阻斷式,週數在選擇當下就已經套用,這裡只是拿來顯示這次選擇的原因與影響。 */
+  eventRevealResult: EventRevealResult | null
   reputation: number
   graduateLog: string[]
   recruitingCandidates: Candidate[] | null
@@ -118,7 +123,7 @@ function teamToSaveData(team: Team): SaveData {
 }
 
 function saveDataToTeam(data: SaveData): Team {
-  return { ...data, trainingRollResult: null, pendingGameSummary: null }
+  return { ...data, trainingRollResult: null, eventRevealResult: null, pendingGameSummary: null }
 }
 
 function loadInitialTeam(): Team | null {
@@ -260,6 +265,8 @@ function runTrainingWeek(team: Team, attribute: AttributeKey) {
         playerName: playerNameById.get(roll.playerId) ?? '',
         roll: roll.roll,
         succeeded: roll.succeeded,
+        gain: roll.gain,
+        bonusLabel: roll.bonusLabel,
       })),
     },
   }
@@ -305,6 +312,7 @@ function App() {
             practiceMatchTotalWeeks: [],
             seasonGameLog: [],
             trainingRollResult: null,
+            eventRevealResult: null,
             reputation: INITIAL_REPUTATION,
             graduateLog: [],
             recruitingCandidates: null,
@@ -516,6 +524,16 @@ function App() {
             players,
             reputation: applyReputationDelta(team.reputation, resolution.reputationDelta),
             lastResult: resolution.text,
+            eventRevealResult: {
+              cardTitle: card.title,
+              risk,
+              succeeded: resolution.succeeded,
+              text: resolution.text,
+              attribute: resolution.attribute ?? null,
+              attributeDelta: resolution.attributeDelta,
+              fatigueDelta: resolution.fatigueDelta,
+              reputationDelta: resolution.reputationDelta,
+            },
           })
         }}
       />
@@ -561,6 +579,13 @@ function App() {
       year={year}
       weekOfYear={weekOfYear}
       phaseLabel={PHASE_LABELS[phase]}
+      scheduleStrip={
+        <ScheduleStrip
+          currentTotalWeek={team.totalWeek}
+          slots={computeScheduleStrip(team.totalWeek)}
+          weeksUntilNextMatch={weeksUntilNextOfficialMatch(team.totalWeek)}
+        />
+      }
       actions={
         <SaveControls
           onExport={() => {
@@ -590,14 +615,15 @@ function App() {
           }}
         />
       }
+      roster={<RosterScreen players={team.players} />}
     >
       <GameSummaryDialog
         result={team.pendingGameSummary?.display ?? null}
         onConfirm={() => setTeam(team.pendingGameSummary!.nextTeamState)}
       />
       <SeasonSummaryDialog result={team.pendingSeasonSummary} />
+      <EventResultDialog result={team.eventRevealResult} />
       {actionPanel}
-      <RosterScreen players={team.players} />
     </AppShell>
   )
 }

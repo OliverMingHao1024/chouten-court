@@ -97,6 +97,8 @@ describe('App', () => {
     expect(await screen.findByText('淡水高中')).toBeInTheDocument()
     expect(screen.getByText(/山田 教練/)).toBeInTheDocument()
 
+    // The roster is collapsed by default; the HUD's "名冊" toggle reveals it.
+    await user.click(screen.getByRole('button', { name: '名冊' }))
     const roster = document.querySelectorAll('.roster-tile')
     expect(roster).toHaveLength(12)
   })
@@ -111,6 +113,7 @@ describe('App', () => {
       await user.type(screen.getByLabelText('種子碼(選填)'), 'same-luck')
       await user.click(screen.getByRole('button', { name: '建隊' }))
       await screen.findByText('淡水高中')
+      await user.click(screen.getByRole('button', { name: '名冊' }))
       const roster = Array.from(document.querySelectorAll('.roster-tile')).map((item) => item.textContent)
       unmount()
       return roster
@@ -119,6 +122,15 @@ describe('App', () => {
     const first = await buildWithSeed()
     const second = await buildWithSeed()
     expect(first).toEqual(second)
+  })
+
+  it('shows the schedule strip counting down to the season opener from week 1', async () => {
+    const user = userEvent.setup()
+    await buildTeam(user)
+
+    expect(screen.getByText('距離下一場正式賽 26 週')).toBeInTheDocument()
+    expect(screen.getByText('本週')).toBeInTheDocument()
+    expect(screen.getAllByText('未知').length).toBeGreaterThan(0)
   })
 
   it('advances the week and reports the result after a training week', async () => {
@@ -139,6 +151,30 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: '全隊休養' }))
 
     expect(screen.getByText('本週全隊休養,沒有成長,體力大幅恢復。')).toBeInTheDocument()
+  })
+
+  it('shows an event reveal dialog explaining the outcome once a random event is resolved', async () => {
+    const user = userEvent.setup()
+    await buildTeam(user)
+
+    let eventChoice = document.querySelector<HTMLButtonElement>('.event-card__choice')
+    for (let i = 0; i < 26 && !eventChoice; i++) {
+      await user.click(screen.getByRole('button', { name: '三分' }))
+      eventChoice = document.querySelector<HTMLButtonElement>('.event-card__choice')
+    }
+    expect(eventChoice).not.toBeNull()
+
+    await user.click(eventChoice!)
+
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog).toHaveAttribute('open')
+    expect(screen.getByText(/成功|失敗/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '關閉' })).toBeInTheDocument()
+
+    // The week already advanced when the choice was made (non-blocking reveal): closing
+    // the dialog does not gate progress, unlike the official-game summary dialog's "繼續".
+    await user.click(screen.getByRole('button', { name: '關閉' }))
+    expect(dialog).not.toHaveAttribute('open')
   })
 
   it('switches to the season match screen once the offseason ends, replacing the train/practice panel', async () => {
@@ -240,6 +276,7 @@ describe('App', () => {
     expect(await screen.findByText(/畢業 12 人/)).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: `招生 — 選出 ${ROSTER_SIZE} 名新生` })).toBeInTheDocument()
     // the graduated roster is gone until recruiting fills it back up
+    await user.click(screen.getByRole('button', { name: '名冊' }))
     expect(document.querySelectorAll('.roster-tile')).toHaveLength(0)
 
     const candidateButtons = document.querySelectorAll<HTMLButtonElement>('.recruiting-card__candidate')

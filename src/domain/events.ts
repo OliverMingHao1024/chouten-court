@@ -18,6 +18,12 @@ export const EVENT_CATEGORY_LABELS: Record<EventCategory, string> = {
 export const EVENT_RISKS = ['safe', 'balanced', 'bold'] as const
 export type EventRisk = (typeof EVENT_RISKS)[number]
 
+export const EVENT_RISK_LABELS: Record<EventRisk, string> = {
+  safe: '穩妥處理',
+  balanced: '折衷應對',
+  bold: '放手一搏',
+}
+
 // 每張卡的三檔風險統一用這個成功率(原創數值),不再逐卡各自設定。
 export const EVENT_RISK_SUCCESS_RATE: Record<EventRisk, number> = {
   safe: 0.7,

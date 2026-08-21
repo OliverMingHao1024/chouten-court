@@ -51,6 +51,20 @@
   font-weight: 700;
 }
 
+.training-result-dialog__die-gain {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+
+.training-result-dialog__die-bonus {
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
 /* 立體塑膠骰子質感:漸層底色 + 內外陰影營造浮凸感,不隨主題變色,貼近現實骰子的白色觀感。 */
 .training-result-dialog__die {
   width: 100%;
@@ -140,6 +154,14 @@
       inset 0 -3px 5px rgba(0, 0, 0, 0.18),
       0 0 14px var(--accent-strong),
       0 0 4px var(--accent-strong);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .training-result-dialog__die--rolling,
+  .training-result-dialog__die:not(.training-result-dialog__die--rolling),
+  .training-result-dialog__die--critical {
+    animation: none;
   }
 }
 

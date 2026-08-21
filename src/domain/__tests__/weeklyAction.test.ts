@@ -4,6 +4,7 @@ import {
   applyTeamRest,
   applyPracticeMatch,
   computeTrainingRollGain,
+  personalityBonusLabel,
 } from '../weeklyAction'
 import { createInitialRoster } from '../roster'
 import { ATTRIBUTE_KEYS, type AttributeSet, type Player } from '../types'
@@ -44,6 +45,24 @@ describe('computeTrainingRollGain', () => {
     expect(computeTrainingRollGain('rebound', 'fragile', 6)).toBeGreaterThan(
       computeTrainingRollGain('rebound', 'steady', 6),
     )
+  })
+})
+
+describe('personalityBonusLabel', () => {
+  it('returns null when the personality multiplier does not change the rounded gain', () => {
+    // steady has no multiplier at all, so it never has a bonus to show.
+    expect(personalityBonusLabel('three', 'steady', 4)).toBeNull()
+  })
+
+  it('returns null when a multiplier applies but rounding absorbs it (no visible change)', () => {
+    // genius's 1.3x on a roll of 2 (base gain 1, x1.3 = 1.3, rounds back down to 1): no visible bonus.
+    expect(computeTrainingRollGain('three', 'genius', 2)).toBe(1)
+    expect(personalityBonusLabel('three', 'genius', 2)).toBeNull()
+  })
+
+  it('names the personality when its multiplier actually raises the gain', () => {
+    expect(personalityBonusLabel('three', 'genius', 4)).toBe('天才型加成')
+    expect(personalityBonusLabel('rebound', 'fragile', 6)).toBe('玻璃體質加成')
   })
 })
 

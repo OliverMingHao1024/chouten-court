@@ -12,3 +12,9 @@
   background: var(--success, #16a34a);
   transition: width 0.2s ease;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .fatigue-bar__fill {
+    transition: none;
+  }
+}

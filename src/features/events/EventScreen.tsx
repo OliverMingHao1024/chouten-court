@@ -1,13 +1,7 @@
 import { useState } from 'react'
 import type { EventCard, EventRisk } from '../../domain/events'
-import { EVENT_CATEGORY_LABELS, EVENT_RISK_SUCCESS_RATE, fillEventTemplate } from '../../domain/events'
+import { EVENT_CATEGORY_LABELS, EVENT_RISK_LABELS, EVENT_RISK_SUCCESS_RATE, fillEventTemplate } from '../../domain/events'
 import './EventScreen.css'
-
-const RISK_LABELS: Record<EventRisk, string> = {
-  safe: '穩妥處理',
-  balanced: '折衷應對',
-  bold: '放手一搏',
-}
 
 export interface EventScreenProps {
   card: EventCard
@@ -41,7 +35,7 @@ export function EventScreen({ card, featuredPlayerName, lastResult, onChoose }: 
               onChoose(choice.risk)
             }}
           >
-            <span className="event-card__choice-risk">{RISK_LABELS[choice.risk]}</span>
+            <span className="event-card__choice-risk">{EVENT_RISK_LABELS[choice.risk]}</span>
             <span className="event-card__choice-label">{choice.label}</span>
             <span className="event-card__choice-rate">
               成功率 {Math.round(EVENT_RISK_SUCCESS_RATE[choice.risk] * 100)}%

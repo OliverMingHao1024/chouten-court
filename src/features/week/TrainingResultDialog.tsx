@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useResultDialog } from '../shared/useResultDialog'
 import './TrainingResultDialog.css'
 
 // 3x3 骰子點數配置(左到右、上到下),true 代表該格有一個點,參考現實骰子的點位排列。
@@ -20,6 +21,8 @@ export interface TrainingDieRoll {
   playerName: string
   roll: number
   succeeded: boolean
+  gain: number
+  bonusLabel: string | null
 }
 
 export interface TrainingRollResult {
@@ -86,30 +89,24 @@ function TrainingDie({ roll, settleDelayMs }: TrainingDieProps) {
         <DieFace value={face} />
       </div>
       <span className="training-result-dialog__die-name">{roll.playerName}</span>
+      {!rolling && (
+        <span className="training-result-dialog__die-gain">
+          {roll.gain > 0 ? `+${roll.gain}` : '+0'}
+          {roll.bonusLabel && (
+            <span className="training-result-dialog__die-bonus">{roll.bonusLabel}</span>
+          )}
+        </span>
+      )}
       <span className="sr-only">
-        {roll.playerName} 擲出 {roll.roll} 點,{roll.succeeded ? '成功' : '失敗'}
+        {roll.playerName} 擲出 {roll.roll} 點,{roll.succeeded ? '成功' : '失敗'},實際增量 +{roll.gain}
+        {roll.bonusLabel ? `,${roll.bonusLabel}` : ''}
       </span>
     </li>
   )
 }
 
 export function TrainingResultDialog({ result }: TrainingResultDialogProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null)
-  const [displayed, setDisplayed] = useState<TrainingRollResult | null>(null)
-  const [prevResult, setPrevResult] = useState<TrainingRollResult | null>(null)
-  const [resultVersion, setResultVersion] = useState(0)
-
-  if (result !== prevResult) {
-    setPrevResult(result)
-    if (result) {
-      setDisplayed(result)
-      setResultVersion((version) => version + 1)
-    }
-  }
-
-  useEffect(() => {
-    if (result) dialogRef.current?.showModal()
-  }, [result])
+  const { dialogRef, displayed, version: resultVersion } = useResultDialog(result)
 
   return (
     <dialog

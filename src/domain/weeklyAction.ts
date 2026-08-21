@@ -1,7 +1,7 @@
 import { advancePlayerWeek, ATTRIBUTE_MAX, clamp, computeMatchWinProbability } from './matchEngine'
 import { createSeededRng } from './rng'
 import { computeStyleTag } from './styleTag'
-import type { AttributeKey, Player, PersonalityKey } from './types'
+import { PERSONALITY_LABELS, type AttributeKey, type Player, type PersonalityKey } from './types'
 
 // 訓練不再分風險強度,單一動作、固定負荷;成長量直接依骰子點數對應,不是另外判定成功/失敗
 // (原創數值,待調校):1點不成長,2~3點小幅成長,4~5點中幅成長,6點(會心一擊)成長最多。
@@ -64,11 +64,23 @@ export function computeTrainingRollGain(attribute: AttributeKey, personality: Pe
   return Math.round(ROLL_GROWTH[roll] * personalityMultiplier(attribute, personality, roll))
 }
 
+/** 只有當個性真的把這次骰的成長量往上推,才回傳標籤;倍率存在但被四捨五入吃掉時回傳 null。 */
+export function personalityBonusLabel(
+  attribute: AttributeKey,
+  personality: PersonalityKey,
+  roll: number,
+): string | null {
+  const baseGain = ROLL_GROWTH[roll]
+  const gain = computeTrainingRollGain(attribute, personality, roll)
+  return gain > baseGain ? `${PERSONALITY_LABELS[personality]}加成` : null
+}
+
 export interface PlayerRoll {
   playerId: string
   roll: number
   succeeded: boolean
   gain: number
+  bonusLabel: string | null
 }
 
 export interface TrainingResult {
@@ -96,7 +108,8 @@ export function applyTraining(roster: Player[], attribute: AttributeKey, seed: n
     const gain = computeTrainingRollGain(attribute, player.personality, roll)
     const succeeded = gain > 0
     if (succeeded) successCount += 1
-    rolls.push({ playerId: player.id, roll, succeeded, gain })
+    const bonusLabel = personalityBonusLabel(attribute, player.personality, roll)
+    rolls.push({ playerId: player.id, roll, succeeded, gain, bonusLabel })
 
     const clampedAttribute = clamp(player.attributes[attribute] + gain, 0, ATTRIBUTE_MAX)
     totalGain += clampedAttribute - player.attributes[attribute]

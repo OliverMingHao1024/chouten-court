@@ -53,13 +53,34 @@ describe('GameSummaryDialog', () => {
         onConfirm={() => {}}
       />,
     )
-    expect(screen.getByText(/球員03/)).toBeInTheDocument()
+    expect(screen.getAllByText(/球員03/).length).toBeGreaterThan(0)
     expect(screen.getByText(/受傷前疲勞值 85/)).toBeInTheDocument()
   })
 
   it('does not show an injuries section when nobody got hurt', () => {
     render(<GameSummaryDialog result={makeResult()} onConfirm={() => {}} />)
     expect(screen.queryByText('新發生的傷勢')).not.toBeInTheDocument()
+  })
+
+  it('explains the outcome with a ranked list of reasons drawn from the same data already shown', () => {
+    render(<GameSummaryDialog result={makeResult()} onConfirm={() => {}} />)
+    expect(screen.getByText('主要原因')).toBeInTheDocument()
+    expect(screen.getByText(/球員01 本場成長 三分\+1/)).toBeInTheDocument()
+  })
+
+  it('does not show a reasons section when nothing notable happened', () => {
+    render(
+      <GameSummaryDialog
+        result={makeResult({ players: [{ playerId: 'p1', playerName: '球員01', role: 'starter', fatigueBefore: 20, fatigueAfter: 30, grewAttribute: null }] })}
+        onConfirm={() => {}}
+      />,
+    )
+    expect(screen.queryByText('主要原因')).not.toBeInTheDocument()
+  })
+
+  it('always suggests a concrete next step', () => {
+    render(<GameSummaryDialog result={makeResult()} onConfirm={() => {}} />)
+    expect(screen.getByText(/^下一步:/)).toBeInTheDocument()
   })
 
   it('stays closed when there is no result yet', () => {
