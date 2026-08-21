@@ -126,6 +126,30 @@
   margin-top: 2px;
 }
 
+.roster-dialog__status {
+  margin: 0;
+  font-size: 0.85rem;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+
+.roster-dialog__status--injury {
+  color: var(--danger, #dc2626);
+  border-color: var(--danger, #dc2626);
+}
+
+.roster-dialog__status--fatigue {
+  color: var(--warning, #d97706);
+  border-color: var(--warning, #d97706);
+}
+
+.roster-dialog__status--thriving {
+  color: var(--accent-strong);
+  border-color: var(--accent-strong);
+}
+
 .roster-dialog__attributes {
   display: flex;
   flex-direction: column;

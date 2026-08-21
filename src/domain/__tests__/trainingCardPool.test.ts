@@ -64,6 +64,26 @@ describe('cardCost and cardEffectTier', () => {
     expect(cardEffectMultiplier(makeCard({ age: 0 }))).toBe(1)
     expect(cardEffectMultiplier(makeCard({ age: MAX_CARD_AGE }))).toBeCloseTo(MIN_EFFECT_TIER / 3)
   })
+
+  it('discounts a teamTraining card whose attribute matches the given focus style', () => {
+    const card = makeCard({ kind: 'teamTraining', attribute: 'three', age: 0 })
+    expect(cardCost(card, 'shooting')).toBe(cardCost(card, null) - 1)
+  })
+
+  it('does not discount a teamTraining card whose attribute does not match the focus style', () => {
+    const card = makeCard({ kind: 'teamTraining', attribute: 'rebound', age: 0 })
+    expect(cardCost(card, 'shooting')).toBe(cardCost(card, null))
+  })
+
+  it('never applies a focus discount to non-teamTraining cards', () => {
+    const card = makeCard({ kind: 'rest', attribute: null, age: 0 })
+    expect(cardCost(card, 'rebounding')).toBe(cardCost(card, null))
+  })
+
+  it('never lets the focus discount push cost below the minimum', () => {
+    const nearlyExpiredCard = makeCard({ kind: 'teamTraining', attribute: 'three', age: MAX_CARD_AGE })
+    expect(cardCost(nearlyExpiredCard, 'shooting')).toBe(MIN_CARD_COST)
+  })
 })
 
 describe('maxTrainingPoints / trainingPointsRecovery', () => {

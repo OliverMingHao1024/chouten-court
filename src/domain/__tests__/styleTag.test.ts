@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeStyleTag, STYLE_LABELS } from '../styleTag'
+import { computeStyleTag, primaryStyleForAttribute, STYLE_LABELS } from '../styleTag'
 import type { AttributeSet } from '../types'
 
 function attrs(overrides: Partial<AttributeSet>): AttributeSet {
@@ -37,5 +37,21 @@ describe('computeStyleTag', () => {
   it('is deterministic for the same attributes', () => {
     const a = attrs({ shooting: 70, three: 65 })
     expect(computeStyleTag(a)).toEqual(computeStyleTag(a))
+  })
+})
+
+describe('primaryStyleForAttribute', () => {
+  it('maps three to shooting, its heaviest-weighted style', () => {
+    expect(primaryStyleForAttribute('three')).toBe('shooting')
+  })
+
+  it('maps pass to playmaking and rebound to rebounding', () => {
+    expect(primaryStyleForAttribute('pass')).toBe('playmaking')
+    expect(primaryStyleForAttribute('rebound')).toBe('rebounding')
+  })
+
+  it('agrees with computeStyleTag on a profile dominated by a single attribute', () => {
+    const tag = computeStyleTag(attrs({ pass: 95 }))
+    expect(tag.primary).toBe(primaryStyleForAttribute('pass'))
   })
 })

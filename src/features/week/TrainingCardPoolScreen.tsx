@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { getOpponentTier } from '../../domain/opponentTier'
 import { learnableAbilitiesForPlayer, SPECIAL_ABILITY_LABELS, type SpecialAbilityKey } from '../../domain/specialAbilities'
+import { primaryStyleForAttribute, STYLE_LABELS } from '../../domain/styleTag'
 import {
   canSelectCards,
   cardCost,
@@ -12,8 +13,14 @@ import {
   type TrainingCardPoolState,
 } from '../../domain/trainingCardPool'
 import type { CardSelection } from '../../domain/trainingCardResolution'
-import { ATTRIBUTE_LABELS, type Player } from '../../domain/types'
-import { PRACTICE_OPPONENT_STRENGTH, PRACTICE_STRENGTHS, type PracticeStrength } from '../../domain/weeklyAction'
+import { computeTeamFocusStyle, FOCUS_DISCOUNT } from '../../domain/trainingDirection'
+import { ATTRIBUTE_LABELS, PERSONALITY_LABELS, type AttributeKey, type Player } from '../../domain/types'
+import {
+  attributeAffinityPersonalities,
+  PRACTICE_OPPONENT_STRENGTH,
+  PRACTICE_STRENGTHS,
+  type PracticeStrength,
+} from '../../domain/weeklyAction'
 import './TrainingCardPoolScreen.css'
 
 const KIND_LABELS: Record<CardKind, string> = {
@@ -32,6 +39,31 @@ const STRENGTH_LABELS: Record<PracticeStrength, string> = {
 function cardTitle(card: PoolCard): string {
   if (card.kind === 'teamTraining' && card.attribute) return ATTRIBUTE_LABELS[card.attribute]
   return KIND_LABELS[card.kind]
+}
+
+function isTrainable(player: Player): boolean {
+  return player.injuryStatus === 'healthy' || player.injuryStatus === 'returning'
+}
+
+interface AffinityHint {
+  personalityCount: number
+  personalityLabel: string
+  styleCount: number
+  styleLabel: string
+}
+
+function computeAffinityHint(attribute: AttributeKey, players: Player[]): AffinityHint {
+  const affinityPersonalities = attributeAffinityPersonalities(attribute)
+  const trainable = players.filter(isTrainable)
+  const personalityCount = trainable.filter((player) => affinityPersonalities.includes(player.personality)).length
+  const style = primaryStyleForAttribute(attribute)
+  const styleCount = style ? trainable.filter((player) => player.styleTag.primary === style).length : 0
+  return {
+    personalityCount,
+    personalityLabel: affinityPersonalities.map((personality) => PERSONALITY_LABELS[personality]).join('／'),
+    styleCount,
+    styleLabel: style ? STYLE_LABELS[style] : '',
+  }
 }
 
 export interface TrainingCardPoolScreenProps {
@@ -62,14 +94,16 @@ export function TrainingCardPoolScreen({
   const [individualChoices, setIndividualChoices] = useState<Record<string, IndividualChoice>>({})
   const [strengthChoices, setStrengthChoices] = useState<Record<string, PracticeStrength>>({})
 
+  const focusStyle = computeTeamFocusStyle(players)
   const selectedCards = pool.cards.filter((card) => selectedIds.includes(card.id))
-  const remainingAfterSelection = trainingPoints - selectedCards.reduce((sum, card) => sum + cardCost(card), 0)
+  const remainingAfterSelection =
+    trainingPoints - selectedCards.reduce((sum, card) => sum + cardCost(card, focusStyle), 0)
 
   function toggleCard(card: PoolCard) {
     setSelectedIds((prev) => {
       if (prev.includes(card.id)) return prev.filter((id) => id !== card.id)
       if (prev.length >= MAX_CARDS_PER_WEEK) return prev
-      if (!canSelectCards([...selectedCards, card], trainingPoints)) return prev
+      if (!canSelectCards([...selectedCards, card], trainingPoints, focusStyle)) return prev
       return [...prev, card.id]
     })
   }
@@ -83,7 +117,8 @@ export function TrainingCardPoolScreen({
     return true
   })
 
-  const canConfirm = selectedCards.length > 0 && canSelectCards(selectedCards, trainingPoints) && allSubChoicesFilled
+  const canConfirm =
+    selectedCards.length > 0 && canSelectCards(selectedCards, trainingPoints, focusStyle) && allSubChoicesFilled
 
   function handleConfirm() {
     if (!canConfirm) return
@@ -105,8 +140,15 @@ export function TrainingCardPoolScreen({
 
   return (
     <section className="training-card-pool">
+      {focusStyle && (
+        <p className="training-card-pool__focus">
+          本月焦點:{STYLE_LABELS[focusStyle]}型 — 對應屬性的全隊訓練卡 -{FOCUS_DISCOUNT}點
+        </p>
+      )}
+
       <p className="training-card-pool__points">
-        訓練點數 {trainingPoints - selectedCards.reduce((sum, card) => sum + cardCost(card), 0)} / {maxTrainingPoints}
+        訓練點數 {trainingPoints - selectedCards.reduce((sum, card) => sum + cardCost(card, focusStyle), 0)} /{' '}
+        {maxTrainingPoints}
         {selectedCards.length > 0 && (
           <span className="training-card-pool__points-preview">(已選 {selectedCards.length} 張,剩餘 {remainingAfterSelection})</span>
         )}
@@ -115,8 +157,12 @@ export function TrainingCardPoolScreen({
       <ul className="training-card-pool__grid" role="group" aria-label="訓練卡池">
         {pool.cards.map((card) => {
           const selected = selectedIds.includes(card.id)
-          const disabled = !selected && (selectedCards.length >= MAX_CARDS_PER_WEEK || cardCost(card) > remainingAfterSelection)
+          const cost = cardCost(card, focusStyle)
+          const baseCost = cardCost(card, null)
+          const discounted = cost < baseCost
+          const disabled = !selected && (selectedCards.length >= MAX_CARDS_PER_WEEK || cost > remainingAfterSelection)
           const effectTier = cardEffectTier(card)
+          const affinity = card.kind === 'teamTraining' && card.attribute ? computeAffinityHint(card.attribute, players) : null
           return (
             <li key={card.id}>
               <button
@@ -127,11 +173,28 @@ export function TrainingCardPoolScreen({
               >
                 <span className="training-card-pool__card-kind">{KIND_LABELS[card.kind]}</span>
                 <span className="training-card-pool__card-title">{cardTitle(card)}</span>
-                <span className="training-card-pool__card-cost">{cardCost(card)} 點</span>
+                <span className="training-card-pool__card-cost">
+                  {discounted && <span className="training-card-pool__card-cost-original">{baseCost}</span>}
+                  {cost} 點
+                </span>
                 <span className="training-card-pool__card-effect" aria-label={`效果強度 ${effectTier}/${MAX_EFFECT_TIER}`}>
                   {'●'.repeat(effectTier)}
                   {'○'.repeat(MAX_EFFECT_TIER - effectTier)}
                 </span>
+                {affinity && (affinity.personalityCount > 0 || affinity.styleCount > 0) && (
+                  <span className="training-card-pool__card-affinity">
+                    {affinity.personalityCount > 0 && (
+                      <span title={`${affinity.personalityLabel}訓練此屬性效果更好`}>
+                        ★{affinity.personalityLabel} {affinity.personalityCount}人
+                      </span>
+                    )}
+                    {affinity.styleCount > 0 && (
+                      <span title={`已是「${affinity.styleLabel}型」球風的球員,此屬性會強化既有優勢`}>
+                        {affinity.styleLabel}型契合 {affinity.styleCount}人
+                      </span>
+                    )}
+                  </span>
+                )}
               </button>
             </li>
           )

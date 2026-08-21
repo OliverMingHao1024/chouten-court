@@ -53,9 +53,21 @@ export const PRACTICE_LOSS_GROWTH: Record<PracticeStrength, number> = {
 const FRAGILE_HIGH_ROLL_MULTIPLIER = 1.25
 const FRAGILE_HIGH_ROLL_THRESHOLD = 4
 
+const ATTRIBUTE_AFFINITY_MULTIPLIER = 1.3
+
+/**
+ * 哪些個性對這項屬性有固定(不看骰面)的訓練加成,供卡池畫面顯示「個性相性」提示,
+ * 也是 personalityMultiplier 骰面無關那一半的單一資料來源。玻璃體質的加成只在高骰面才觸發,
+ * 屬於骰面相關的風險補償,不算「相性」,不列在這裡。
+ */
+export function attributeAffinityPersonalities(attribute: AttributeKey): PersonalityKey[] {
+  const affinities: PersonalityKey[] = ['genius']
+  if (attribute === 'shooting' || attribute === 'three') affinities.push('scorer')
+  return affinities
+}
+
 function personalityMultiplier(attribute: AttributeKey, personality: PersonalityKey, roll: number): number {
-  if (personality === 'genius') return 1.3
-  if (personality === 'scorer' && (attribute === 'shooting' || attribute === 'three')) return 1.3
+  if (attributeAffinityPersonalities(attribute).includes(personality)) return ATTRIBUTE_AFFINITY_MULTIPLIER
   if (personality === 'fragile' && roll >= FRAGILE_HIGH_ROLL_THRESHOLD) return FRAGILE_HIGH_ROLL_MULTIPLIER
   return 1.0
 }

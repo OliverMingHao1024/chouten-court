@@ -3,6 +3,7 @@ import {
   applyTraining,
   applyTeamRest,
   applyPracticeMatch,
+  attributeAffinityPersonalities,
   computeTrainingRollGain,
   personalityBonusLabel,
 } from '../weeklyAction'
@@ -20,6 +21,26 @@ function totalAttributeValue(roster: Player[]): number {
     0,
   )
 }
+
+describe('attributeAffinityPersonalities', () => {
+  it('lists genius for every attribute', () => {
+    for (const attribute of ATTRIBUTE_KEYS) {
+      expect(attributeAffinityPersonalities(attribute)).toContain('genius')
+    }
+  })
+
+  it('adds scorer only for shooting and three', () => {
+    expect(attributeAffinityPersonalities('shooting')).toContain('scorer')
+    expect(attributeAffinityPersonalities('three')).toContain('scorer')
+    expect(attributeAffinityPersonalities('rebound')).not.toContain('scorer')
+  })
+
+  it('never lists fragile, since its bonus depends on the roll rather than the attribute', () => {
+    for (const attribute of ATTRIBUTE_KEYS) {
+      expect(attributeAffinityPersonalities(attribute)).not.toContain('fragile')
+    }
+  })
+})
 
 describe('computeTrainingRollGain', () => {
   it('gives a bigger gain to a personality that favours the trained attribute', () => {

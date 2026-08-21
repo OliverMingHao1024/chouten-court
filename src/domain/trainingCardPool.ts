@@ -1,6 +1,7 @@
 import { REPUTATION_MAX } from './reputation'
 import type { Rng } from './rng'
-import { ATTRIBUTE_KEYS, type AttributeKey } from './types'
+import { focusDiscountForAttribute } from './trainingDirection'
+import { ATTRIBUTE_KEYS, type AttributeKey, type StyleKey } from './types'
 
 // 白球のキセキ研究(docs/training-card-pool-plan.md)交叉驗證過上限/回復量隨評判連續變化,
 // 但沒有任何來源公開過個別卡片的起始成本/效果或衰減幅度,以下數值皆為本專案原創,待調校。
@@ -42,8 +43,15 @@ export interface TrainingCardPoolState {
   nextCardId: number
 }
 
-export function cardCost(card: PoolCard): number {
-  return Math.max(MIN_CARD_COST, BASE_COST[card.kind] - card.age)
+/**
+ * focusStyle 為選填的「本月焦點」(見 trainingDirection.ts):即時算出的球風分類,
+ * 對應屬性的全隊訓練卡會拿到固定折扣。省略時行為與過去完全相同。
+ */
+export function cardCost(card: PoolCard, focusStyle: StyleKey | null = null): number {
+  const base = Math.max(MIN_CARD_COST, BASE_COST[card.kind] - card.age)
+  if (card.kind !== 'teamTraining' || !card.attribute) return base
+  const discount = focusDiscountForAttribute(card.attribute, focusStyle)
+  return Math.max(MIN_CARD_COST, base - discount)
 }
 
 export function cardEffectTier(card: PoolCard): number {
@@ -67,13 +75,13 @@ export function recoverTrainingPoints(current: number, reputation: number): numb
   return Math.min(maxTrainingPoints(reputation), current + trainingPointsRecovery(reputation))
 }
 
-export function totalCost(cards: PoolCard[]): number {
-  return cards.reduce((sum, card) => sum + cardCost(card), 0)
+export function totalCost(cards: PoolCard[], focusStyle: StyleKey | null = null): number {
+  return cards.reduce((sum, card) => sum + cardCost(card, focusStyle), 0)
 }
 
 /** 是否能同時選這些卡:張數不超過每週上限,且總花費不超過剩餘點數。 */
-export function canSelectCards(cards: PoolCard[], remainingPoints: number): boolean {
-  return cards.length > 0 && cards.length <= MAX_CARDS_PER_WEEK && totalCost(cards) <= remainingPoints
+export function canSelectCards(cards: PoolCard[], remainingPoints: number, focusStyle: StyleKey | null = null): boolean {
+  return cards.length > 0 && cards.length <= MAX_CARDS_PER_WEEK && totalCost(cards, focusStyle) <= remainingPoints
 }
 
 // 同類卡疊加時額外再乘一次的效果倍率(原創數值,待調校)。

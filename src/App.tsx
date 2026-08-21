@@ -49,6 +49,7 @@ import {
   type TrainingCardPoolState,
 } from './domain/trainingCardPool'
 import { resolveCardSelections, type CardSelection } from './domain/trainingCardResolution'
+import { computeTeamFocusStyle } from './domain/trainingDirection'
 import { ATTRIBUTE_LABELS, INJURY_STATUS_LABELS, type Player } from './domain/types'
 import { PRACTICE_STRENGTHS, type PracticeStrength } from './domain/weeklyAction'
 import { CareerSummaryScreen } from './features/career/CareerSummaryScreen'
@@ -281,7 +282,9 @@ function runTrainingCardWeek(team: Team, selections: CardSelection[]) {
   const poolRng = createSeededRng(hashSeed(`${team.seed}-${team.totalWeek}-cardpool`))
   const advance = advanceCardPool(team.cardPool, selections.map((selection) => selection.card.id), poolRng)
 
-  const spent = totalCost(selections.map((selection) => selection.card))
+  // 用選卡當下(訓練結算前)的名冊算焦點,跟畫面上顯示、玩家實際看到並依此決策的折扣保持一致。
+  const focusStyle = computeTeamFocusStyle(team.players)
+  const spent = totalCost(selections.map((selection) => selection.card), focusStyle)
   const trainingPoints = recoverTrainingPoints(team.trainingPoints - spent, team.reputation)
 
   const playerNameById = Object.fromEntries(team.players.map((player) => [player.id, player.name]))

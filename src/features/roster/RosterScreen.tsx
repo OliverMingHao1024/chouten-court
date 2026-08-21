@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { computeOverallGrade } from '../../domain/attributeGrade'
 import { ATTRIBUTE_MAX, computeRecoveryRate } from '../../domain/matchEngine'
+import { describePlayerStatus } from '../../domain/playerStatus'
 import { SPECIAL_ABILITY_LABELS } from '../../domain/specialAbilities'
 import { ATTRIBUTE_KEYS, ATTRIBUTE_LABELS, INJURY_STATUS_LABELS, type Player } from '../../domain/types'
 import { AttributeBar } from './AttributeBar'
@@ -15,6 +16,7 @@ export interface RosterScreenProps {
 export function RosterScreen({ players }: RosterScreenProps) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null)
+  const status = selectedPlayer ? describePlayerStatus(selectedPlayer) : null
 
   return (
     <div className="roster">
@@ -72,6 +74,9 @@ export function RosterScreen({ players }: RosterScreenProps) {
                 )}
               </div>
             </header>
+            {status && (
+              <p className={`roster-dialog__status roster-dialog__status--${status.tone}`}>{status.text}</p>
+            )}
             <div className="roster-dialog__attributes">
               {ATTRIBUTE_KEYS.map((key) => (
                 <AttributeBar

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { RosterScreen } from './RosterScreen'
 import { computeRecoveryRate } from '../../domain/matchEngine'
+import { describePlayerStatus } from '../../domain/playerStatus'
 import type { Player } from '../../domain/types'
 
 function makePlayer(overrides: Partial<Player> = {}): Player {
@@ -81,6 +82,17 @@ describe('RosterScreen', () => {
 
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByText(`每週體力恢復 ${computeRecoveryRate(player)} 點`)).toBeInTheDocument()
+  })
+
+  it('shows a near-term status blurb in the dialog, derived from injury/fatigue/attributes', async () => {
+    const user = userEvent.setup()
+    const player = makePlayer({ injuryStatus: 'major', injuryWeeksRemaining: 3 })
+    render(<RosterScreen players={[player]} />)
+
+    await user.click(screen.getByRole('button', { name: /球員01/ }))
+
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText(describePlayerStatus(player).text)).toBeInTheDocument()
   })
 
   it('shows the right player when a different block is clicked', async () => {

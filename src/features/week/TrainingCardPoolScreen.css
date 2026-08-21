@@ -8,6 +8,13 @@
   gap: var(--space-3);
 }
 
+.training-card-pool__focus {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--accent-strong);
+}
+
 .training-card-pool__points {
   margin: 0;
   font-weight: 700;
@@ -70,9 +77,25 @@
   font-weight: 700;
 }
 
+.training-card-pool__card-cost-original {
+  margin-right: 2px;
+  color: var(--text-muted);
+  text-decoration: line-through;
+  font-weight: 400;
+}
+
 .training-card-pool__card-effect {
   font-size: 0.7rem;
   letter-spacing: 1px;
+}
+
+.training-card-pool__card-affinity {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  font-size: 0.62rem;
+  color: var(--accent-strong);
 }
 
 .training-card-pool__sub-choice {
