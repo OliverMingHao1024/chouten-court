@@ -1,5 +1,7 @@
 # `chouten-court` 遊戲性改善建議
 
+> ⚠️ **已被取代，不代表現況（僅供歷史存查）**：本文件的建議已被後續的 `docs/basketball-gameplay-improvement-plan.md`（第 1-6 階段，已全數實作）與 `docs/baseball-modes-benchmark-and-optimization-plan.md`（V1-V4 roadmap）吸收並取代。程式碼後續也已多次變動（例如訓練已改為訓練卡池制，個性效果亦已補齊），本文件內容已與現況不符。**請勿依本文件內容做判斷或實作決策**，請改看上述兩份文件。
+
 > 整理日期：2026-08-20  
 > 參考文件：`docs/prospi-hakkyuu-no-kiseki-gameplay-analysis.md`  
 > 目的：將《野球魂》白球模式的研究結論，轉化為適合本專案高中籃球經營玩法的改善方向。

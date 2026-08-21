@@ -1,5 +1,7 @@
 # `chouten-court` 遊戲性改善規格書
 
+> ⚠️ **已被取代，不代表現況（僅供歷史存查）**：本文件已被後續的 `docs/basketball-gameplay-improvement-plan.md`（第 1-6 階段，已全數實作）取代，且部分內容已明確過時——例如文中「captain 與 clutch 個性目前只是標籤，沒有任何遊戲效果」「玻璃體質尚未實作成長優勢」等描述已不成立，這些效果都已在後續階段補上（見 `matchEngine.ts` 的 `CAPTAIN_STRENGTH_BONUS`、`CLUTCH_PERFORMANCE_BONUS`、fragile 訓練骰面加成）。**請勿依本文件內容做判斷或實作決策**，請改看 `docs/basketball-gameplay-improvement-plan.md`。
+
 > 依 `docs/gameplay-improvement-recommendations.md`（2026-08-20）逐項展開為可驗收的規格。
 > 已省略該文件第 9 節列出的暫緩項目（名人堂、成就、宿敵校追蹤等）。
 > 建議實作順序依原文件第 10 節，各節之間的依賴關係已在各自的「實作決策」註明。

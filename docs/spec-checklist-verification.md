@@ -1,5 +1,7 @@
 # Spec Checklist 補全結果 — 獨立驗證報告
 
+> ⚠️ **已停用,不代表現況(僅供歷史存查)**:本文件是針對 `docs/spec-checklist.md`(同樣已停用)當時記錄的 7 個落差項目做的驗證快照,程式碼後續已多次變動,內容已與現況不符。目前進度請改看 `docs/baseball-modes-benchmark-and-optimization-plan.md` 第 12 節。**請勿依本文件內容做判斷或實作決策。**
+
 > 針對 `docs/spec-checklist.md` 中記錄的 7 個落差項目,在補全實作後,以獨立 agent 重新讀碼驗證(不採信 checklist 文字本身),確認是否真的落地、有無殘留舊邏輯或新引入 bug。驗證時間:本次對話當下。
 
 ## 驗證方式
