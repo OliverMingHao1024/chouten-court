@@ -1,0 +1,204 @@
+import { useState } from 'react'
+import { getOpponentTier } from '../../domain/opponentTier'
+import {
+  canSelectCards,
+  cardCost,
+  cardEffectTier,
+  MAX_CARDS_PER_WEEK,
+  MAX_EFFECT_TIER,
+  type CardKind,
+  type PoolCard,
+  type TrainingCardPoolState,
+} from '../../domain/trainingCardPool'
+import type { CardSelection } from '../../domain/trainingCardResolution'
+import { ATTRIBUTE_KEYS, ATTRIBUTE_LABELS, type AttributeKey, type Player } from '../../domain/types'
+import { PRACTICE_OPPONENT_STRENGTH, PRACTICE_STRENGTHS, type PracticeStrength } from '../../domain/weeklyAction'
+import './TrainingCardPoolScreen.css'
+
+const KIND_LABELS: Record<CardKind, string> = {
+  teamTraining: '全隊訓練',
+  individualTraining: '個別訓練',
+  practiceMatch: '練習賽',
+  rest: '休養',
+}
+
+const STRENGTH_LABELS: Record<PracticeStrength, string> = {
+  weak: getOpponentTier(PRACTICE_OPPONENT_STRENGTH.weak),
+  medium: getOpponentTier(PRACTICE_OPPONENT_STRENGTH.medium),
+  strong: getOpponentTier(PRACTICE_OPPONENT_STRENGTH.strong),
+}
+
+function cardTitle(card: PoolCard): string {
+  if (card.kind === 'teamTraining' && card.attribute) return ATTRIBUTE_LABELS[card.attribute]
+  return KIND_LABELS[card.kind]
+}
+
+export interface TrainingCardPoolScreenProps {
+  pool: TrainingCardPoolState
+  trainingPoints: number
+  maxTrainingPoints: number
+  players: Player[]
+  opponentNames: Record<PracticeStrength, string>
+  onConfirm: (selections: CardSelection[]) => void
+}
+
+interface IndividualChoice {
+  playerId?: string
+  attribute?: AttributeKey
+}
+
+export function TrainingCardPoolScreen({
+  pool,
+  trainingPoints,
+  maxTrainingPoints,
+  players,
+  opponentNames,
+  onConfirm,
+}: TrainingCardPoolScreenProps) {
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [individualChoices, setIndividualChoices] = useState<Record<string, IndividualChoice>>({})
+  const [strengthChoices, setStrengthChoices] = useState<Record<string, PracticeStrength>>({})
+
+  const selectedCards = pool.cards.filter((card) => selectedIds.includes(card.id))
+  const remainingAfterSelection = trainingPoints - selectedCards.reduce((sum, card) => sum + cardCost(card), 0)
+
+  function toggleCard(card: PoolCard) {
+    setSelectedIds((prev) => {
+      if (prev.includes(card.id)) return prev.filter((id) => id !== card.id)
+      if (prev.length >= MAX_CARDS_PER_WEEK) return prev
+      if (!canSelectCards([...selectedCards, card], trainingPoints)) return prev
+      return [...prev, card.id]
+    })
+  }
+
+  const allSubChoicesFilled = selectedCards.every((card) => {
+    if (card.kind === 'individualTraining') {
+      const choice = individualChoices[card.id]
+      return !!choice?.playerId && !!choice?.attribute
+    }
+    if (card.kind === 'practiceMatch') return !!strengthChoices[card.id]
+    return true
+  })
+
+  const canConfirm = selectedCards.length > 0 && canSelectCards(selectedCards, trainingPoints) && allSubChoicesFilled
+
+  function handleConfirm() {
+    if (!canConfirm) return
+    const selections: CardSelection[] = selectedCards.map((card) => {
+      if (card.kind === 'individualTraining') {
+        const choice = individualChoices[card.id]!
+        return { card, playerId: choice.playerId, attribute: choice.attribute }
+      }
+      if (card.kind === 'practiceMatch') {
+        return { card, strength: strengthChoices[card.id] }
+      }
+      return { card }
+    })
+    onConfirm(selections)
+    setSelectedIds([])
+    setIndividualChoices({})
+    setStrengthChoices({})
+  }
+
+  return (
+    <section className="training-card-pool">
+      <p className="training-card-pool__points">
+        訓練點數 {trainingPoints - selectedCards.reduce((sum, card) => sum + cardCost(card), 0)} / {maxTrainingPoints}
+        {selectedCards.length > 0 && (
+          <span className="training-card-pool__points-preview">(已選 {selectedCards.length} 張,剩餘 {remainingAfterSelection})</span>
+        )}
+      </p>
+
+      <ul className="training-card-pool__grid" role="group" aria-label="訓練卡池">
+        {pool.cards.map((card) => {
+          const selected = selectedIds.includes(card.id)
+          const disabled = !selected && (selectedCards.length >= MAX_CARDS_PER_WEEK || cardCost(card) > remainingAfterSelection)
+          const effectTier = cardEffectTier(card)
+          return (
+            <li key={card.id}>
+              <button
+                type="button"
+                className={`training-card-pool__card${selected ? ' training-card-pool__card--selected' : ''}`}
+                disabled={disabled}
+                onClick={() => toggleCard(card)}
+              >
+                <span className="training-card-pool__card-kind">{KIND_LABELS[card.kind]}</span>
+                <span className="training-card-pool__card-title">{cardTitle(card)}</span>
+                <span className="training-card-pool__card-cost">{cardCost(card)} 點</span>
+                <span className="training-card-pool__card-effect" aria-label={`效果強度 ${effectTier}/${MAX_EFFECT_TIER}`}>
+                  {'●'.repeat(effectTier)}
+                  {'○'.repeat(MAX_EFFECT_TIER - effectTier)}
+                </span>
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+
+      {selectedCards
+        .filter((card) => card.kind === 'individualTraining')
+        .map((card) => (
+          <div key={card.id} className="training-card-pool__sub-choice">
+            <p className="training-card-pool__sub-choice-label">個別訓練:選球員與屬性</p>
+            <select
+              aria-label={`${card.id}-player`}
+              value={individualChoices[card.id]?.playerId ?? ''}
+              onChange={(e) =>
+                setIndividualChoices((prev) => ({ ...prev, [card.id]: { ...prev[card.id], playerId: e.target.value } }))
+              }
+            >
+              <option value="" disabled>
+                選球員
+              </option>
+              {players
+                .filter((player) => player.injuryStatus === 'healthy' || player.injuryStatus === 'returning')
+                .map((player) => (
+                  <option key={player.id} value={player.id}>
+                    {player.name}
+                  </option>
+                ))}
+            </select>
+            <div className="training-card-pool__attribute-picker" role="group" aria-label="個別訓練屬性">
+              {ATTRIBUTE_KEYS.map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  className={`training-card-pool__attribute-button${individualChoices[card.id]?.attribute === key ? ' training-card-pool__attribute-button--selected' : ''}`}
+                  onClick={() =>
+                    setIndividualChoices((prev) => ({ ...prev, [card.id]: { ...prev[card.id], attribute: key } }))
+                  }
+                >
+                  {ATTRIBUTE_LABELS[key]}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+
+      {selectedCards
+        .filter((card) => card.kind === 'practiceMatch')
+        .map((card) => (
+          <div key={card.id} className="training-card-pool__sub-choice">
+            <p className="training-card-pool__sub-choice-label">練習賽:選對手強度</p>
+            <div className="training-card-pool__options">
+              {PRACTICE_STRENGTHS.map((strength) => (
+                <button
+                  key={strength}
+                  type="button"
+                  className={`training-card-pool__option${strengthChoices[card.id] === strength ? ' training-card-pool__option--selected' : ''}`}
+                  onClick={() => setStrengthChoices((prev) => ({ ...prev, [card.id]: strength }))}
+                >
+                  <span className="training-card-pool__option-label">{opponentNames[strength]}</span>
+                  <span className="training-card-pool__option-rate">{STRENGTH_LABELS[strength]}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+
+      <button type="button" className="button-primary" disabled={!canConfirm} onClick={handleConfirm}>
+        確認本週訓練
+      </button>
+    </section>
+  )
+}

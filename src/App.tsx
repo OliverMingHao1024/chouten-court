@@ -1,10 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import {
-  canScheduleAnotherPracticeMatch,
-  getCalendarPosition,
-  getSeasonPhase,
-  PHASE_LABELS,
-} from './domain/calendar'
+import { getCalendarPosition, getSeasonPhase, PHASE_LABELS } from './domain/calendar'
 import { generateOpponentName } from './domain/opponentName'
 import { generateOpponentAce, opponentAceEraIndex } from './domain/opponentAce'
 import {
@@ -44,14 +39,17 @@ import {
 import { advanceSeasonWeek, type SeasonGameLogEntry } from './domain/season'
 import { computeSeasonAwards, type SeasonRecord } from './domain/seasonSummary'
 import { computeStyleTag } from './domain/styleTag'
-import { ATTRIBUTE_LABELS, INJURY_STATUS_LABELS, type AttributeKey, type Player } from './domain/types'
 import {
-  applyPracticeMatch,
-  applyTeamRest,
-  applyTraining,
-  PRACTICE_STRENGTHS,
-  type PracticeStrength,
-} from './domain/weeklyAction'
+  advanceCardPool,
+  createInitialCardPool,
+  maxTrainingPoints,
+  recoverTrainingPoints,
+  totalCost,
+  type TrainingCardPoolState,
+} from './domain/trainingCardPool'
+import { resolveCardSelections, type CardSelection } from './domain/trainingCardResolution'
+import { ATTRIBUTE_LABELS, INJURY_STATUS_LABELS, type Player } from './domain/types'
+import { PRACTICE_STRENGTHS, type PracticeStrength } from './domain/weeklyAction'
 import { CareerSummaryScreen } from './features/career/CareerSummaryScreen'
 import { EventResultDialog, type EventRevealResult } from './features/events/EventResultDialog'
 import { EventScreen } from './features/events/EventScreen'
@@ -64,8 +62,8 @@ import { SetupScreen } from './features/setup/SetupScreen'
 import { AppShell } from './features/shell/AppShell'
 import { SaveControls } from './features/shell/SaveControls'
 import { ScheduleStrip } from './features/shell/ScheduleStrip'
-import { WeekScreen } from './features/week/WeekScreen'
-import type { TrainingRollResult } from './features/week/TrainingResultDialog'
+import { TrainingCardPoolScreen } from './features/week/TrainingCardPoolScreen'
+import { TrainingCardResultDialog, type TrainingCardWeekResult } from './features/week/TrainingCardResultDialog'
 
 interface Team {
   teamName: string
@@ -74,9 +72,14 @@ interface Team {
   totalWeek: number
   players: Player[]
   lastResult: string | null
-  practiceMatchTotalWeeks: number[]
   seasonGameLog: SeasonGameLogEntry[]
-  trainingRollResult: TrainingRollResult | null
+  cardPool: TrainingCardPoolState
+  trainingPoints: number
+  /**
+   * 本週訓練卡池結算結果:非阻斷式,週數在選卡當下就已經套用,這裡只是拿來顯示這次選擇的
+   * 原因與影響。純執行期狀態,不寫入存檔(比照 eventRevealResult)。
+   */
+  cardPoolResult: TrainingCardWeekResult | null
   /** 事件揭曉:非阻斷式,週數在選擇當下就已經套用,這裡只是拿來顯示這次選擇的原因與影響。 */
   eventRevealResult: EventRevealResult | null
   reputation: number
@@ -90,7 +93,7 @@ interface Team {
   lastLineup: GameLineup | null
   /**
    * 賽後摘要待確認:比賽結果已算好,但要等玩家確認摘要後才會真正套用(進入下一週)。
-   * 純執行期狀態,不寫入存檔(比照 trainingRollResult)。
+   * 純執行期狀態,不寫入存檔(比照 eventRevealResult)。
    */
   pendingGameSummary: PendingGameSummary | null
 }
@@ -109,8 +112,9 @@ function teamToSaveData(team: Team): SaveData {
     totalWeek: team.totalWeek,
     players: team.players,
     lastResult: team.lastResult,
-    practiceMatchTotalWeeks: team.practiceMatchTotalWeeks,
     seasonGameLog: team.seasonGameLog,
+    cardPool: team.cardPool,
+    trainingPoints: team.trainingPoints,
     reputation: team.reputation,
     graduateLog: team.graduateLog,
     recruitingCandidates: team.recruitingCandidates,
@@ -123,7 +127,7 @@ function teamToSaveData(team: Team): SaveData {
 }
 
 function saveDataToTeam(data: SaveData): Team {
-  return { ...data, trainingRollResult: null, eventRevealResult: null, pendingGameSummary: null }
+  return { ...data, cardPoolResult: null, eventRevealResult: null, pendingGameSummary: null }
 }
 
 function loadInitialTeam(): Team | null {
@@ -249,45 +253,44 @@ function weeklyEventForWeek(team: Team): WeeklyEvent | null {
   return { card, featuredPlayer }
 }
 
-function runTrainingWeek(team: Team, attribute: AttributeKey) {
-  const result = applyTraining(team.players, attribute, team.seed + team.totalWeek)
-  const playerNameById = new Map(team.players.map((player) => [player.id, player.name]))
-  return {
-    totalWeek: team.totalWeek + 1,
-    players: result.roster,
-    lastResult: `本週訓練重點:${ATTRIBUTE_LABELS[attribute]}`,
-    trainingRollResult: {
-      attributeLabel: ATTRIBUTE_LABELS[attribute],
-      successCount: result.successCount,
-      totalPlayers: result.totalPlayers,
-      totalGain: result.totalGain,
-      rolls: result.rolls.map((roll) => ({
-        playerName: playerNameById.get(roll.playerId) ?? '',
-        roll: roll.roll,
-        succeeded: roll.succeeded,
-        gain: roll.gain,
-        bonusLabel: roll.bonusLabel,
-      })),
-    },
-  }
-}
-
-function runTeamRestWeek(team: Team) {
-  const result = applyTeamRest(team.players, team.seed + team.totalWeek)
-  return {
-    totalWeek: team.totalWeek + 1,
-    players: result.roster,
-    lastResult: '本週全隊休養,沒有成長,體力大幅恢復。',
-    trainingRollResult: null,
-  }
-}
-
 function practiceOpponentNamesForWeek(team: Team): Record<PracticeStrength, string> {
   const entries = PRACTICE_STRENGTHS.map((strength) => {
     const rng = createSeededRng(hashSeed(`${team.seed}-${team.totalWeek}-opponent-${strength}`))
     return [strength, generateOpponentName(rng)] as const
   })
   return Object.fromEntries(entries) as Record<PracticeStrength, string>
+}
+
+function summarizeResolvedCards(resolvedCards: TrainingCardWeekResult['resolvedCards']): string {
+  return resolvedCards
+    .map((card) => {
+      if (card.kind === 'teamTraining') return `全隊訓練·${ATTRIBUTE_LABELS[card.attribute]}`
+      if (card.kind === 'individualTraining') return `個別訓練·${ATTRIBUTE_LABELS[card.attribute]}`
+      if (card.kind === 'practiceMatch') return `練習賽${card.outcome === 'win' ? '獲勝' : '落敗'}`
+      return '全隊休養'
+    })
+    .join('、')
+}
+
+function runTrainingCardWeek(team: Team, selections: CardSelection[]) {
+  const resolution = resolveCardSelections(team.players, selections, team.seed + team.totalWeek)
+
+  const poolRng = createSeededRng(hashSeed(`${team.seed}-${team.totalWeek}-cardpool`))
+  const advance = advanceCardPool(team.cardPool, selections.map((selection) => selection.card.id), poolRng)
+
+  const spent = totalCost(selections.map((selection) => selection.card))
+  const trainingPoints = recoverTrainingPoints(team.trainingPoints - spent, team.reputation)
+
+  const playerNameById = Object.fromEntries(team.players.map((player) => [player.id, player.name]))
+
+  return {
+    totalWeek: team.totalWeek + 1,
+    players: resolution.roster,
+    cardPool: advance.state,
+    trainingPoints,
+    lastResult: summarizeResolvedCards(resolution.resolvedCards),
+    cardPoolResult: { resolvedCards: resolution.resolvedCards, playerNameById },
+  }
 }
 
 function App() {
@@ -309,9 +312,10 @@ function App() {
             totalWeek: 1,
             players: createInitialRoster(seed),
             lastResult: null,
-            practiceMatchTotalWeeks: [],
             seasonGameLog: [],
-            trainingRollResult: null,
+            cardPool: createInitialCardPool(createSeededRng(hashSeed(`${seed}-cardpool-init`))),
+            trainingPoints: maxTrainingPoints(INITIAL_REPUTATION),
+            cardPoolResult: null,
             eventRevealResult: null,
             reputation: INITIAL_REPUTATION,
             graduateLog: [],
@@ -539,33 +543,15 @@ function App() {
       />
     )
   } else {
-    const practiceMatchWeeksThisYear = team.practiceMatchTotalWeeks
-      .filter((totalWeek) => getCalendarPosition(totalWeek).year === year)
-      .map((totalWeek) => getCalendarPosition(totalWeek).weekOfYear)
-    const practiceMatchAllowed = canScheduleAnotherPracticeMatch(weekOfYear, practiceMatchWeeksThisYear)
-
     actionPanel = (
-      <WeekScreen
-        practiceMatchAllowed={practiceMatchAllowed}
+      <TrainingCardPoolScreen
+        pool={team.cardPool}
+        trainingPoints={team.trainingPoints}
+        maxTrainingPoints={maxTrainingPoints(team.reputation)}
+        players={team.players}
         opponentNames={practiceOpponentNamesForWeek(team)}
-        lastResult={team.lastResult}
-        trainingRollResult={team.trainingRollResult}
-        onTrain={(attribute) => {
-          setTeam({ ...team, ...runTrainingWeek(team, attribute) })
-        }}
-        onTeamRest={() => {
-          setTeam({ ...team, ...runTeamRestWeek(team) })
-        }}
-        onPracticeMatch={(strength: PracticeStrength) => {
-          const result = applyPracticeMatch(team.players, strength, team.seed + team.totalWeek)
-          const outcomeMessage = result.outcome === 'win' ? '練習賽獲勝!' : '練習賽落敗'
-          setTeam({
-            ...team,
-            totalWeek: team.totalWeek + 1,
-            players: result.roster,
-            lastResult: outcomeMessage + describeNewInjuries(team.players, result.roster),
-            practiceMatchTotalWeeks: [...team.practiceMatchTotalWeeks, team.totalWeek],
-          })
+        onConfirm={(selections) => {
+          setTeam({ ...team, ...runTrainingCardWeek(team, selections) })
         }}
       />
     )
@@ -623,6 +609,7 @@ function App() {
       />
       <SeasonSummaryDialog result={team.pendingSeasonSummary} />
       <EventResultDialog result={team.eventRevealResult} />
+      <TrainingCardResultDialog result={team.cardPoolResult} />
       {actionPanel}
     </AppShell>
   )

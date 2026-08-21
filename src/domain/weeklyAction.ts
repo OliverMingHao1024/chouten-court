@@ -14,10 +14,10 @@ const ROLL_GROWTH: Record<number, number> = {
   6: 3,
 }
 
-const TRAINING_LOAD = 8
+export const TRAINING_LOAD = 8
 
 // 全隊休養:不練習、沒有成長,換取確定且比訓練更大的體力恢復(原創數值,待調校)。
-const TEAM_REST_LOAD = -10
+export const TEAM_REST_LOAD = -10
 
 export type PracticeStrength = 'weak' | 'medium' | 'strong'
 
@@ -29,20 +29,20 @@ export const PRACTICE_OPPONENT_STRENGTH: Record<PracticeStrength, number> = {
   strong: 80,
 }
 
-const PRACTICE_LOAD: Record<PracticeStrength, number> = {
+export const PRACTICE_LOAD: Record<PracticeStrength, number> = {
   weak: 15,
   medium: 20,
   strong: 25,
 }
 
-const PRACTICE_WIN_GROWTH: Record<PracticeStrength, number> = {
+export const PRACTICE_WIN_GROWTH: Record<PracticeStrength, number> = {
   weak: 1,
   medium: 2,
   strong: 3,
 }
 
 // 輸了還是有練到,但比贏球少;強度越高、輸了學到的也越多。
-const PRACTICE_LOSS_GROWTH: Record<PracticeStrength, number> = {
+export const PRACTICE_LOSS_GROWTH: Record<PracticeStrength, number> = {
   weak: 0,
   medium: 0,
   strong: 1,

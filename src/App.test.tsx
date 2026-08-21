@@ -12,6 +12,7 @@ import { hashSeed } from './domain/rng'
 import { createInitialRoster, ROSTER_SIZE } from './domain/roster'
 import { SAVE_FORMAT_VERSION, SAVE_STORAGE_KEY } from './domain/saveData'
 import { DEFAULT_TACTICS } from './domain/tactics'
+import type { PoolCard } from './domain/trainingCardPool'
 import { ATTRIBUTE_KEYS, type AttributeSet } from './domain/types'
 
 const OPPONENT_NAME_PATTERN = new RegExp(`(${REGIONS.join('|')})(${SUFFIXES.join('|')})`)
@@ -21,30 +22,49 @@ const OPPONENT_TIER_PATTERN = new RegExp(`^(${OPPONENT_TIERS.join('|')})$`)
 // and final year with this cohort, with the semifinal (game 0, week 142) already won.
 const LAST_YEAR3_FINAL4_WEEK = 143
 
+function baseSaveData(overrides: Record<string, unknown> = {}) {
+  return {
+    version: SAVE_FORMAT_VERSION,
+    teamName: '淡水高中',
+    coachName: '山田',
+    seed: 1,
+    totalWeek: 1,
+    players: createInitialRoster(1),
+    lastResult: null,
+    seasonGameLog: [],
+    cardPool: { cards: [], nextCardId: 0 },
+    trainingPoints: 10,
+    reputation: 50,
+    graduateLog: [],
+    recruitingCandidates: null,
+    careerLog: [],
+    eraCount: 0,
+    pendingSeasonSummary: null,
+    careerEnded: null,
+    lastLineup: null,
+    ...overrides,
+  }
+}
+
+function seedSaveWithCard(card: PoolCard, extra: Record<string, unknown> = {}) {
+  window.localStorage.setItem(
+    SAVE_STORAGE_KEY,
+    JSON.stringify(baseSaveData({ cardPool: { cards: [card], nextCardId: 1 }, ...extra })),
+  )
+}
+
 function seedSaveAtGraduationEve() {
   expect(getCalendarPosition(LAST_YEAR3_FINAL4_WEEK)).toEqual({ year: 3, weekOfYear: 47 })
   const players = createInitialRoster(1).map((p) => ({ ...p, grade: 3 }))
   window.localStorage.setItem(
     SAVE_STORAGE_KEY,
-    JSON.stringify({
-      version: SAVE_FORMAT_VERSION,
-      teamName: '淡水高中',
-      coachName: '山田',
-      seed: 1,
-      totalWeek: LAST_YEAR3_FINAL4_WEEK,
-      players,
-      lastResult: null,
-      practiceMatchTotalWeeks: [],
-      seasonGameLog: [{ totalWeek: LAST_YEAR3_FINAL4_WEEK - 1, phase: 'final4', outcome: 'win' }],
-      reputation: 50,
-      graduateLog: [],
-      recruitingCandidates: null,
-      careerLog: [],
-      eraCount: 0,
-      pendingSeasonSummary: null,
-      careerEnded: null,
-      lastLineup: null,
-    }),
+    JSON.stringify(
+      baseSaveData({
+        totalWeek: LAST_YEAR3_FINAL4_WEEK,
+        players,
+        seasonGameLog: [{ totalWeek: LAST_YEAR3_FINAL4_WEEK - 1, phase: 'final4', outcome: 'win' }],
+      }),
+    ),
   )
 }
 
@@ -60,7 +80,7 @@ async function buildTeam(user: ReturnType<typeof userEvent.setup>, seed?: string
 }
 
 // A ~25% chance random event can appear on any offseason week instead of the
-// train/practice panel; resolve it (any choice) so tests can reach the screen they expect.
+// training-card panel; resolve it (any choice) so tests can reach the screen they expect.
 async function resolveLeadingEvents(user: ReturnType<typeof userEvent.setup>) {
   let choice = document.querySelector<HTMLButtonElement>('.event-card__choice')
   while (choice) {
@@ -69,17 +89,38 @@ async function resolveLeadingEvents(user: ReturnType<typeof userEvent.setup>) {
   }
 }
 
-// Advances exactly `times` weeks by training (三分) every week, transparently
-// resolving any random event that appears instead of the train/practice panel on a
-// given week (an event still consumes that week, same as training does).
-async function trainRepeatedly(user: ReturnType<typeof userEvent.setup>, times: number) {
+// Picks the first affordable card in this week's training pool (up to MAX_CARDS_PER_WEEK is
+// not exercised here; one card is enough to advance a week) and confirms it, filling in
+// whichever sub-choice the card needs (individual training: player + attribute; practice
+// match: strength). Assumes the training-card panel (not an event or match) is showing.
+async function advanceOneCardWeek(user: ReturnType<typeof userEvent.setup>) {
+  const cardButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('.training-card-pool__card'))
+  const affordable = cardButtons.find((button) => !button.disabled)
+  if (!affordable) throw new Error('no affordable training card this week')
+  await user.click(affordable)
+
+  const playerSelect = document.querySelector<HTMLSelectElement>('.training-card-pool__sub-choice select')
+  if (playerSelect) {
+    await user.selectOptions(playerSelect, playerSelect.options[1].value)
+    await user.click(document.querySelectorAll<HTMLButtonElement>('.training-card-pool__attribute-button')[0])
+  }
+  const strengthButtons = document.querySelectorAll<HTMLButtonElement>('.training-card-pool__option')
+  if (strengthButtons.length > 0) await user.click(strengthButtons[0])
+
+  await user.click(screen.getByRole('button', { name: '確認本週訓練' }))
+}
+
+// Advances exactly `times` weeks, transparently resolving any random event that appears
+// instead of the training-card panel on a given week (an event still consumes that week,
+// same as a training card does).
+async function advanceWeeksRepeatedly(user: ReturnType<typeof userEvent.setup>, times: number) {
   for (let i = 0; i < times; i++) {
     const eventChoice = document.querySelector<HTMLButtonElement>('.event-card__choice')
     if (eventChoice) {
       await user.click(eventChoice)
       continue
     }
-    await user.click(screen.getByRole('button', { name: '三分' }))
+    await advanceOneCardWeek(user)
   }
 }
 
@@ -133,24 +174,59 @@ describe('App', () => {
     expect(screen.getAllByText('未知').length).toBeGreaterThan(0)
   })
 
-  it('advances the week and reports the result after a training week', async () => {
+  it('advances the week and reports the result after a team-training card', async () => {
+    seedSaveWithCard({ id: 'card-1', kind: 'teamTraining', attribute: 'three', age: 0 })
     const user = userEvent.setup()
-    await buildTeam(user)
+    render(<App />)
     await resolveLeadingEvents(user)
 
-    await user.click(screen.getByRole('button', { name: '三分' }))
+    await user.click(screen.getByRole('button', { name: /三分/ }))
+    await user.click(screen.getByRole('button', { name: '確認本週訓練' }))
 
-    expect(screen.getByText('本週訓練重點:三分')).toBeInTheDocument()
+    expect(screen.getByText(/全隊訓練·三分/)).toBeInTheDocument()
+    expect(await screen.findByText('本週訓練結果')).toBeInTheDocument()
   })
 
-  it('advances the week and reports the result after a team-rest week', async () => {
+  it('advances the week and reports the result after a rest card', async () => {
+    seedSaveWithCard({ id: 'card-1', kind: 'rest', attribute: null, age: 0 })
     const user = userEvent.setup()
-    await buildTeam(user)
+    render(<App />)
     await resolveLeadingEvents(user)
 
-    await user.click(screen.getByRole('button', { name: '全隊休養' }))
+    await user.click(screen.getByRole('button', { name: /休養/ }))
+    await user.click(screen.getByRole('button', { name: '確認本週訓練' }))
 
-    expect(screen.getByText('本週全隊休養,沒有成長,體力大幅恢復。')).toBeInTheDocument()
+    expect(screen.getByText(/全隊休養/)).toBeInTheDocument()
+  })
+
+  it('advances the week and reports the result after an individualTraining card', async () => {
+    seedSaveWithCard({ id: 'card-1', kind: 'individualTraining', attribute: null, age: 0 })
+    const user = userEvent.setup()
+    render(<App />)
+    await resolveLeadingEvents(user)
+
+    await user.click(screen.getByRole('button', { name: /個別訓練/ }))
+    const playerSelect = screen.getByRole('combobox')
+    await user.selectOptions(playerSelect, (playerSelect as HTMLSelectElement).options[1].value)
+    await user.click(screen.getByRole('button', { name: 'IQ' }))
+    await user.click(screen.getByRole('button', { name: '確認本週訓練' }))
+
+    expect(screen.getByText(/個別訓練·IQ/)).toBeInTheDocument()
+  })
+
+  it('advances the week and reports the result after a practiceMatch card', async () => {
+    seedSaveWithCard({ id: 'card-1', kind: 'practiceMatch', attribute: null, age: 0 })
+    const user = userEvent.setup()
+    render(<App />)
+    await resolveLeadingEvents(user)
+
+    await user.click(screen.getByRole('button', { name: /練習賽/ }))
+    expect(screen.getAllByText(OPPONENT_NAME_PATTERN).length).toBeGreaterThan(0)
+
+    await user.click(screen.getAllByRole('button', { name: /弱校|中堅|名門|籃球名校/ })[0])
+    await user.click(screen.getByRole('button', { name: '確認本週訓練' }))
+
+    expect(screen.getByText(/練習賽:(獲勝|落敗)/)).toBeInTheDocument()
   })
 
   it('shows an event reveal dialog explaining the outcome once a random event is resolved', async () => {
@@ -159,7 +235,7 @@ describe('App', () => {
 
     let eventChoice = document.querySelector<HTMLButtonElement>('.event-card__choice')
     for (let i = 0; i < 26 && !eventChoice; i++) {
-      await user.click(screen.getByRole('button', { name: '三分' }))
+      await advanceOneCardWeek(user)
       eventChoice = document.querySelector<HTMLButtonElement>('.event-card__choice')
     }
     expect(eventChoice).not.toBeNull()
@@ -177,24 +253,24 @@ describe('App', () => {
     expect(dialog).not.toHaveAttribute('open')
   })
 
-  it('switches to the season match screen once the offseason ends, replacing the train/practice panel', async () => {
+  it('switches to the season match screen once the offseason ends, replacing the training-card panel', async () => {
     const user = userEvent.setup()
     await buildTeam(user)
 
-    // Fast-forward through the 26-week offseason into the season by training every week.
-    await trainRepeatedly(user, 26)
+    // Fast-forward through the 26-week offseason into the season.
+    await advanceWeeksRepeatedly(user, 26)
 
     expect(await screen.findByText('資格賽')).toBeInTheDocument()
     expect(screen.getByText('第 1 / 4 戰')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '開打' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: '練習賽' })).not.toBeInTheDocument()
+    expect(document.querySelector('.training-card-pool')).not.toBeInTheDocument()
   })
 
   it('plays through official season games and reports each result', async () => {
     const user = userEvent.setup()
     await buildTeam(user)
 
-    await trainRepeatedly(user, 26)
+    await advanceWeeksRepeatedly(user, 26)
 
     await screen.findByText('第 1 / 4 戰')
     await user.click(screen.getByRole('button', { name: '開打' }))
@@ -203,21 +279,11 @@ describe('App', () => {
     expect(await screen.findByText('第 2 / 4 戰')).toBeInTheDocument()
   })
 
-  it('shows a generated opponent school name for a practice match', async () => {
-    const user = userEvent.setup()
-    await buildTeam(user)
-    await resolveLeadingEvents(user)
-
-    await user.click(screen.getByRole('button', { name: '練習賽' }))
-
-    expect(screen.getAllByText(OPPONENT_NAME_PATTERN).length).toBeGreaterThan(0)
-  })
-
   it('shows a generated opponent school name and tier for an official season game', async () => {
     const user = userEvent.setup()
     await buildTeam(user)
 
-    await trainRepeatedly(user, 26)
+    await advanceWeeksRepeatedly(user, 26)
     await screen.findByText('第 1 / 4 戰')
 
     expect(screen.getByText(OPPONENT_NAME_PATTERN)).toBeInTheDocument()
@@ -227,7 +293,7 @@ describe('App', () => {
   it('persists progress to localStorage and restores it on a fresh mount (e.g. a page reload)', async () => {
     const user = userEvent.setup()
     const { unmount } = await buildTeam(user)
-    await trainRepeatedly(user, 1)
+    await advanceWeeksRepeatedly(user, 1)
     await screen.findByText('第 1 年 第 2 週')
     unmount()
 
@@ -287,7 +353,7 @@ describe('App', () => {
 
     expect(screen.queryByRole('heading', { name: `招生 — 選出 ${ROSTER_SIZE} 名新生` })).not.toBeInTheDocument()
     expect(await screen.findByText('第 4 年 第 1 週')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '全隊休養' })).toBeInTheDocument()
+    expect(document.querySelector('.training-card-pool')).toBeInTheDocument()
   })
 
   it('ends the career and shows the champion summary when the team wins the final4 final', async () => {
@@ -316,25 +382,14 @@ describe('App', () => {
 
     window.localStorage.setItem(
       SAVE_STORAGE_KEY,
-      JSON.stringify({
-        version: SAVE_FORMAT_VERSION,
-        teamName: '淡水高中',
-        coachName: '山田',
-        seed: teamSeed,
-        totalWeek: LAST_YEAR3_FINAL4_WEEK,
-        players,
-        lastResult: null,
-        practiceMatchTotalWeeks: [],
-        seasonGameLog: [{ totalWeek: LAST_YEAR3_FINAL4_WEEK - 1, phase: 'final4', outcome: 'win' }],
-        reputation: 50,
-        graduateLog: [],
-        recruitingCandidates: null,
-        careerLog: [],
-        eraCount: 0,
-        pendingSeasonSummary: null,
-        careerEnded: null,
-        lastLineup: null,
-      }),
+      JSON.stringify(
+        baseSaveData({
+          seed: teamSeed,
+          totalWeek: LAST_YEAR3_FINAL4_WEEK,
+          players,
+          seasonGameLog: [{ totalWeek: LAST_YEAR3_FINAL4_WEEK - 1, phase: 'final4', outcome: 'win' }],
+        }),
+      ),
     )
 
     const user = userEvent.setup()
@@ -354,25 +409,14 @@ describe('App', () => {
     const players = createInitialRoster(1).map((p) => ({ ...p, grade: 3 }))
     window.localStorage.setItem(
       SAVE_STORAGE_KEY,
-      JSON.stringify({
-        version: SAVE_FORMAT_VERSION,
-        teamName: '淡水高中',
-        coachName: '山田',
-        seed: 1,
-        totalWeek: LAST_YEAR3_FINAL4_WEEK,
-        players,
-        lastResult: null,
-        practiceMatchTotalWeeks: [],
-        seasonGameLog: [{ totalWeek: LAST_YEAR3_FINAL4_WEEK - 1, phase: 'final4', outcome: 'loss' }],
-        reputation: 50,
-        graduateLog: [],
-        recruitingCandidates: null,
-        careerLog: [],
-        eraCount: INSURANCE_MAX_ERAS - 1,
-        pendingSeasonSummary: null,
-        careerEnded: null,
-        lastLineup: null,
-      }),
+      JSON.stringify(
+        baseSaveData({
+          totalWeek: LAST_YEAR3_FINAL4_WEEK,
+          players,
+          seasonGameLog: [{ totalWeek: LAST_YEAR3_FINAL4_WEEK - 1, phase: 'final4', outcome: 'loss' }],
+          eraCount: INSURANCE_MAX_ERAS - 1,
+        }),
+      ),
     )
 
     const user = userEvent.setup()

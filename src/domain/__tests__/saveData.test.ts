@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { generateCandidatePool } from '../recruiting'
 import { createInitialRoster } from '../roster'
+import { createSeededRng } from '../rng'
 import {
   SAVE_FORMAT_VERSION,
   SAVE_STORAGE_KEY,
@@ -11,6 +12,7 @@ import {
   writeSaveToStorage,
   type SaveData,
 } from '../saveData'
+import { createInitialCardPool } from '../trainingCardPool'
 
 function makeSaveData(overrides: Partial<SaveData> = {}): SaveData {
   return {
@@ -21,8 +23,9 @@ function makeSaveData(overrides: Partial<SaveData> = {}): SaveData {
     totalWeek: 5,
     players: createInitialRoster(42),
     lastResult: '本週訓練重點:三分(照常執行)',
-    practiceMatchTotalWeeks: [2],
     seasonGameLog: [{ totalWeek: 27, phase: 'qualifying', outcome: 'win' }],
+    cardPool: createInitialCardPool(createSeededRng(42)),
+    trainingPoints: 7,
     reputation: 50,
     graduateLog: [],
     recruitingCandidates: null,
@@ -122,6 +125,22 @@ describe('parseSaveData', () => {
 
   it('rejects a save format version older than the current one (e.g. a pre-recruiting save)', () => {
     expect(parseSaveData(makeSaveData({ version: SAVE_FORMAT_VERSION - 1 }))).toBeNull()
+  })
+
+  it('rejects a save missing the training card pool or training points', () => {
+    const { cardPool: _cardPool, ...withoutCardPool } = makeSaveData()
+    expect(parseSaveData(withoutCardPool)).toBeNull()
+    const { trainingPoints: _trainingPoints, ...withoutPoints } = makeSaveData()
+    expect(parseSaveData(withoutPoints)).toBeNull()
+  })
+
+  it('rejects a card pool with a malformed card (bad kind, or an attribute outside AttributeKey)', () => {
+    const data = makeSaveData()
+    const brokenKind = { ...data.cardPool, cards: [{ ...data.cardPool.cards[0], kind: 'not-a-kind' }] }
+    expect(parseSaveData({ ...data, cardPool: brokenKind })).toBeNull()
+
+    const brokenAttribute = { ...data.cardPool, cards: [{ ...data.cardPool.cards[0], attribute: 'not-an-attribute' }] }
+    expect(parseSaveData({ ...data, cardPool: brokenAttribute })).toBeNull()
   })
 })
 

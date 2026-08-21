@@ -1,0 +1,146 @@
+.training-card-pool {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.training-card-pool__points {
+  margin: 0;
+  font-weight: 700;
+}
+
+.training-card-pool__points-preview {
+  margin-left: var(--space-2);
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.training-card-pool__grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+}
+
+.training-card-pool__card {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-2);
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.training-card-pool__card:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.training-card-pool__card--selected {
+  border-color: var(--accent-strong);
+  background: var(--accent-bg);
+}
+
+.training-card-pool__card-kind {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+}
+
+.training-card-pool__card-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.training-card-pool__card-cost {
+  font-size: 0.75rem;
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.training-card-pool__card-effect {
+  font-size: 0.7rem;
+  letter-spacing: 1px;
+}
+
+.training-card-pool__sub-choice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.training-card-pool__sub-choice-label {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.training-card-pool__attribute-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.training-card-pool__attribute-button {
+  flex: 1 1 calc(33% - var(--space-2));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: inherit;
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.training-card-pool__attribute-button--selected {
+  border-color: var(--accent-strong);
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.training-card-pool__options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.training-card-pool__option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.training-card-pool__option--selected {
+  border-color: var(--accent-strong);
+}
+
+.training-card-pool__option-label {
+  font-weight: 700;
+}
+
+.training-card-pool__option-rate {
+  font-size: 0.85rem;
+  color: var(--accent-strong);
+}

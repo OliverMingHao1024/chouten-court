@@ -4,10 +4,19 @@ import { PHASE_GAME_COUNT } from './officialMatch'
 import type { Candidate } from './recruiting'
 import type { SeasonGameLogEntry } from './season'
 import type { SeasonRecord, SeasonSummaryResult } from './seasonSummary'
-import { ATTRIBUTE_KEYS, INJURY_STATUSES, PERSONALITY_KEYS, POSITIONS, STYLE_KEYS, type Player } from './types'
+import { CARD_KINDS, type PoolCard, type TrainingCardPoolState } from './trainingCardPool'
+import {
+  ATTRIBUTE_KEYS,
+  INJURY_STATUSES,
+  PERSONALITY_KEYS,
+  POSITIONS,
+  STYLE_KEYS,
+  type AttributeKey,
+  type Player,
+} from './types'
 
 export const SAVE_STORAGE_KEY = 'chouten-court:save'
-export const SAVE_FORMAT_VERSION = 8
+export const SAVE_FORMAT_VERSION = 9
 
 const OFFICIAL_PHASES = Object.keys(PHASE_GAME_COUNT)
 const FINAL4_PLACEMENTS = ['champion', 'runnerUp', 'third', 'fourth']
@@ -21,8 +30,9 @@ export interface SaveData {
   totalWeek: number
   players: Player[]
   lastResult: string | null
-  practiceMatchTotalWeeks: number[]
   seasonGameLog: SeasonGameLogEntry[]
+  cardPool: TrainingCardPoolState
+  trainingPoints: number
   reputation: number
   graduateLog: string[]
   recruitingCandidates: Candidate[] | null
@@ -113,6 +123,23 @@ function isValidSeasonRecord(value: unknown): value is SeasonRecord {
   return true
 }
 
+function isValidPoolCard(value: unknown): value is PoolCard {
+  if (!isPlainObject(value)) return false
+  if (typeof value.id !== 'string') return false
+  if (typeof value.kind !== 'string' || !(CARD_KINDS as readonly string[]).includes(value.kind)) return false
+  if (value.attribute !== null && !(ATTRIBUTE_KEYS as readonly string[]).includes(value.attribute as AttributeKey)) {
+    return false
+  }
+  if (typeof value.age !== 'number') return false
+  return true
+}
+
+function isValidCardPool(value: unknown): value is TrainingCardPoolState {
+  if (!isPlainObject(value)) return false
+  if (typeof value.nextCardId !== 'number') return false
+  return Array.isArray(value.cards) && value.cards.every(isValidPoolCard)
+}
+
 function isValidGameLineup(value: unknown): value is GameLineup {
   if (!isPlainObject(value)) return false
   const isStringArray = (v: unknown): v is string[] => Array.isArray(v) && v.every((id) => typeof id === 'string')
@@ -142,13 +169,9 @@ export function parseSaveData(raw: unknown): SaveData | null {
   if (typeof raw.totalWeek !== 'number' || raw.totalWeek < 1) return null
   if (!Array.isArray(raw.players) || raw.players.length === 0 || !raw.players.every(isValidPlayer)) return null
   if (raw.lastResult !== null && typeof raw.lastResult !== 'string') return null
-  if (
-    !Array.isArray(raw.practiceMatchTotalWeeks) ||
-    !raw.practiceMatchTotalWeeks.every((week) => typeof week === 'number')
-  ) {
-    return null
-  }
   if (!Array.isArray(raw.seasonGameLog) || !raw.seasonGameLog.every(isValidGameLogEntry)) return null
+  if (!isValidCardPool(raw.cardPool)) return null
+  if (typeof raw.trainingPoints !== 'number') return null
   if (typeof raw.reputation !== 'number') return null
   if (!Array.isArray(raw.graduateLog) || !raw.graduateLog.every((entry) => typeof entry === 'string')) return null
   if (raw.recruitingCandidates !== null) {
@@ -168,8 +191,9 @@ export function parseSaveData(raw: unknown): SaveData | null {
     totalWeek: raw.totalWeek,
     players: raw.players as Player[],
     lastResult: raw.lastResult as string | null,
-    practiceMatchTotalWeeks: raw.practiceMatchTotalWeeks as number[],
     seasonGameLog: raw.seasonGameLog as SeasonGameLogEntry[],
+    cardPool: raw.cardPool as TrainingCardPoolState,
+    trainingPoints: raw.trainingPoints,
     reputation: raw.reputation,
     graduateLog: raw.graduateLog as string[],
     recruitingCandidates: raw.recruitingCandidates as Candidate[] | null,
