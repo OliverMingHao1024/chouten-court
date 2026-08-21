@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { computeOverallGrade } from '../../domain/attributeGrade'
 import { ATTRIBUTE_MAX, computeRecoveryRate } from '../../domain/matchEngine'
+import { SPECIAL_ABILITY_LABELS } from '../../domain/specialAbilities'
 import { ATTRIBUTE_KEYS, ATTRIBUTE_LABELS, INJURY_STATUS_LABELS, type Player } from '../../domain/types'
 import { AttributeBar } from './AttributeBar'
 import { FatigueBar } from './FatigueBar'
@@ -81,6 +82,15 @@ export function RosterScreen({ players }: RosterScreenProps) {
                 />
               ))}
             </div>
+            {selectedPlayer.specialAbilities.length > 0 && (
+              <ul className="roster-dialog__abilities">
+                {selectedPlayer.specialAbilities.map((ability) => (
+                  <li key={ability} className="roster-dialog__ability">
+                    {SPECIAL_ABILITY_LABELS[ability]}
+                  </li>
+                ))}
+              </ul>
+            )}
             <button type="button" className="button-primary" onClick={() => dialogRef.current?.close()}>
               關閉
             </button>

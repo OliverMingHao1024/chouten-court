@@ -1,3 +1,5 @@
+import type { SpecialAbilityKey } from './specialAbilities'
+
 export const ATTRIBUTE_KEYS = [
   'shooting',
   'three',
@@ -75,6 +77,8 @@ export interface Player {
   height: number
   attributes: AttributeSet
   personality: PersonalityKey
+  /** 後天習得、可同時持有多項的能力;跟天生固定、單一的 personality 是兩套獨立系統。 */
+  specialAbilities: SpecialAbilityKey[]
   fatigue: number
   styleTag: StyleTag
   injuryStatus: InjuryStatus

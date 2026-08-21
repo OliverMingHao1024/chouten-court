@@ -1,5 +1,6 @@
 import { advancePlayerWeek, ATTRIBUTE_MAX, clamp, computeMatchWinProbability } from './matchEngine'
 import { createSeededRng } from './rng'
+import { attemptLearnAbility, learnableAbilitiesForPlayer, type SpecialAbilityKey } from './specialAbilities'
 import { computeStyleTag } from './styleTag'
 import { cardEffectMultiplier, comboAttributes, COMBO_BONUS_MULTIPLIER, type PoolCard } from './trainingCardPool'
 import type { AttributeKey, Player } from './types'
@@ -17,13 +18,14 @@ import {
 } from './weeklyAction'
 
 /**
- * 一張卡選中後需要的額外選擇:個別訓練要選球員+屬性,練習賽要選強度;全隊訓練/休養
- * 不需要額外選擇,卡片本身(全隊訓練)或種類(休養)就已經決定好一切。
+ * 一張卡選中後需要的額外選擇:個別訓練要選球員+一項要嘗試教的特殊能力,練習賽要選強度;
+ * 全隊訓練/休養不需要額外選擇,卡片本身(全隊訓練)或種類(休養)就已經決定好一切。
  */
 export interface CardSelection {
   card: PoolCard
   playerId?: string
   attribute?: AttributeKey
+  ability?: SpecialAbilityKey
   strength?: PracticeStrength
 }
 
@@ -37,8 +39,9 @@ export interface ResolvedTeamTrainingCard {
 export interface ResolvedIndividualTrainingCard {
   kind: 'individualTraining'
   playerId: string
-  attribute: AttributeKey
-  roll: PlayerRoll
+  ability: SpecialAbilityKey
+  succeeded: boolean
+  chance: number
 }
 
 export interface ResolvedPracticeMatchCard {
@@ -68,12 +71,18 @@ export interface CardResolutionResult {
  * 呼叫兩次同一名球員就會恢復兩次。這裡先把每名球員這一週(可能來自多張卡)的負荷與成長
  * 累加起來,每人只呼叫一次 advancePlayerWeek,避免恢復量被重複計算。
  */
-export function resolveCardSelections(roster: Player[], selections: CardSelection[], seed: number): CardResolutionResult {
+export function resolveCardSelections(
+  roster: Player[],
+  selections: CardSelection[],
+  seed: number,
+  reputation: number,
+): CardResolutionResult {
   const rng = createSeededRng(seed)
   const comboSet = new Set(comboAttributes(selections.map((selection) => selection.card)))
 
   const loadByPlayer = new Map<string, number>()
   const growthByPlayer = new Map<string, Array<{ attribute: AttributeKey; gain: number }>>()
+  const learnedByPlayer = new Map<string, SpecialAbilityKey[]>()
   const matchWeekPlayers = new Set<string>()
 
   function addLoad(playerId: string, load: number) {
@@ -83,6 +92,11 @@ export function resolveCardSelections(roster: Player[], selections: CardSelectio
     const list = growthByPlayer.get(playerId) ?? []
     list.push({ attribute, gain })
     growthByPlayer.set(playerId, list)
+  }
+  function addLearnedAbility(playerId: string, ability: SpecialAbilityKey) {
+    const list = learnedByPlayer.get(playerId) ?? []
+    list.push(ability)
+    learnedByPlayer.set(playerId, list)
   }
   function isSidelined(player: Player) {
     return player.injuryStatus === 'minor' || player.injuryStatus === 'major'
@@ -116,23 +130,26 @@ export function resolveCardSelections(roster: Player[], selections: CardSelectio
       }
       resolvedCards.push({ kind: 'teamTraining', attribute, comboBonus: comboSet.has(attribute), rolls })
     } else if (card.kind === 'individualTraining') {
-      if (!selection.playerId || !selection.attribute) {
-        throw new Error('individualTraining selection is missing playerId/attribute')
+      if (!selection.playerId || !selection.ability) {
+        throw new Error('individualTraining selection is missing playerId/ability')
       }
-      const attribute = selection.attribute
+      const ability = selection.ability
       const player = roster.find((candidate) => candidate.id === selection.playerId)
       if (!player) throw new Error(`individualTraining target player not found: ${selection.playerId}`)
+      if (!learnableAbilitiesForPlayer(player, reputation).includes(ability)) {
+        throw new Error(`${player.id} cannot currently learn ${ability} (locked or already known)`)
+      }
 
-      let roll: PlayerRoll = { playerId: player.id, roll: 0, succeeded: false, gain: 0, bonusLabel: null }
+      let succeeded = false
+      let chance = 0
       if (!isSidelined(player)) {
-        const rolled = Math.floor(rng() * 6) + 1
-        const baseGain = computeTrainingRollGain(attribute, player.personality, rolled)
-        const gain = Math.round(baseGain * effectMultiplier)
-        roll = { playerId: player.id, roll: rolled, succeeded: gain > 0, gain, bonusLabel: personalityBonusLabel(attribute, player.personality, rolled) }
-        addGrowth(player.id, attribute, gain)
+        const attempt = attemptLearnAbility(player, ability, rng)
+        succeeded = attempt.succeeded
+        chance = attempt.chance
+        if (succeeded) addLearnedAbility(player.id, ability)
         addLoad(player.id, TRAINING_LOAD)
       }
-      resolvedCards.push({ kind: 'individualTraining', playerId: player.id, attribute, roll })
+      resolvedCards.push({ kind: 'individualTraining', playerId: player.id, ability, succeeded, chance })
     } else if (card.kind === 'practiceMatch') {
       if (!selection.strength) throw new Error('practiceMatch selection is missing strength')
       const strength = selection.strength
@@ -183,6 +200,10 @@ export function resolveCardSelections(roster: Player[], selections: CardSelectio
         attributes = { ...attributes, [entry.attribute]: clamp(attributes[entry.attribute] + entry.gain, 0, ATTRIBUTE_MAX) }
       }
       grownPlayer = { ...player, attributes, styleTag: computeStyleTag(attributes) }
+    }
+    const learned = learnedByPlayer.get(player.id)
+    if (learned && learned.length > 0) {
+      grownPlayer = { ...grownPlayer, specialAbilities: [...grownPlayer.specialAbilities, ...learned] }
     }
     const totalLoad = loadByPlayer.get(player.id) ?? 0
     return advancePlayerWeek(grownPlayer, totalLoad, rng, matchWeekPlayers.has(player.id))

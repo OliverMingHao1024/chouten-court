@@ -77,6 +77,22 @@ describe('parseSaveData', () => {
     expect(parseSaveData({ ...data, players: [brokenPlayer, ...data.players.slice(1)] })).toBeNull()
   })
 
+  it('rejects a player missing specialAbilities, and one with an unknown ability key', () => {
+    const data = makeSaveData()
+    const { specialAbilities: _specialAbilities, ...withoutAbilities } = data.players[0]
+    expect(parseSaveData({ ...data, players: [withoutAbilities, ...data.players.slice(1)] })).toBeNull()
+
+    const withBadAbility = { ...data.players[0], specialAbilities: ['not-a-real-ability'] }
+    expect(parseSaveData({ ...data, players: [withBadAbility, ...data.players.slice(1)] })).toBeNull()
+  })
+
+  it('accepts a player with a valid, non-empty specialAbilities list', () => {
+    const data = makeSaveData()
+    const withAbility = { ...data.players[0], specialAbilities: ['ironWall' as const] }
+    const modified = { ...data, players: [withAbility, ...data.players.slice(1)] }
+    expect(parseSaveData(JSON.parse(serializeSaveData(modified)))).toEqual(modified)
+  })
+
   it('rejects a player with an invalid enum value', () => {
     const data = makeSaveData()
     const brokenPlayer = { ...data.players[0], injuryStatus: 'deceased' }

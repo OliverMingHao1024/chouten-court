@@ -29,14 +29,20 @@ describe('TrainingCardResultDialog', () => {
     expect(screen.getByText('同類疊加加成')).toBeInTheDocument()
   })
 
-  it('summarizes an individualTraining card with the player name and gain', () => {
+  it('summarizes a successful individualTraining card with the player name and ability learned', () => {
     const cards: ResolvedCard[] = [
-      { kind: 'individualTraining', playerId: 'p1', attribute: 'iq', roll: { playerId: 'p1', roll: 6, succeeded: true, gain: 3, bonusLabel: '天才型加成' } },
+      { kind: 'individualTraining', playerId: 'p1', ability: 'ironWall', succeeded: true, chance: 0.8 },
     ]
     render(<TrainingCardResultDialog result={makeResult(cards)} />)
-    expect(screen.getByText(/個別訓練·IQ/)).toBeInTheDocument()
-    expect(screen.getByText(/球員01 \+3/)).toBeInTheDocument()
-    expect(screen.getByText('天才型加成')).toBeInTheDocument()
+    expect(screen.getByText(/球員01 學會了「鐵閘」/)).toBeInTheDocument()
+  })
+
+  it('summarizes a failed individualTraining card distinctly from a success', () => {
+    const cards: ResolvedCard[] = [
+      { kind: 'individualTraining', playerId: 'p1', ability: 'ironWall', succeeded: false, chance: 0.2 },
+    ]
+    render(<TrainingCardResultDialog result={makeResult(cards)} />)
+    expect(screen.getByText(/球員01 嘗試學習「鐵閘」失敗/)).toBeInTheDocument()
   })
 
   it('summarizes a practiceMatch card with outcome and any beneficiaries', () => {

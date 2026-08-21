@@ -4,9 +4,11 @@ import {
   applyFatigueDelta,
   clamp,
   computeMatchWinProbability,
+  computePerformanceVarianceRange,
   computeRecoveryRate,
   computeTeamStrength,
   computeWinProbability,
+  QUICK_RECOVERY_BONUS,
   RECOVERY_INDIVIDUAL_VARIANCE,
   rollForInjury,
   tickInjuryRecovery,
@@ -15,6 +17,10 @@ import { createSeededRng } from '../rng'
 import { createInitialRoster } from '../roster'
 import type { Player } from '../types'
 import type { GameLineup } from '../lineup'
+
+function withAbility<T extends Player>(player: T, ability: T['specialAbilities'][number]): T {
+  return { ...player, specialAbilities: [ability] }
+}
 
 describe('clamp', () => {
   it('keeps values within range and clips outliers', () => {
@@ -59,6 +65,12 @@ describe('computeRecoveryRate', () => {
     const fragile = { ...player, personality: 'fragile' as const }
     const steady = { ...player, personality: 'steady' as const }
     expect(computeRecoveryRate(fragile)).toBe(computeRecoveryRate(steady))
+  })
+
+  it('adds the quickRecovery special-ability bonus on top of the baseline', () => {
+    const player = createInitialRoster(1)[0]
+    const withQuickRecovery = withAbility(player, 'quickRecovery')
+    expect(computeRecoveryRate(withQuickRecovery)).toBe(computeRecoveryRate(player) + QUICK_RECOVERY_BONUS)
   })
 })
 
@@ -186,6 +198,49 @@ describe('computeTeamStrength', () => {
       computeTeamStrength(clutch, undefined, undefined, false),
     )
   })
+
+  it('boosts a clutchAce player only when clutchActive is true, independent of the clutch personality bonus', () => {
+    const roster = createInitialRoster(1).map((p) => ({
+      ...p,
+      attributes: { shooting: 60, three: 60, rebound: 60, pass: 60, defense: 60, athletic: 60, iq: 60 },
+      personality: 'steady' as const,
+    }))
+    const clutchAce = roster.map((p, i) => (i === 0 ? withAbility(p, 'clutchAce') : p))
+
+    expect(computeTeamStrength(clutchAce, undefined, undefined, false)).toBe(
+      computeTeamStrength(roster, undefined, undefined, false),
+    )
+    expect(computeTeamStrength(clutchAce, undefined, undefined, true)).toBeGreaterThan(
+      computeTeamStrength(clutchAce, undefined, undefined, false),
+    )
+  })
+
+  it('boosts the relevant attribute for the 1~5 attribute-boosting special abilities', () => {
+    const roster = createInitialRoster(1).map((p) => ({
+      ...p,
+      attributes: { shooting: 60, three: 60, rebound: 60, pass: 60, defense: 60, athletic: 60, iq: 60 },
+    }))
+    const withDeadeye = roster.map((p, i) => (i === 0 ? withAbility(p, 'deadeyeShooter') : p))
+    expect(computeTeamStrength(withDeadeye)).toBeGreaterThan(computeTeamStrength(roster))
+  })
+
+  it('gives an additional, stackable team-strength bonus for a teamSoul or chokeHold starter, independent of the captain bonus', () => {
+    const roster = createInitialRoster(1).map((p) => ({
+      ...p,
+      attributes: { shooting: 60, three: 60, rebound: 60, pass: 60, defense: 60, athletic: 60, iq: 60 },
+      personality: 'steady' as const,
+    }))
+    const lineup: GameLineup = { starters: roster.slice(0, 5).map((p) => p.id), rotation: roster.slice(5, 8).map((p) => p.id) }
+    const baseline = computeTeamStrength(roster, undefined, lineup)
+
+    const withTeamSoul = roster.map((p, i) => (i === 0 ? withAbility(p, 'teamSoul') : p))
+    const withBoth = withTeamSoul.map((p, i) => (i === 0 ? { ...p, personality: 'captain' as const } : p))
+
+    expect(computeTeamStrength(withTeamSoul, undefined, lineup)).toBeGreaterThan(baseline)
+    expect(computeTeamStrength(withBoth, undefined, lineup)).toBeGreaterThan(
+      computeTeamStrength(withTeamSoul, undefined, lineup),
+    )
+  })
 })
 
 describe('rollForInjury', () => {
@@ -248,6 +303,22 @@ describe('rollForInjury', () => {
 
     expect(injuryCount(fragile)).toBeGreaterThan(injuryCount(steady))
   })
+
+  it('injures an ironBody player less often than one without it, at the same fatigue', () => {
+    const roster = createInitialRoster(1)
+    const ironBody: Player = withAbility({ ...roster[0], fatigue: 80 }, 'ironBody')
+    const plain: Player = { ...roster[0], fatigue: 80 }
+
+    const injuryCount = (player: Player) => {
+      let count = 0
+      for (let seed = 0; seed < 300; seed++) {
+        if (rollForInjury(player, createSeededRng(seed)).injuryStatus !== 'healthy') count += 1
+      }
+      return count
+    }
+
+    expect(injuryCount(ironBody)).toBeLessThan(injuryCount(plain))
+  })
 })
 
 describe('tickInjuryRecovery', () => {
@@ -303,6 +374,44 @@ describe('advancePlayerWeek', () => {
       const result = advancePlayerWeek(player, 20, createSeededRng(seed), false)
       expect(result.injuryStatus).toBe('healthy')
     }
+  })
+
+  it('reduces positive match load for an ironHeart player, but only on match weeks', () => {
+    const roster = createInitialRoster(1)
+    const ironHeart: Player = withAbility({ ...roster[0], fatigue: 50 }, 'ironHeart')
+    const plain: Player = { ...roster[0], fatigue: 50 }
+
+    const matchResult = advancePlayerWeek(ironHeart, 20, createSeededRng(1), true)
+    const plainMatchResult = advancePlayerWeek(plain, 20, createSeededRng(1), true)
+    expect(matchResult.fatigue).toBeLessThan(plainMatchResult.fatigue)
+
+    // Same ability, same positive load, but a non-match (training) week: no reduction.
+    const trainingResult = advancePlayerWeek(ironHeart, 20, createSeededRng(1), false)
+    const plainTrainingResult = advancePlayerWeek(plain, 20, createSeededRng(1), false)
+    expect(trainingResult.fatigue).toBe(plainTrainingResult.fatigue)
+  })
+
+  it('does not reduce recovery (negative load) for an ironHeart player on a rest week', () => {
+    const roster = createInitialRoster(1)
+    const ironHeart: Player = withAbility({ ...roster[0], fatigue: 50 }, 'ironHeart')
+    const plain: Player = { ...roster[0], fatigue: 50 }
+    const restResult = advancePlayerWeek(ironHeart, -10, createSeededRng(1), false)
+    const plainRestResult = advancePlayerWeek(plain, -10, createSeededRng(1), false)
+    expect(restResult.fatigue).toBe(plainRestResult.fatigue)
+  })
+})
+
+describe('computePerformanceVarianceRange', () => {
+  it('reduces the variance range for a steadyAnchor player, similar to the steady personality', () => {
+    const roster = createInitialRoster(1).map((p) => ({ ...p, personality: 'genius' as const }))
+    const baseline = computePerformanceVarianceRange(roster)
+    const withSteadyAnchor = roster.map((p, i) => (i === 0 ? withAbility(p, 'steadyAnchor') : p))
+    expect(computePerformanceVarianceRange(withSteadyAnchor)).toBeLessThan(baseline)
+  })
+
+  it('never drops the range below the declared minimum', () => {
+    const roster = createInitialRoster(1).map((p) => withAbility({ ...p, personality: 'steady' as const }, 'steadyAnchor'))
+    expect(computePerformanceVarianceRange(roster)).toBeGreaterThanOrEqual(1)
   })
 })
 

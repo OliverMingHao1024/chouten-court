@@ -208,10 +208,10 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: /個別訓練/ }))
     const playerSelect = screen.getByRole('combobox')
     await user.selectOptions(playerSelect, (playerSelect as HTMLSelectElement).options[1].value)
-    await user.click(screen.getByRole('button', { name: 'IQ' }))
+    await user.click(screen.getByRole('button', { name: '神射手' }))
     await user.click(screen.getByRole('button', { name: '確認本週訓練' }))
 
-    expect(screen.getByText(/個別訓練·IQ/)).toBeInTheDocument()
+    expect(screen.getByText(/個別訓練:.*神射手/)).toBeInTheDocument()
   })
 
   it('advances the week and reports the result after a practiceMatch card', async () => {

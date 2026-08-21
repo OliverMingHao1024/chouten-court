@@ -93,6 +93,7 @@ export function createInitialRoster(seed: number, size: number = ROSTER_SIZE): P
       height: randomHeight(position, rng),
       attributes,
       personality,
+      specialAbilities: [],
       fatigue: 0,
       styleTag: computeStyleTag(attributes),
       injuryStatus: 'healthy',

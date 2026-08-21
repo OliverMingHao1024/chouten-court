@@ -58,6 +58,8 @@ export const ROTATION_MATCH_LOAD = Math.round(OFFICIAL_MATCH_LOAD / 2)
 const STARTER_GAME_GROWTH_CHANCE = 0.4
 const ROTATION_GAME_GROWTH_CHANCE = 0.2
 const GAME_GROWTH_AMOUNT = 1
+// 特殊能力「實戰成長者」額外提高正式賽的實戰成長機率(原創數值,待調校)。
+const IN_GAME_GROWER_BONUS_CHANCE = 0.15
 
 export interface GameGrowthEntry {
   playerId: string
@@ -122,8 +124,12 @@ export function simulateOfficialGame(
           ? advancePlayerWeek(player, ROTATION_MATCH_LOAD, rng, true, majorInjuryWeeks)
           : advancePlayerWeek(player, 0, rng, false)
 
-    const growthChance =
+    const baseGrowthChance =
       role === 'starter' ? STARTER_GAME_GROWTH_CHANCE : role === 'rotation' ? ROTATION_GAME_GROWTH_CHANCE : 0
+    const growthChance =
+      baseGrowthChance > 0 && player.specialAbilities.includes('inGameGrower')
+        ? baseGrowthChance + IN_GAME_GROWER_BONUS_CHANCE
+        : baseGrowthChance
     if (growthChance > 0 && rng() < growthChance) {
       const attribute = rollGameGrowthAttribute(rng)
       const attributes = {

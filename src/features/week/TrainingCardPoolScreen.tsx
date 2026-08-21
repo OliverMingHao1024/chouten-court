@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { getOpponentTier } from '../../domain/opponentTier'
+import { learnableAbilitiesForPlayer, SPECIAL_ABILITY_LABELS, type SpecialAbilityKey } from '../../domain/specialAbilities'
 import {
   canSelectCards,
   cardCost,
@@ -11,7 +12,7 @@ import {
   type TrainingCardPoolState,
 } from '../../domain/trainingCardPool'
 import type { CardSelection } from '../../domain/trainingCardResolution'
-import { ATTRIBUTE_KEYS, ATTRIBUTE_LABELS, type AttributeKey, type Player } from '../../domain/types'
+import { ATTRIBUTE_LABELS, type Player } from '../../domain/types'
 import { PRACTICE_OPPONENT_STRENGTH, PRACTICE_STRENGTHS, type PracticeStrength } from '../../domain/weeklyAction'
 import './TrainingCardPoolScreen.css'
 
@@ -38,13 +39,14 @@ export interface TrainingCardPoolScreenProps {
   trainingPoints: number
   maxTrainingPoints: number
   players: Player[]
+  reputation: number
   opponentNames: Record<PracticeStrength, string>
   onConfirm: (selections: CardSelection[]) => void
 }
 
 interface IndividualChoice {
   playerId?: string
-  attribute?: AttributeKey
+  ability?: SpecialAbilityKey
 }
 
 export function TrainingCardPoolScreen({
@@ -52,6 +54,7 @@ export function TrainingCardPoolScreen({
   trainingPoints,
   maxTrainingPoints,
   players,
+  reputation,
   opponentNames,
   onConfirm,
 }: TrainingCardPoolScreenProps) {
@@ -74,7 +77,7 @@ export function TrainingCardPoolScreen({
   const allSubChoicesFilled = selectedCards.every((card) => {
     if (card.kind === 'individualTraining') {
       const choice = individualChoices[card.id]
-      return !!choice?.playerId && !!choice?.attribute
+      return !!choice?.playerId && !!choice?.ability
     }
     if (card.kind === 'practiceMatch') return !!strengthChoices[card.id]
     return true
@@ -87,7 +90,7 @@ export function TrainingCardPoolScreen({
     const selections: CardSelection[] = selectedCards.map((card) => {
       if (card.kind === 'individualTraining') {
         const choice = individualChoices[card.id]!
-        return { card, playerId: choice.playerId, attribute: choice.attribute }
+        return { card, playerId: choice.playerId, ability: choice.ability }
       }
       if (card.kind === 'practiceMatch') {
         return { card, strength: strengthChoices[card.id] }
@@ -137,43 +140,55 @@ export function TrainingCardPoolScreen({
 
       {selectedCards
         .filter((card) => card.kind === 'individualTraining')
-        .map((card) => (
-          <div key={card.id} className="training-card-pool__sub-choice">
-            <p className="training-card-pool__sub-choice-label">個別訓練:選球員與屬性</p>
-            <select
-              aria-label={`${card.id}-player`}
-              value={individualChoices[card.id]?.playerId ?? ''}
-              onChange={(e) =>
-                setIndividualChoices((prev) => ({ ...prev, [card.id]: { ...prev[card.id], playerId: e.target.value } }))
-              }
-            >
-              <option value="" disabled>
-                選球員
-              </option>
-              {players
-                .filter((player) => player.injuryStatus === 'healthy' || player.injuryStatus === 'returning')
-                .map((player) => (
-                  <option key={player.id} value={player.id}>
-                    {player.name}
-                  </option>
-                ))}
-            </select>
-            <div className="training-card-pool__attribute-picker" role="group" aria-label="個別訓練屬性">
-              {ATTRIBUTE_KEYS.map((key) => (
-                <button
-                  key={key}
-                  type="button"
-                  className={`training-card-pool__attribute-button${individualChoices[card.id]?.attribute === key ? ' training-card-pool__attribute-button--selected' : ''}`}
-                  onClick={() =>
-                    setIndividualChoices((prev) => ({ ...prev, [card.id]: { ...prev[card.id], attribute: key } }))
-                  }
-                >
-                  {ATTRIBUTE_LABELS[key]}
-                </button>
-              ))}
+        .map((card) => {
+          const choice = individualChoices[card.id]
+          const selectedPlayer = players.find((player) => player.id === choice?.playerId)
+          const learnable = selectedPlayer ? learnableAbilitiesForPlayer(selectedPlayer, reputation) : []
+          return (
+            <div key={card.id} className="training-card-pool__sub-choice">
+              <p className="training-card-pool__sub-choice-label">個別訓練:選球員與要教的特殊能力</p>
+              <select
+                aria-label={`${card.id}-player`}
+                value={choice?.playerId ?? ''}
+                onChange={(e) =>
+                  setIndividualChoices((prev) => ({ ...prev, [card.id]: { playerId: e.target.value } }))
+                }
+              >
+                <option value="" disabled>
+                  選球員
+                </option>
+                {players
+                  .filter((player) => player.injuryStatus === 'healthy' || player.injuryStatus === 'returning')
+                  .map((player) => (
+                    <option key={player.id} value={player.id}>
+                      {player.name}
+                    </option>
+                  ))}
+              </select>
+              {selectedPlayer && (
+                <div className="training-card-pool__attribute-picker" role="group" aria-label="個別訓練能力">
+                  {learnable.length === 0 && (
+                    <p className="training-card-pool__sub-choice-label">
+                      {selectedPlayer.name}已經學會目前解鎖的所有特殊能力
+                    </p>
+                  )}
+                  {learnable.map((ability) => (
+                    <button
+                      key={ability}
+                      type="button"
+                      className={`training-card-pool__attribute-button${choice?.ability === ability ? ' training-card-pool__attribute-button--selected' : ''}`}
+                      onClick={() =>
+                        setIndividualChoices((prev) => ({ ...prev, [card.id]: { ...prev[card.id], ability } }))
+                      }
+                    >
+                      {SPECIAL_ABILITY_LABELS[ability]}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          )
+        })}
 
       {selectedCards
         .filter((card) => card.kind === 'practiceMatch')

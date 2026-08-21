@@ -27,6 +27,7 @@ import { applyReputationDelta, computeSeasonReputationDelta, INITIAL_REPUTATION 
 import { createInitialRoster, ROSTER_SIZE } from './domain/roster'
 import { createSeededRng, hashSeed } from './domain/rng'
 import { computeScheduleStrip, weeksUntilNextOfficialMatch } from './domain/schedule'
+import { SPECIAL_ABILITY_LABELS } from './domain/specialAbilities'
 import {
   clearSaveFromStorage,
   loadSaveFromStorage,
@@ -265,7 +266,9 @@ function summarizeResolvedCards(resolvedCards: TrainingCardWeekResult['resolvedC
   return resolvedCards
     .map((card) => {
       if (card.kind === 'teamTraining') return `全隊訓練·${ATTRIBUTE_LABELS[card.attribute]}`
-      if (card.kind === 'individualTraining') return `個別訓練·${ATTRIBUTE_LABELS[card.attribute]}`
+      if (card.kind === 'individualTraining') {
+        return `個別訓練:${card.succeeded ? '學會' : '嘗試'}${SPECIAL_ABILITY_LABELS[card.ability]}`
+      }
       if (card.kind === 'practiceMatch') return `練習賽${card.outcome === 'win' ? '獲勝' : '落敗'}`
       return '全隊休養'
     })
@@ -273,7 +276,7 @@ function summarizeResolvedCards(resolvedCards: TrainingCardWeekResult['resolvedC
 }
 
 function runTrainingCardWeek(team: Team, selections: CardSelection[]) {
-  const resolution = resolveCardSelections(team.players, selections, team.seed + team.totalWeek)
+  const resolution = resolveCardSelections(team.players, selections, team.seed + team.totalWeek, team.reputation)
 
   const poolRng = createSeededRng(hashSeed(`${team.seed}-${team.totalWeek}-cardpool`))
   const advance = advanceCardPool(team.cardPool, selections.map((selection) => selection.card.id), poolRng)
@@ -549,6 +552,7 @@ function App() {
         trainingPoints={team.trainingPoints}
         maxTrainingPoints={maxTrainingPoints(team.reputation)}
         players={team.players}
+        reputation={team.reputation}
         opponentNames={practiceOpponentNamesForWeek(team)}
         onConfirm={(selections) => {
           setTeam({ ...team, ...runTrainingCardWeek(team, selections) })

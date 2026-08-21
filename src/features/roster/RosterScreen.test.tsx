@@ -21,6 +21,7 @@ function makePlayer(overrides: Partial<Player> = {}): Player {
       iq: 77,
     },
     personality: 'steady',
+    specialAbilities: [],
     fatigue: 0,
     styleTag: { primary: 'playmaking', secondary: 'shooting', label: '組織射手型' },
     injuryStatus: 'healthy',
@@ -94,6 +95,26 @@ describe('RosterScreen', () => {
 
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByText('球員02')).toBeInTheDocument()
+  })
+
+  it('shows the learned special abilities in the dialog, when the player has any', async () => {
+    const user = userEvent.setup()
+    render(<RosterScreen players={[makePlayer({ specialAbilities: ['ironWall', 'quickRecovery'] })]} />)
+
+    await user.click(screen.getByRole('button', { name: /球員01/ }))
+
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText('鐵閘')).toBeInTheDocument()
+    expect(within(dialog).getByText('快速回復')).toBeInTheDocument()
+  })
+
+  it('shows no abilities section when the player has not learned any yet', async () => {
+    const user = userEvent.setup()
+    render(<RosterScreen players={[makePlayer({ specialAbilities: [] })]} />)
+
+    await user.click(screen.getByRole('button', { name: /球員01/ }))
+
+    expect(document.querySelector('.roster-dialog__abilities')).not.toBeInTheDocument()
   })
 
   it('closes the dialog when the backdrop (the dialog element itself, not its content) is clicked', async () => {

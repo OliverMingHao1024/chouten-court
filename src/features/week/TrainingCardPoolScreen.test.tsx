@@ -20,7 +20,7 @@ describe('TrainingCardPoolScreen', () => {
   it('renders every card in the pool with its cost', () => {
     const cards = Array.from({ length: 9 }, (_, i) => makeCard({ id: `c${i}`, attribute: 'three' }))
     render(
-      <TrainingCardPoolScreen pool={makePool(cards)} trainingPoints={10} maxTrainingPoints={10} players={players} opponentNames={opponentNames} onConfirm={() => {}} />,
+      <TrainingCardPoolScreen pool={makePool(cards)} trainingPoints={10} maxTrainingPoints={10} players={players} reputation={100} opponentNames={opponentNames} onConfirm={() => {}} />,
     )
     expect(screen.getAllByText('三分')).toHaveLength(9)
   })
@@ -29,7 +29,7 @@ describe('TrainingCardPoolScreen', () => {
     const user = userEvent.setup()
     const cards = [makeCard({ id: 'a', kind: 'rest', attribute: null })]
     render(
-      <TrainingCardPoolScreen pool={makePool(cards)} trainingPoints={10} maxTrainingPoints={10} players={players} opponentNames={opponentNames} onConfirm={() => {}} />,
+      <TrainingCardPoolScreen pool={makePool(cards)} trainingPoints={10} maxTrainingPoints={10} players={players} reputation={100} opponentNames={opponentNames} onConfirm={() => {}} />,
     )
     const card = screen.getByRole('button', { name: /休養/ })
     await user.click(card)
@@ -42,7 +42,7 @@ describe('TrainingCardPoolScreen', () => {
     const user = userEvent.setup()
     const cards = Array.from({ length: MAX_CARDS_PER_WEEK + 1 }, (_, i) => makeCard({ id: `c${i}`, kind: 'rest', attribute: null }))
     render(
-      <TrainingCardPoolScreen pool={makePool(cards)} trainingPoints={999} maxTrainingPoints={999} players={players} opponentNames={opponentNames} onConfirm={() => {}} />,
+      <TrainingCardPoolScreen pool={makePool(cards)} trainingPoints={999} maxTrainingPoints={999} players={players} reputation={100} opponentNames={opponentNames} onConfirm={() => {}} />,
     )
     const buttons = screen.getAllByRole('button', { name: /休養/ })
     for (const button of buttons) await user.click(button)
@@ -53,7 +53,7 @@ describe('TrainingCardPoolScreen', () => {
   it('disables a card whose cost would exceed the remaining points', () => {
     const cards = [makeCard({ id: 'a', kind: 'practiceMatch', attribute: null })]
     render(
-      <TrainingCardPoolScreen pool={makePool(cards)} trainingPoints={1} maxTrainingPoints={10} players={players} opponentNames={opponentNames} onConfirm={() => {}} />,
+      <TrainingCardPoolScreen pool={makePool(cards)} trainingPoints={1} maxTrainingPoints={10} players={players} reputation={100} opponentNames={opponentNames} onConfirm={() => {}} />,
     )
     expect(screen.getByRole('button', { name: /練習賽/ })).toBeDisabled()
   })
@@ -61,7 +61,7 @@ describe('TrainingCardPoolScreen', () => {
   it('keeps 確認本週訓練 disabled until at least one card is selected', () => {
     const cards = [makeCard({ id: 'a', kind: 'rest', attribute: null })]
     render(
-      <TrainingCardPoolScreen pool={makePool(cards)} trainingPoints={10} maxTrainingPoints={10} players={players} opponentNames={opponentNames} onConfirm={() => {}} />,
+      <TrainingCardPoolScreen pool={makePool(cards)} trainingPoints={10} maxTrainingPoints={10} players={players} reputation={100} opponentNames={opponentNames} onConfirm={() => {}} />,
     )
     expect(screen.getByRole('button', { name: '確認本週訓練' })).toBeDisabled()
   })
@@ -71,19 +71,19 @@ describe('TrainingCardPoolScreen', () => {
     const onConfirm = vi.fn()
     const card = makeCard({ id: 'a', attribute: 'three' })
     render(
-      <TrainingCardPoolScreen pool={makePool([card])} trainingPoints={10} maxTrainingPoints={10} players={players} opponentNames={opponentNames} onConfirm={onConfirm} />,
+      <TrainingCardPoolScreen pool={makePool([card])} trainingPoints={10} maxTrainingPoints={10} players={players} reputation={100} opponentNames={opponentNames} onConfirm={onConfirm} />,
     )
     await user.click(screen.getByRole('button', { name: /三分/ }))
     await user.click(screen.getByRole('button', { name: '確認本週訓練' }))
     expect(onConfirm).toHaveBeenCalledWith([{ card }])
   })
 
-  it('requires a player and attribute before confirming an individualTraining card', async () => {
+  it('requires a player and an ability before confirming an individualTraining card', async () => {
     const user = userEvent.setup()
     const onConfirm = vi.fn()
     const card = makeCard({ id: 'a', kind: 'individualTraining', attribute: null })
     render(
-      <TrainingCardPoolScreen pool={makePool([card])} trainingPoints={10} maxTrainingPoints={10} players={players} opponentNames={opponentNames} onConfirm={onConfirm} />,
+      <TrainingCardPoolScreen pool={makePool([card])} trainingPoints={10} maxTrainingPoints={10} players={players} reputation={100} opponentNames={opponentNames} onConfirm={onConfirm} />,
     )
     await user.click(screen.getByRole('button', { name: /個別訓練/ }))
     expect(screen.getByRole('button', { name: '確認本週訓練' })).toBeDisabled()
@@ -91,9 +91,29 @@ describe('TrainingCardPoolScreen', () => {
     await user.selectOptions(screen.getByLabelText('a-player'), players[0].id)
     expect(screen.getByRole('button', { name: '確認本週訓練' })).toBeDisabled()
 
-    await user.click(screen.getByRole('button', { name: 'IQ' }))
+    await user.click(screen.getByRole('button', { name: '神射手' }))
     await user.click(screen.getByRole('button', { name: '確認本週訓練' }))
-    expect(onConfirm).toHaveBeenCalledWith([{ card, playerId: players[0].id, attribute: 'iq' }])
+    expect(onConfirm).toHaveBeenCalledWith([{ card, playerId: players[0].id, ability: 'deadeyeShooter' }])
+  })
+
+  it("only offers abilities the selected player doesn't already have", async () => {
+    const user = userEvent.setup()
+    const learnedPlayer = { ...players[0], specialAbilities: ['deadeyeShooter' as const] }
+    const card = makeCard({ id: 'a', kind: 'individualTraining', attribute: null })
+    render(
+      <TrainingCardPoolScreen
+        pool={makePool([card])}
+        trainingPoints={10}
+        maxTrainingPoints={10}
+        players={[learnedPlayer, ...players.slice(1)]}
+        reputation={100}
+        opponentNames={opponentNames}
+        onConfirm={() => {}}
+      />,
+    )
+    await user.click(screen.getByRole('button', { name: /個別訓練/ }))
+    await user.selectOptions(screen.getByLabelText('a-player'), learnedPlayer.id)
+    expect(screen.queryByRole('button', { name: '神射手' })).not.toBeInTheDocument()
   })
 
   it('requires a strength before confirming a practiceMatch card', async () => {
@@ -101,7 +121,7 @@ describe('TrainingCardPoolScreen', () => {
     const onConfirm = vi.fn()
     const card = makeCard({ id: 'a', kind: 'practiceMatch', attribute: null })
     render(
-      <TrainingCardPoolScreen pool={makePool([card])} trainingPoints={10} maxTrainingPoints={10} players={players} opponentNames={opponentNames} onConfirm={onConfirm} />,
+      <TrainingCardPoolScreen pool={makePool([card])} trainingPoints={10} maxTrainingPoints={10} players={players} reputation={100} opponentNames={opponentNames} onConfirm={onConfirm} />,
     )
     await user.click(screen.getByRole('button', { name: /練習賽/ }))
     expect(screen.getByRole('button', { name: '確認本週訓練' })).toBeDisabled()
@@ -115,7 +135,7 @@ describe('TrainingCardPoolScreen', () => {
     const user = userEvent.setup()
     const card = makeCard({ id: 'a', kind: 'rest', attribute: null })
     render(
-      <TrainingCardPoolScreen pool={makePool([card])} trainingPoints={10} maxTrainingPoints={10} players={players} opponentNames={opponentNames} onConfirm={() => {}} />,
+      <TrainingCardPoolScreen pool={makePool([card])} trainingPoints={10} maxTrainingPoints={10} players={players} reputation={100} opponentNames={opponentNames} onConfirm={() => {}} />,
     )
     const cardButton = screen.getByRole('button', { name: /休養/ })
     await user.click(cardButton)

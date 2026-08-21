@@ -4,6 +4,7 @@ import { PHASE_GAME_COUNT } from './officialMatch'
 import type { Candidate } from './recruiting'
 import type { SeasonGameLogEntry } from './season'
 import type { SeasonRecord, SeasonSummaryResult } from './seasonSummary'
+import { SPECIAL_ABILITY_KEYS } from './specialAbilities'
 import { CARD_KINDS, type PoolCard, type TrainingCardPoolState } from './trainingCardPool'
 import {
   ATTRIBUTE_KEYS,
@@ -16,7 +17,7 @@ import {
 } from './types'
 
 export const SAVE_STORAGE_KEY = 'chouten-court:save'
-export const SAVE_FORMAT_VERSION = 9
+export const SAVE_FORMAT_VERSION = 10
 
 const OFFICIAL_PHASES = Object.keys(PHASE_GAME_COUNT)
 const FINAL4_PLACEMENTS = ['champion', 'runnerUp', 'third', 'fourth']
@@ -59,6 +60,12 @@ function isValidPlayer(value: unknown): value is Player {
   }
 
   if (typeof value.personality !== 'string' || !(PERSONALITY_KEYS as readonly string[]).includes(value.personality)) {
+    return false
+  }
+  if (
+    !Array.isArray(value.specialAbilities) ||
+    !value.specialAbilities.every((key) => (SPECIAL_ABILITY_KEYS as readonly string[]).includes(key))
+  ) {
     return false
   }
   if (typeof value.fatigue !== 'number') return false

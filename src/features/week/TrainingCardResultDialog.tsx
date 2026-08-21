@@ -1,3 +1,4 @@
+import { SPECIAL_ABILITY_LABELS } from '../../domain/specialAbilities'
 import type { ResolvedCard } from '../../domain/trainingCardResolution'
 import { ATTRIBUTE_LABELS } from '../../domain/types'
 import { useResultDialog } from '../shared/useResultDialog'
@@ -28,10 +29,10 @@ function ResolvedCardSummary({ card, playerNameById }: { card: ResolvedCard; pla
   }
   if (card.kind === 'individualTraining') {
     const playerName = playerNameById[card.playerId] ?? ''
+    const abilityLabel = SPECIAL_ABILITY_LABELS[card.ability]
     return (
       <li>
-        個別訓練·{ATTRIBUTE_LABELS[card.attribute]}:{playerName} {formatSigned(card.roll.gain)}
-        {card.roll.bonusLabel && <span className="training-card-result-dialog__combo">{card.roll.bonusLabel}</span>}
+        個別訓練:{playerName} {card.succeeded ? `學會了「${abilityLabel}」` : `嘗試學習「${abilityLabel}」失敗`}
       </li>
     )
   }

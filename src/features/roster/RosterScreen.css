@@ -131,3 +131,21 @@
   flex-direction: column;
   gap: var(--space-1);
 }
+
+.roster-dialog__abilities {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.roster-dialog__ability {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--accent-strong);
+  border: 1px solid var(--accent-strong);
+  border-radius: 999px;
+  padding: 2px 8px;
+}

@@ -1,6 +1,11 @@
 import { lineupWeight, type GameLineup } from './lineup'
 import { hashSeed, type Rng } from './rng'
+import type { SpecialAbilityKey } from './specialAbilities'
 import type { AttributeKey, Player } from './types'
+
+function hasAbility(player: Player, ability: SpecialAbilityKey): boolean {
+  return player.specialAbilities.includes(ability)
+}
 
 export const FATIGUE_MIN = 0
 export const FATIGUE_MAX = 100
@@ -11,15 +16,19 @@ export const BASELINE_RECOVERY = 10
 export const RECOVERY_INDIVIDUAL_VARIANCE = 2
 // 年級造成的恢復差異(原創數值,待調校):低年級體力回復略快,高三略慢。
 export const RECOVERY_GRADE_DELTA: Record<number, number> = { 1: 1, 2: 0, 3: -1 }
+// 特殊能力「快速回復」的每週恢復量加成(原創數值,待調校)。
+export const QUICK_RECOVERY_BONUS = 3
 
 /**
  * 單一球員的每週體力恢復量:基準值疊加「終身固定、由 id 雜湊決定」的個人差異,再疊加年級
- * 差異。刻意不讓個性或傷勢狀態影響恢復速度,避免和玻璃體質既有的受傷機率效果混為一談。
+ * 差異與「快速回復」特殊能力加成。刻意不讓個性或傷勢狀態影響恢復速度,避免和玻璃體質既有的
+ * 受傷機率效果混為一談。
  */
 export function computeRecoveryRate(player: Player): number {
   const individual = (hashSeed(player.id) % (RECOVERY_INDIVIDUAL_VARIANCE * 2 + 1)) - RECOVERY_INDIVIDUAL_VARIANCE
   const gradeDelta = RECOVERY_GRADE_DELTA[player.grade] ?? 0
-  return BASELINE_RECOVERY + individual + gradeDelta
+  const abilityBonus = hasAbility(player, 'quickRecovery') ? QUICK_RECOVERY_BONUS : 0
+  return BASELINE_RECOVERY + individual + gradeDelta + abilityBonus
 }
 
 // 受傷機率隨疲勞值線性上升(原創數值,待調校):疲勞 0 時約 2%,疲勞 100 時約 20%。
@@ -27,6 +36,8 @@ export const INJURY_BASE_PROBABILITY = 0.02
 export const INJURY_FATIGUE_PROBABILITY_SCALE = 0.18
 // 玻璃體質(fragile)個性受傷機率係數較高。
 export const FRAGILE_INJURY_MULTIPLIER = 1.6
+// 特殊能力「玄鐵之軀」降低受傷機率(原創數值,待調校)。
+export const IRON_BODY_INJURY_MULTIPLIER = 0.7
 // 受傷後三成機率是重傷,其餘七成是輕傷。
 export const MAJOR_INJURY_SHARE = 0.3
 // 復出過渡期屬性打 8 折,僅影響比賽表現計算,不修改球員實際屬性數值。
@@ -39,6 +50,10 @@ export const HIGH_FATIGUE_RISK_THRESHOLD = 70
 // 隊長型(captain)僅列為先發時提供小幅團隊有效戰力加成(原創數值,待調校);多名隊長同時
 // 先發也不重複疊加,只取一次效果。
 export const CAPTAIN_STRENGTH_BONUS = 3
+// 特殊能力「隊魂領袖」「鎖喉夾擊」跟隊長型走同一種機制,但各自是獨立來源,可以同時疊加
+// (原創數值,待調校)。
+export const TEAM_SOUL_STRENGTH_BONUS = 3
+export const CHOKE_HOLD_STRENGTH_BONUS = 3
 // 抗壓型(clutch)僅在八強/四強階段生效,提高該球員的有效比賽表現;不修改永久屬性
 // (原創數值,待調校)。
 export const CLUTCH_PERFORMANCE_BONUS = 0.1
@@ -60,9 +75,20 @@ export function applyFatigueDelta(player: Player, load: number): Player {
   return { ...player, fatigue }
 }
 
+// 特殊能力「鋼鐵般的心臟」降低正式賽/練習賽的疲勞負荷(原創數值,待調校);只降低會增加疲勞
+// 的正向負荷,不影響休養/訓練這類非比賽負荷,也不會讓負向負荷(恢復)被放大。
+export const IRON_HEART_MATCH_LOAD_MULTIPLIER = 0.85
+
+function applyIronHeartLoadReduction(player: Player, load: number, isMatchWeek: boolean): number {
+  if (isMatchWeek && load > 0 && hasAbility(player, 'ironHeart')) return load * IRON_HEART_MATCH_LOAD_MULTIPLIER
+  return load
+}
+
 function injuryProbability(player: Player): number {
-  const base = INJURY_BASE_PROBABILITY + (player.fatigue / FATIGUE_MAX) * INJURY_FATIGUE_PROBABILITY_SCALE
-  return player.personality === 'fragile' ? base * FRAGILE_INJURY_MULTIPLIER : base
+  let probability = INJURY_BASE_PROBABILITY + (player.fatigue / FATIGUE_MAX) * INJURY_FATIGUE_PROBABILITY_SCALE
+  if (player.personality === 'fragile') probability *= FRAGILE_INJURY_MULTIPLIER
+  if (hasAbility(player, 'ironBody')) probability *= IRON_BODY_INJURY_MULTIPLIER
+  return probability
 }
 
 /** 比賽結算時依當下疲勞值滾機率判定是否受傷;已經缺賽中的球員不會再被判定。 */
@@ -102,6 +128,32 @@ export function tickInjuryRecovery(player: Player, rng: Rng): Player {
 
 export type AttributeWeights = Partial<Record<AttributeKey, number>>
 
+// 特殊能力 1~5 每項對應一個屬性,比賽計算隊伍戰力時,額外加成該球員在對應屬性上的有效值
+// (原創數值,待調校);跟訓練層面的「個性加成」是獨立的兩件事,只在比賽計算生效。
+const ATTRIBUTE_BOOST_ABILITIES: Partial<Record<SpecialAbilityKey, AttributeKey>> = {
+  deadeyeShooter: 'three',
+  paintBeast: 'shooting',
+  reboundMachine: 'rebound',
+  passingArtist: 'pass',
+  ironWall: 'defense',
+}
+export const ABILITY_ATTRIBUTE_BOOST_AMOUNT = 5
+
+// 特殊能力「抗壓王牌」跟抗壓型個性走同一種機制(八強/四強額外表現加成),但是獨立來源,
+// 兩者可以同時生效(原創數值,待調校)。
+export const CLUTCH_ACE_PERFORMANCE_BONUS = 0.1
+
+function boostedAttributes(player: Player): Player['attributes'] {
+  let attributes = player.attributes
+  for (const ability of player.specialAbilities) {
+    const attribute = ATTRIBUTE_BOOST_ABILITIES[ability]
+    if (attribute) {
+      attributes = { ...attributes, [attribute]: attributes[attribute] + ABILITY_ATTRIBUTE_BOOST_AMOUNT }
+    }
+  }
+  return attributes
+}
+
 function weightedAttributeAverage(attributes: Player['attributes'], weights?: AttributeWeights): number {
   let weightedSum = 0
   let weightTotal = 0
@@ -114,10 +166,12 @@ function weightedAttributeAverage(attributes: Player['attributes'], weights?: At
 }
 
 function effectiveAttributeAverage(player: Player, weights?: AttributeWeights, clutchActive = false): number {
-  const average = weightedAttributeAverage(player.attributes, weights)
+  const average = weightedAttributeAverage(boostedAttributes(player), weights)
   const fatigueMultiplier = 1 - (player.fatigue / FATIGUE_MAX) * FATIGUE_PERFORMANCE_PENALTY
   const returningMultiplier = player.injuryStatus === 'returning' ? RETURNING_ATTRIBUTE_MULTIPLIER : 1
-  const clutchMultiplier = clutchActive && player.personality === 'clutch' ? 1 + CLUTCH_PERFORMANCE_BONUS : 1
+  let clutchMultiplier = 1
+  if (clutchActive && player.personality === 'clutch') clutchMultiplier *= 1 + CLUTCH_PERFORMANCE_BONUS
+  if (clutchActive && hasAbility(player, 'clutchAce')) clutchMultiplier *= 1 + CLUTCH_ACE_PERFORMANCE_BONUS
   return average * fatigueMultiplier * returningMultiplier * clutchMultiplier
 }
 
@@ -138,7 +192,7 @@ export function advancePlayerWeek(
     return applyFatigueDelta(tickInjuryRecovery(player, rng), 0)
   }
   const ticked = player.injuryStatus === 'returning' ? tickInjuryRecovery(player, rng) : player
-  const fatigued = applyFatigueDelta(ticked, load)
+  const fatigued = applyFatigueDelta(ticked, applyIronHeartLoadReduction(ticked, load, isMatchWeek))
   return isMatchWeek ? rollForInjury(fatigued, rng, majorInjuryWeeks) : fatigued
 }
 
@@ -146,9 +200,10 @@ export function advancePlayerWeek(
  * 隊伍戰力:未提供 lineup 時,對「可上場」球員(排除輕傷/重傷)做簡單平均,沿用練習賽等
  * 沒有先發/輪替概念的場合。提供 lineup 時,改依先發/輪替權重(先發6:輪替3:未上場0)
  * 做加權平均,未列入陣容的球員完全不計入戰力;若加權後總權重為 0(例如陣容剛好是空的),
- * 安全退回未加權平均,避免除以 0。clutchActive 為 true 時(八強/四強階段),抗壓型球員的
- * 有效表現額外加成;有 lineup 且先發中有隊長型球員時,額外加上一次性的團隊戰力加成
- * (多名隊長同時先發不重複疊加)。
+ * 安全退回未加權平均,避免除以 0。clutchActive 為 true 時(八強/四強階段),抗壓型個性與
+ * 「抗壓王牌」特殊能力的球員有效表現各自額外加成;有 lineup 且先發中有隊長型球員、或帶
+ * 「隊魂領袖」「鎖喉夾擊」特殊能力的球員時,各自額外加上一次性的團隊戰力加成(同一類來源
+ * 多人同時先發不重複疊加,但不同來源之間可以疊加)。
  */
 export function computeTeamStrength(
   roster: Player[],
@@ -161,7 +216,14 @@ export function computeTeamStrength(
   const hasCaptainStarter = lineup
     ? lineup.starters.some((id) => roster.find((player) => player.id === id)?.personality === 'captain')
     : false
-  const captainBonus = hasCaptainStarter ? CAPTAIN_STRENGTH_BONUS : 0
+  const hasAbilityStarter = (ability: SpecialAbilityKey) =>
+    lineup
+      ? lineup.starters.some((id) => roster.find((player) => player.id === id)?.specialAbilities.includes(ability))
+      : false
+  const startBonus =
+    (hasCaptainStarter ? CAPTAIN_STRENGTH_BONUS : 0) +
+    (hasAbilityStarter('teamSoul') ? TEAM_SOUL_STRENGTH_BONUS : 0) +
+    (hasAbilityStarter('chokeHold') ? CHOKE_HOLD_STRENGTH_BONUS : 0)
 
   if (lineup) {
     const weighted = pool.map((player) => ({ player, weight: lineupWeight(player.id, lineup) }))
@@ -173,7 +235,7 @@ export function computeTeamStrength(
           0,
         ) /
           totalWeight +
-        captainBonus
+        startBonus
       )
     }
   }
@@ -181,7 +243,7 @@ export function computeTeamStrength(
   return (
     pool.reduce((sum, player) => sum + effectiveAttributeAverage(player, attributeWeights, clutchActive), 0) /
       pool.length +
-    captainBonus
+    startBonus
   )
 }
 
@@ -194,15 +256,20 @@ export function computeWinProbability(teamStrength: number, opponentStrength: nu
 const PERFORMANCE_VARIANCE_BASE = 4
 const PERFORMANCE_VARIANCE_PERSONALITY_DELTA = 1.5
 const PERFORMANCE_VARIANCE_MIN = 1
+// 特殊能力「定海神針」跟穩健型走同一種降低波動機制,是獨立來源(原創數值,待調校)。
+const PERFORMANCE_VARIANCE_ABILITY_DELTA = 1.5
 
-function computePerformanceVarianceRange(roster: Player[], lineup?: GameLineup): number {
+export function computePerformanceVarianceRange(roster: Player[], lineup?: GameLineup): number {
   const available = roster.filter((player) => player.injuryStatus !== 'minor' && player.injuryStatus !== 'major')
   // 有陣容時,只計算實際上場(先發+輪替)的個性組成,未上場球員不影響場上表現波動。
   const pool = lineup ? available.filter((player) => lineupWeight(player.id, lineup) > 0) : available
   const scorerCount = pool.filter((player) => player.personality === 'scorer').length
   const steadyCount = pool.filter((player) => player.personality === 'steady').length
+  const steadyAnchorCount = pool.filter((player) => hasAbility(player, 'steadyAnchor')).length
   const range =
-    PERFORMANCE_VARIANCE_BASE + (scorerCount - steadyCount) * PERFORMANCE_VARIANCE_PERSONALITY_DELTA
+    PERFORMANCE_VARIANCE_BASE +
+    (scorerCount - steadyCount) * PERFORMANCE_VARIANCE_PERSONALITY_DELTA -
+    steadyAnchorCount * PERFORMANCE_VARIANCE_ABILITY_DELTA
   return Math.max(PERFORMANCE_VARIANCE_MIN, range)
 }
 

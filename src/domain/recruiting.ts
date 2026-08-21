@@ -110,6 +110,7 @@ export function signCandidates(candidates: Candidate[], selectedIds: string[]): 
       height: candidate.height,
       attributes: candidate.trueAttributes,
       personality: candidate.personality,
+      specialAbilities: [],
       fatigue: 0,
       styleTag: computeStyleTag(candidate.trueAttributes),
       injuryStatus: 'healthy',

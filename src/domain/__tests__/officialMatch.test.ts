@@ -122,6 +122,21 @@ describe('in-game growth from playing time', () => {
     expect(starterGrowthCount).toBeGreaterThan(rotationGrowthCount)
   })
 
+  it('gives an inGameGrower starter a higher growth rate than a starter without it, across many games', () => {
+    const roster = createInitialRoster(1).map((p, i) => (i === 0 ? { ...p, specialAbilities: ['inGameGrower' as const] } : p))
+    const lineup: GameLineup = { starters: [roster[0].id, roster[1].id], rotation: [] }
+
+    const trials = 500
+    let growerGrowthCount = 0
+    let plainGrowthCount = 0
+    for (let seed = 0; seed < trials; seed++) {
+      const result = simulateOfficialGame(roster, 'qualifying', seed, DEFAULT_TACTICS, testAce, lineup)
+      if (result.growth.some((entry) => entry.playerId === roster[0].id)) growerGrowthCount += 1
+      if (result.growth.some((entry) => entry.playerId === roster[1].id)) plainGrowthCount += 1
+    }
+    expect(growerGrowthCount).toBeGreaterThan(plainGrowthCount)
+  })
+
   it('recomputes the style tag when a player gets in-game growth', () => {
     const roster = createInitialRoster(1)
     const lineup = fullLineup(roster)
