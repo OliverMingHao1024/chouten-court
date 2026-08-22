@@ -24,9 +24,13 @@ function renderScreen(overrides: Partial<React.ComponentProps<typeof SeasonMatch
       opponentAce={{ name: '陳志明', scoring: 90, shooting: 80 }}
       opponentStyle="fastBreak"
       reputation={50}
+      alwaysScouted={false}
       players={players}
       initialLineup={null}
       lastResult={null}
+      rivals={[]}
+      onPinRival={vi.fn()}
+      onUnpinRival={vi.fn()}
       onPlayGame={vi.fn()}
       {...overrides}
     />,
@@ -131,9 +135,13 @@ describe('SeasonMatchScreen', () => {
         opponentAce={{ name: '陳志明', scoring: 90, shooting: 80 }}
         opponentStyle="fastBreak"
         reputation={50}
+        alwaysScouted={false}
         players={tiredPlayers}
         initialLineup={null}
         lastResult={null}
+        rivals={[]}
+        onPinRival={vi.fn()}
+        onUnpinRival={vi.fn()}
         onPlayGame={vi.fn()}
       />,
     )
@@ -196,10 +204,54 @@ describe('SeasonMatchScreen', () => {
     expect(screen.queryByText(/戰力區間/)).not.toBeInTheDocument()
   })
 
+  it('reveals scouting intel below the reputation threshold when alwaysScouted (影片分析室) is unlocked', () => {
+    renderScreen({ reputation: 0, alwaysScouted: true })
+    expect(screen.queryByText(/尚未偵察/)).not.toBeInTheDocument()
+    expect(screen.getByText(/戰力區間/)).toBeInTheDocument()
+  })
+
   it('reveals opponent style, strength range, and ace weakness at/above the reputation threshold', () => {
     renderScreen({ reputation: 55, opponentStyle: 'interior', opponentAce: { name: '陳志明', scoring: 99, shooting: 60 } })
     expect(screen.getByText(/禁區型/)).toBeInTheDocument()
     expect(screen.getByText(/戰力區間/)).toBeInTheDocument()
     expect(screen.getByText(/三分準度較弱/)).toBeInTheDocument()
+  })
+
+  it('offers to pin the opponent as a rival when not already pinned and there is room', async () => {
+    const user = userEvent.setup()
+    const onPinRival = vi.fn()
+    renderScreen({ opponentName: '板橋高中', rivals: [], onPinRival })
+
+    await user.click(screen.getByRole('button', { name: '釘選為宿敵' }))
+    expect(onPinRival).toHaveBeenCalledWith('板橋高中')
+  })
+
+  it('shows head-to-head record and an unpin button when the opponent is already a rival', async () => {
+    const user = userEvent.setup()
+    const onUnpinRival = vi.fn()
+    renderScreen({
+      opponentName: '板橋高中',
+      rivals: [{ name: '板橋高中', wins: 2, losses: 1, biggestComebackMargin: 9, pinnedAtWeek: 1 }],
+      onUnpinRival,
+    })
+
+    expect(screen.getByText(/交手 2勝1敗/)).toBeInTheDocument()
+    expect(screen.getByText(/最大逆轉 9 分/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '釘選為宿敵' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: '取消宿敵' }))
+    expect(onUnpinRival).toHaveBeenCalledWith('板橋高中')
+  })
+
+  it('hides the pin button once MAX_PINNED_RIVALS is reached (for a non-rival opponent)', () => {
+    renderScreen({
+      opponentName: '新對手高中',
+      rivals: [
+        { name: 'A', wins: 0, losses: 0, biggestComebackMargin: null, pinnedAtWeek: 1 },
+        { name: 'B', wins: 0, losses: 0, biggestComebackMargin: null, pinnedAtWeek: 1 },
+        { name: 'C', wins: 0, losses: 0, biggestComebackMargin: null, pinnedAtWeek: 1 },
+      ],
+    })
+    expect(screen.queryByRole('button', { name: '釘選為宿敵' })).not.toBeInTheDocument()
   })
 })

@@ -9,6 +9,8 @@ export interface AppShellProps {
   weekOfYear: number
   monthLabel: string
   phaseLabel: string
+  /** 已永久解鎖的學校資產標籤;空陣列時不顯示這行。 */
+  schoolAssetLabels: string[]
   actions?: ReactNode
   /** 名冊內容;有提供時 HUD 才會顯示獨立的「名冊」收合按鈕,不再固定佔據每個畫面下方。 */
   roster?: ReactNode
@@ -25,6 +27,7 @@ export function AppShell({
   weekOfYear,
   monthLabel,
   phaseLabel,
+  schoolAssetLabels,
   actions,
   roster,
   scheduleStrip,
@@ -42,6 +45,9 @@ export function AppShell({
             <p className="app-shell__coach">
               {coachName} 教練 · 聲望 {reputation}
             </p>
+            {schoolAssetLabels.length > 0 && (
+              <p className="app-shell__assets">永久資產:{schoolAssetLabels.join('、')}</p>
+            )}
           </div>
           <div className="app-shell__calendar">
             <p className="app-shell__week">

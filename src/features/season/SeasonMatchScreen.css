@@ -84,6 +84,36 @@
   color: var(--text-muted);
 }
 
+.matchup-card__rival {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.matchup-card__rival-record {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--accent-strong);
+}
+
+.matchup-card__rival-button {
+  align-self: center;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2px var(--space-2);
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+
+.matchup-card__rival-button:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+
 .matchup-card__scouting {
   font-size: 0.75rem;
   color: var(--accent-strong);

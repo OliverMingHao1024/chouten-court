@@ -5,6 +5,14 @@ import { distributePlayerStats } from './domain/boxScoreStats'
 import { generateOpponentAce, opponentAceEraIndex } from './domain/opponentAce'
 import { generateOpponentStyle } from './domain/opponentStyle'
 import type { QuarterScore } from './domain/quarterSimulation'
+import { computeComebackMargin, pickOpponentName, pinRival, recordRivalGame, unpinRival, type RivalRecord } from './domain/rivals'
+import {
+  evaluateSchoolAssetUnlocks,
+  hasSchoolAsset,
+  newlyUnlockedAssets,
+  SCHOOL_ASSET_LABELS,
+  type SchoolAssetKey,
+} from './domain/schoolAssets'
 import {
   getGameIndexForWeek,
   isClutchPhase,
@@ -97,6 +105,10 @@ interface Team {
   careerEnded: CareerEndReason | null
   /** 最近一次正式賽使用的陣容,做為下一場的預設起點;尚未打過正式賽時為 null。 */
   lastLineup: GameLineup | null
+  /** 玩家釘選的宿敵學校,跨屆保存交手戰績與最大逆轉分差。 */
+  rivals: RivalRecord[]
+  /** 聲望達門檻永久解鎖的學校資產,只會增加不會因聲望下降而收回。 */
+  schoolAssets: SchoolAssetKey[]
   /**
    * 賽後摘要待確認:比賽結果已算好,但要等玩家確認摘要後才會真正套用(進入下一週)。
    * 純執行期狀態,不寫入存檔(比照 eventRevealResult)。
@@ -135,6 +147,8 @@ function teamToSaveData(team: Team): SaveData {
     pendingSeasonSummary: team.pendingSeasonSummary,
     careerEnded: team.careerEnded,
     lastLineup: team.lastLineup,
+    rivals: team.rivals,
+    schoolAssets: team.schoolAssets,
   }
 }
 
@@ -159,7 +173,8 @@ function downloadJson(filename: string, contents: string): void {
 
 function opponentNameForWeek(team: Team): string {
   const rng = createSeededRng(hashSeed(`${team.seed}-${team.totalWeek}-opponent`))
-  return generateOpponentName(rng)
+  const fallbackName = generateOpponentName(rng)
+  return pickOpponentName(team.rivals, fallbackName, rng)
 }
 
 function describeNewInjuries(before: Player[], after: Player[]): string {
@@ -356,6 +371,8 @@ function App() {
             lastLineup: null,
             pendingGameSummary: null,
             livePlay: null,
+            rivals: [],
+            schoolAssets: [],
           })
         }}
       />
@@ -417,6 +434,8 @@ function App() {
         lineup={lineup}
         onComplete={(gameResult) => {
           const result = advanceSeasonWeek(team.totalWeek, team.seasonGameLog, gameResult)
+          const comebackMargin = computeComebackMargin(gameResult.boxScore.quarters, gameResult.outcome)
+          const rivals = recordRivalGame(team.rivals, opponentNameForWeek(team), gameResult.outcome, comebackMargin)
           let players = result.roster
           let reputation = team.reputation
           let graduateLog = team.graduateLog
@@ -425,6 +444,7 @@ function App() {
           let eraCount = team.eraCount
           let pendingSeasonSummary = team.pendingSeasonSummary
           let careerEnded: CareerEndReason | null = null
+          let schoolAssets = team.schoolAssets
           let message =
             result.message +
             describeNewInjuries(team.players, result.roster) +
@@ -437,6 +457,11 @@ function App() {
             )
             const reputationDelta = computeSeasonReputationDelta(result.finalPhaseReached, result.placement)
             reputation = applyReputationDelta(reputation, reputationDelta)
+            schoolAssets = evaluateSchoolAssetUnlocks(schoolAssets, reputation)
+            const unlockedThisSeason = newlyUnlockedAssets(team.schoolAssets, schoolAssets)
+            if (unlockedThisSeason.length > 0) {
+              message += ` 永久解鎖學校資產:${unlockedThisSeason.map((key) => SCHOOL_ASSET_LABELS[key]).join('、')}!`
+            }
 
             const seasonRecord: SeasonRecord = {
               year: seasonYear,
@@ -473,9 +498,10 @@ function App() {
                   careerEnded = 'insuranceCap'
                 } else {
                   const vacancies = ROSTER_SIZE - players.length
+                  const candidatePoolMultiplier = hasSchoolAsset(schoolAssets, 'scoutingNetwork') ? 4 : 2
                   recruitingCandidates = generateCandidatePool(
                     reputation,
-                    vacancies * 2,
+                    vacancies * candidatePoolMultiplier,
                     hashSeed(`${team.seed}-${result.nextTotalWeek}-recruits`),
                   )
                   message += ` 本屆畢業 ${graduates.length} 人,請完成招生補齊名冊。`
@@ -500,6 +526,8 @@ function App() {
             seasonGameLog: [...team.seasonGameLog, result.gameLogEntry],
             pendingGameSummary: null,
             livePlay: null,
+            rivals,
+            schoolAssets,
           }
 
           // 賽後摘要待玩家確認後才真正套用(進入下一週);在那之前畫面維持原本這場比賽的狀態。
@@ -534,9 +562,13 @@ function App() {
         opponentAce={opponentAce}
         opponentStyle={opponentStyle}
         reputation={team.reputation}
+        alwaysScouted={hasSchoolAsset(team.schoolAssets, 'videoAnalysis')}
         players={team.players}
         initialLineup={team.lastLineup}
         lastResult={team.lastResult}
+        rivals={team.rivals}
+        onPinRival={(name) => setTeam({ ...team, rivals: pinRival(team.rivals, name, team.totalWeek) })}
+        onUnpinRival={(name) => setTeam({ ...team, rivals: unpinRival(team.rivals, name) })}
         onPlayGame={(tactics, lineup) => {
           setTeam({ ...team, livePlay: { tactics, lineup } })
         }}
@@ -567,12 +599,22 @@ function App() {
             return { ...player, fatigue, attributes, styleTag: computeStyleTag(attributes) }
           })
 
+          const reputation = applyReputationDelta(team.reputation, resolution.reputationDelta)
+          const schoolAssets = evaluateSchoolAssetUnlocks(team.schoolAssets, reputation)
+          const unlockedNow = newlyUnlockedAssets(team.schoolAssets, schoolAssets)
+          const lastResult =
+            resolution.text +
+            (unlockedNow.length > 0
+              ? ` 永久解鎖學校資產:${unlockedNow.map((key) => SCHOOL_ASSET_LABELS[key]).join('、')}!`
+              : '')
+
           setTeam({
             ...team,
             totalWeek: team.totalWeek + 1,
             players,
-            reputation: applyReputationDelta(team.reputation, resolution.reputationDelta),
-            lastResult: resolution.text,
+            reputation,
+            schoolAssets,
+            lastResult,
             eventRevealResult: {
               cardTitle: card.title,
               risk,
@@ -612,6 +654,7 @@ function App() {
       weekOfYear={weekOfYear}
       monthLabel={getMonthLabel(weekOfYear)}
       phaseLabel={PHASE_LABELS[phase]}
+      schoolAssetLabels={team.schoolAssets.map((key) => SCHOOL_ASSET_LABELS[key])}
       scheduleStrip={
         <ScheduleStrip
           currentTotalWeek={team.totalWeek}

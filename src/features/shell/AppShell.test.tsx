@@ -6,7 +6,7 @@ import { AppShell } from './AppShell'
 describe('AppShell', () => {
   it('shows team identity and calendar position in the header, and renders children', () => {
     render(
-      <AppShell teamName="頂點高中" coachName="山田" reputation={50} year={1} weekOfYear={5} monthLabel="10月" phaseLabel="非賽季">
+      <AppShell teamName="頂點高中" coachName="山田" reputation={50} year={1} weekOfYear={5} monthLabel="10月" phaseLabel="非賽季" schoolAssetLabels={[]}>
         <p>content here</p>
       </AppShell>,
     )
@@ -19,9 +19,36 @@ describe('AppShell', () => {
     expect(screen.getByText('content here')).toBeInTheDocument()
   })
 
+  it('does not show a permanent-assets line when nothing is unlocked', () => {
+    render(
+      <AppShell teamName="頂點高中" coachName="山田" reputation={50} year={1} weekOfYear={5} monthLabel="10月" phaseLabel="非賽季" schoolAssetLabels={[]}>
+        <p>content here</p>
+      </AppShell>,
+    )
+    expect(screen.queryByText(/永久資產/)).not.toBeInTheDocument()
+  })
+
+  it('shows unlocked permanent-asset labels in the header', () => {
+    render(
+      <AppShell
+        teamName="頂點高中"
+        coachName="山田"
+        reputation={80}
+        year={1}
+        weekOfYear={5}
+        monthLabel="10月"
+        phaseLabel="非賽季"
+        schoolAssetLabels={['球探網', '影片分析室']}
+      >
+        <p>content here</p>
+      </AppShell>,
+    )
+    expect(screen.getByText('永久資產:球探網、影片分析室')).toBeInTheDocument()
+  })
+
   it('does not show a menu toggle when no actions are provided', () => {
     render(
-      <AppShell teamName="頂點高中" coachName="山田" reputation={50} year={1} weekOfYear={5} monthLabel="10月" phaseLabel="非賽季">
+      <AppShell teamName="頂點高中" coachName="山田" reputation={50} year={1} weekOfYear={5} monthLabel="10月" phaseLabel="非賽季" schoolAssetLabels={[]}>
         <p>content here</p>
       </AppShell>,
     )
@@ -40,6 +67,7 @@ describe('AppShell', () => {
         weekOfYear={5}
         monthLabel="10月"
         phaseLabel="非賽季"
+        schoolAssetLabels={[]}
         actions={<button type="button">重新開始</button>}
       >
         <p>content here</p>
@@ -59,7 +87,7 @@ describe('AppShell', () => {
 
   it('does not show a roster toggle when no roster is provided', () => {
     render(
-      <AppShell teamName="頂點高中" coachName="山田" reputation={50} year={1} weekOfYear={5} monthLabel="10月" phaseLabel="非賽季">
+      <AppShell teamName="頂點高中" coachName="山田" reputation={50} year={1} weekOfYear={5} monthLabel="10月" phaseLabel="非賽季" schoolAssetLabels={[]}>
         <p>content here</p>
       </AppShell>,
     )
@@ -78,6 +106,7 @@ describe('AppShell', () => {
         weekOfYear={5}
         monthLabel="10月"
         phaseLabel="非賽季"
+        schoolAssetLabels={[]}
         roster={<p>球員名冊內容</p>}
       >
         <p>content here</p>

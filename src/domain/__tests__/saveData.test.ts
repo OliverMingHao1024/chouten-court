@@ -34,6 +34,8 @@ function makeSaveData(overrides: Partial<SaveData> = {}): SaveData {
     pendingSeasonSummary: null,
     careerEnded: null,
     lastLineup: null,
+    rivals: [],
+    schoolAssets: [],
     ...overrides,
   }
 }

@@ -29,6 +29,13 @@
   color: var(--text-muted);
 }
 
+.app-shell__assets {
+  margin: 2px 0 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--accent-strong);
+}
+
 .app-shell__calendar {
   text-align: right;
 }

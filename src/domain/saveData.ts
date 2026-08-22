@@ -2,6 +2,8 @@ import type { CareerEndReason } from './career'
 import type { GameLineup } from './lineup'
 import { PHASE_GAME_COUNT } from './officialMatch'
 import type { Candidate } from './recruiting'
+import type { RivalRecord } from './rivals'
+import { SCHOOL_ASSET_KEYS, type SchoolAssetKey } from './schoolAssets'
 import type { SeasonGameLogEntry } from './season'
 import type { SeasonRecord, SeasonSummaryResult } from './seasonSummary'
 import { SPECIAL_ABILITY_KEYS } from './specialAbilities'
@@ -17,7 +19,7 @@ import {
 } from './types'
 
 export const SAVE_STORAGE_KEY = 'chouten-court:save'
-export const SAVE_FORMAT_VERSION = 10
+export const SAVE_FORMAT_VERSION = 12
 
 const OFFICIAL_PHASES = Object.keys(PHASE_GAME_COUNT)
 const FINAL4_PLACEMENTS = ['champion', 'runnerUp', 'third', 'fourth']
@@ -42,6 +44,8 @@ export interface SaveData {
   pendingSeasonSummary: SeasonSummaryResult | null
   careerEnded: CareerEndReason | null
   lastLineup: GameLineup | null
+  rivals: RivalRecord[]
+  schoolAssets: SchoolAssetKey[]
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -153,6 +157,15 @@ function isValidGameLineup(value: unknown): value is GameLineup {
   return isStringArray(value.starters) && isStringArray(value.rotation)
 }
 
+function isValidRivalRecord(value: unknown): value is RivalRecord {
+  if (!isPlainObject(value)) return false
+  if (typeof value.name !== 'string') return false
+  if (typeof value.wins !== 'number' || typeof value.losses !== 'number') return false
+  if (value.biggestComebackMargin !== null && typeof value.biggestComebackMargin !== 'number') return false
+  if (typeof value.pinnedAtWeek !== 'number') return false
+  return true
+}
+
 function isValidAwardWinner(value: unknown): boolean {
   if (!isPlainObject(value)) return false
   return typeof value.title === 'string' && typeof value.playerName === 'string'
@@ -189,6 +202,13 @@ export function parseSaveData(raw: unknown): SaveData | null {
   if (raw.pendingSeasonSummary !== null && !isValidSeasonSummaryResult(raw.pendingSeasonSummary)) return null
   if (raw.careerEnded !== null && !CAREER_END_REASONS.includes(raw.careerEnded as string)) return null
   if (raw.lastLineup !== null && !isValidGameLineup(raw.lastLineup)) return null
+  if (!Array.isArray(raw.rivals) || !raw.rivals.every(isValidRivalRecord)) return null
+  if (
+    !Array.isArray(raw.schoolAssets) ||
+    !raw.schoolAssets.every((key) => (SCHOOL_ASSET_KEYS as readonly string[]).includes(key as string))
+  ) {
+    return null
+  }
 
   return {
     version: raw.version,
@@ -209,6 +229,8 @@ export function parseSaveData(raw: unknown): SaveData | null {
     pendingSeasonSummary: raw.pendingSeasonSummary as SeasonSummaryResult | null,
     careerEnded: raw.careerEnded as CareerEndReason | null,
     lastLineup: raw.lastLineup as GameLineup | null,
+    rivals: raw.rivals as RivalRecord[],
+    schoolAssets: raw.schoolAssets as SchoolAssetKey[],
   }
 }
 

@@ -42,6 +42,8 @@ function baseSaveData(overrides: Record<string, unknown> = {}) {
     pendingSeasonSummary: null,
     careerEnded: null,
     lastLineup: null,
+    rivals: [],
+    schoolAssets: [],
     ...overrides,
   }
 }

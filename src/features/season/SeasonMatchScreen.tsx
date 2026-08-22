@@ -19,6 +19,7 @@ import {
   scoutedStrengthRange,
   type OpponentStyleKey,
 } from '../../domain/opponentStyle'
+import { MAX_PINNED_RIVALS, type RivalRecord } from '../../domain/rivals'
 import {
   DEFAULT_TACTICS,
   DEFENSE_TACTICS,
@@ -41,10 +42,16 @@ export interface SeasonMatchScreenProps {
   opponentStyle: OpponentStyleKey
   /** 我方目前聲望;達到偵察門檻才顯示對手風格/戰力區間/王牌弱點等球探情資。 */
   reputation: number
+  /** 已永久解鎖「影片分析室」時,不論聲望高低永遠視為已偵察。 */
+  alwaysScouted: boolean
   players: Player[]
   /** 上一場正式賽使用的陣容,做為本場的預設起點;沒有上一場紀錄時為 null。 */
   initialLineup: GameLineup | null
   lastResult: string | null
+  /** 已釘選的宿敵學校清單(跨屆保存);本場對手若剛好是其中之一,會顯示交手史。 */
+  rivals: RivalRecord[]
+  onPinRival: (name: string) => void
+  onUnpinRival: (name: string) => void
   onPlayGame: (tactics: GameTactics, lineup: GameLineup) => void
 }
 
@@ -73,9 +80,13 @@ export function SeasonMatchScreen({
   opponentAce,
   opponentStyle,
   reputation,
+  alwaysScouted,
   players,
   initialLineup,
   lastResult,
+  rivals,
+  onPinRival,
+  onUnpinRival,
   onPlayGame,
 }: SeasonMatchScreenProps) {
   const [offense, setOffense] = useState<OffenseTactic>(DEFAULT_TACTICS.offense)
@@ -126,6 +137,8 @@ export function SeasonMatchScreen({
     setLineupState(suggestLineup(availablePlayers, strategy))
   }
 
+  const rival = rivals.find((entry) => entry.name === opponentName) ?? null
+
   return (
     <section className="matchup-card">
       <p className="matchup-card__progress">
@@ -140,11 +153,33 @@ export function SeasonMatchScreen({
         </span>
       </div>
 
+      {rival ? (
+        <div className="matchup-card__rival">
+          <p className="matchup-card__rival-record">
+            ★宿敵・交手 {rival.wins}勝{rival.losses}敗
+            {rival.biggestComebackMargin !== null && `・最大逆轉 ${rival.biggestComebackMargin} 分`}
+          </p>
+          <button type="button" className="matchup-card__rival-button" onClick={() => onUnpinRival(rival.name)}>
+            取消宿敵
+          </button>
+        </div>
+      ) : (
+        rivals.length < MAX_PINNED_RIVALS && (
+          <button
+            type="button"
+            className="matchup-card__rival-button"
+            onClick={() => onPinRival(opponentName)}
+          >
+            釘選為宿敵
+          </button>
+        )
+      )}
+
       <p className="matchup-card__ace">
         對方王牌:{opponentAce.name}(得分 {opponentAce.scoring} / 三分 {opponentAce.shooting})
       </p>
 
-      {isOpponentScouted(reputation) ? (
+      {isOpponentScouted(reputation) || alwaysScouted ? (
         <p className="matchup-card__scouting">
           球探情資:{OPPONENT_STYLE_LABELS[opponentStyle]}・戰力區間 {scoutedStrengthRange(preview.opponentStrength).min}~
           {scoutedStrengthRange(preview.opponentStrength).max}・王牌弱點:{describeAceWeakness(opponentAce)}
