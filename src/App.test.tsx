@@ -46,6 +46,8 @@ function baseSaveData(overrides: Record<string, unknown> = {}) {
     schoolAssets: [],
     challengeMode: 'long',
     pendingChallengeDecision: false,
+    achievements: [],
+    seasonHadInjury: false,
     ...overrides,
   }
 }
@@ -202,6 +204,30 @@ describe('App', () => {
     expect(await screen.findByText('本週訓練結果')).toBeInTheDocument()
   })
 
+  it('allows selecting one extra card per week once the training-facility school asset is unlocked', async () => {
+    const cards: PoolCard[] = Array.from({ length: 4 }, (_, i) => ({
+      id: `card-${i}`,
+      kind: 'rest',
+      attribute: null,
+      age: 0,
+    }))
+    window.localStorage.setItem(
+      SAVE_STORAGE_KEY,
+      JSON.stringify(baseSaveData({ cardPool: { cards, nextCardId: 4 }, schoolAssets: ['trainingFacility'] })),
+    )
+    const user = userEvent.setup()
+    render(<App />)
+    await resolveLeadingEvents(user)
+
+    for (const button of screen.getAllByRole('button', { name: /休養/ })) {
+      await user.click(button)
+    }
+    await user.click(screen.getByRole('button', { name: '確認本週訓練' }))
+
+    expect(await screen.findByText('本週訓練結果')).toBeInTheDocument()
+    expect(screen.getAllByText('全隊休養,體力恢復')).toHaveLength(4)
+  })
+
   it('advances the week and reports the result after a rest card', async () => {
     seedSaveWithCard({ id: 'card-1', kind: 'rest', attribute: null, age: 0 })
     const user = userEvent.setup()
@@ -268,18 +294,24 @@ describe('App', () => {
     expect(dialog).not.toHaveAttribute('open')
   })
 
-  it('switches to the season match screen once the offseason ends, replacing the training-card panel', async () => {
-    const user = userEvent.setup()
-    await buildTeam(user)
+  it(
+    'switches to the season match screen once the offseason ends, replacing the training-card panel',
+    async () => {
+      const user = userEvent.setup()
+      await buildTeam(user)
 
-    // Fast-forward through the 26-week offseason into the season.
-    await advanceWeeksRepeatedly(user, 26)
+      // Fast-forward through the 26-week offseason into the season. 26 real UI interactions is
+      // inherently slow; the default 5s test timeout is comfortable in isolation but can flake
+      // under full-suite parallel load, so this test gets a longer budget (see the 3rd `it` arg).
+      await advanceWeeksRepeatedly(user, 26)
 
-    expect(await screen.findByText('資格賽')).toBeInTheDocument()
-    expect(screen.getByText('第 1 / 4 戰')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '開打' })).toBeInTheDocument()
-    expect(document.querySelector('.training-card-pool')).not.toBeInTheDocument()
-  })
+      expect(await screen.findByText('資格賽')).toBeInTheDocument()
+      expect(screen.getByText('第 1 / 4 戰')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: '開打' })).toBeInTheDocument()
+      expect(document.querySelector('.training-card-pool')).not.toBeInTheDocument()
+    },
+    15000,
+  )
 
   it('plays through official season games and reports each result', async () => {
     const user = userEvent.setup()
@@ -342,6 +374,45 @@ describe('App', () => {
 
     expect(screen.queryByLabelText('教練名稱')).not.toBeInTheDocument()
     expect(screen.getByText('淡水高中')).toBeInTheDocument()
+  })
+
+  it('supports switching between multiple save slots without losing either one', async () => {
+    const user = userEvent.setup()
+    await buildTeam(user)
+    await advanceWeeksRepeatedly(user, 1)
+    await screen.findByText(/^第 1 年 第 2 週/)
+
+    await user.click(screen.getByRole('button', { name: '更多選項' }))
+    await user.click(screen.getByRole('button', { name: '切換存檔' }))
+
+    expect(await screen.findByText('選擇存檔')).toBeInTheDocument()
+    expect(screen.getByText(/淡水高中・山田/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: '新增存檔' }))
+    await user.clear(screen.getByLabelText('教練名稱'))
+    await user.type(screen.getByLabelText('教練名稱'), '鈴木')
+    await user.click(screen.getByRole('button', { name: '建隊' }))
+
+    expect(await screen.findByText(/^第 1 年 第 1 週/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: '更多選項' }))
+    await user.click(screen.getByRole('button', { name: '切換存檔' }))
+    expect(await screen.findByText(/淡水高中・鈴木/)).toBeInTheDocument()
+    await user.click(screen.getByText(/淡水高中・山田/))
+
+    expect(await screen.findByText(/^第 1 年 第 2 週/)).toBeInTheDocument()
+  })
+
+  it('deletes a save slot from the switch-save menu, falling back to setup once none remain', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const user = userEvent.setup()
+    await buildTeam(user)
+
+    await user.click(screen.getByRole('button', { name: '更多選項' }))
+    await user.click(screen.getByRole('button', { name: '切換存檔' }))
+    await user.click(screen.getByRole('button', { name: /^刪除存檔/ }))
+
+    expect(await screen.findByLabelText('教練名稱')).toBeInTheDocument()
   })
 
   it('graduates the whole roster and requires recruiting to fill the roster at the end of the 3rd year', async () => {
@@ -415,6 +486,9 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: '開始新生涯' })).toBeInTheDocument()
     // graduation/recruiting is skipped once the career is already over
     expect(screen.queryByRole('heading', { name: `招生 — 選出 ${ROSTER_SIZE} 名新生` })).not.toBeInTheDocument()
+    // the deciding season had only wins logged (one prior win + this win), so it unlocks the
+    // undefeated-season achievement, surfaced on the career summary screen
+    expect(screen.getByText('全勝賽季')).toBeInTheDocument()
   })
 
   it('lets the coach continue the career (dynasty mode) instead of retiring after winning it all', async () => {
@@ -510,6 +584,9 @@ describe('App', () => {
     const skipButton = screen.queryByRole('button', { name: /快速結果/ })
     if (skipButton) await user.click(skipButton)
     await confirmGameSummary(user)
+    // the 三年挑戰 prompt waits until the season summary is dismissed, so both dialogs
+    // never visually stack on top of each other
+    await user.click(await screen.findByRole('button', { name: '關閉' }))
 
     const continueButton = await screen.findByRole('button', { name: '繼續帶下去' })
     expect(screen.getByRole('button', { name: '在此結束,寫進校史' })).toBeInTheDocument()
@@ -543,6 +620,7 @@ describe('App', () => {
     const skipButton = screen.queryByRole('button', { name: /快速結果/ })
     if (skipButton) await user.click(skipButton)
     await confirmGameSummary(user)
+    await user.click(await screen.findByRole('button', { name: '關閉' }))
 
     await user.click(await screen.findByRole('button', { name: '在此結束,寫進校史' }))
 

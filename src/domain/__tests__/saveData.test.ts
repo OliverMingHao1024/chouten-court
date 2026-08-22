@@ -3,12 +3,21 @@ import { generateCandidatePool } from '../recruiting'
 import { createInitialRoster } from '../roster'
 import { createSeededRng } from '../rng'
 import {
+  MIN_SUPPORTED_SAVE_VERSION,
   SAVE_FORMAT_VERSION,
   SAVE_STORAGE_KEY,
   clearSaveFromStorage,
+  createSaveSlot,
+  deleteSaveSlot,
+  listSaveSlots,
+  loadSaveFromSlot,
   loadSaveFromStorage,
+  migrateLegacySingleSlotSave,
   parseSaveData,
+  readActiveSlotId,
   serializeSaveData,
+  writeActiveSlotId,
+  writeSaveToSlot,
   writeSaveToStorage,
   type SaveData,
 } from '../saveData'
@@ -38,6 +47,8 @@ function makeSaveData(overrides: Partial<SaveData> = {}): SaveData {
     schoolAssets: [],
     challengeMode: 'long',
     pendingChallengeDecision: false,
+    achievements: [],
+    seasonHadInjury: false,
     ...overrides,
   }
 }
@@ -143,8 +154,12 @@ describe('parseSaveData', () => {
     expect(parseSaveData(makeSaveData({ lastLineup: { starters: ['p1'] } as never }))).toBeNull()
   })
 
-  it('rejects a save format version older than the current one (e.g. a pre-recruiting save)', () => {
-    expect(parseSaveData(makeSaveData({ version: SAVE_FORMAT_VERSION - 1 }))).toBeNull()
+  it('rejects a save from a future format version (cannot downgrade)', () => {
+    expect(parseSaveData(makeSaveData({ version: SAVE_FORMAT_VERSION + 1 }))).toBeNull()
+  })
+
+  it('rejects a save format version older than MIN_SUPPORTED_SAVE_VERSION, even with all current fields present', () => {
+    expect(parseSaveData(makeSaveData({ version: MIN_SUPPORTED_SAVE_VERSION - 1 }))).toBeNull()
   })
 
   it('rejects a save missing the training card pool or training points', () => {
@@ -161,6 +176,59 @@ describe('parseSaveData', () => {
 
     const brokenAttribute = { ...data.cardPool, cards: [{ ...data.cardPool.cards[0], attribute: 'not-an-attribute' }] }
     expect(parseSaveData({ ...data, cardPool: brokenAttribute })).toBeNull()
+  })
+
+  describe('migration from older-but-supported versions', () => {
+    it('upgrades a v10 save (pre-rivals/schoolAssets/challengeMode) with sensible defaults', () => {
+      const current = makeSaveData()
+      const { rivals: _rivals, schoolAssets: _schoolAssets, challengeMode: _challengeMode, pendingChallengeDecision: _pendingChallengeDecision, ...v10Fields } = current
+      const v10Save = { ...v10Fields, version: 10 }
+
+      expect(parseSaveData(v10Save)).toEqual({
+        ...current,
+        rivals: [],
+        schoolAssets: [],
+        challengeMode: 'long',
+        pendingChallengeDecision: false,
+      })
+    })
+
+    it('upgrades a v11 save (pre-schoolAssets/challengeMode) with sensible defaults', () => {
+      const current = makeSaveData()
+      const { schoolAssets: _schoolAssets, challengeMode: _challengeMode, pendingChallengeDecision: _pendingChallengeDecision, ...v11Fields } = current
+      const v11Save = { ...v11Fields, version: 11 }
+
+      expect(parseSaveData(v11Save)).toEqual({
+        ...current,
+        schoolAssets: [],
+        challengeMode: 'long',
+        pendingChallengeDecision: false,
+      })
+    })
+
+    it('upgrades a v12 save (pre-challengeMode) with sensible defaults', () => {
+      const current = makeSaveData()
+      const { challengeMode: _challengeMode, pendingChallengeDecision: _pendingChallengeDecision, ...v12Fields } = current
+      const v12Save = { ...v12Fields, version: 12 }
+
+      expect(parseSaveData(v12Save)).toEqual({
+        ...current,
+        challengeMode: 'long',
+        pendingChallengeDecision: false,
+      })
+    })
+
+    it('rejects a save older than MIN_SUPPORTED_SAVE_VERSION outright', () => {
+      const current = makeSaveData()
+      const { rivals: _rivals, schoolAssets: _schoolAssets, challengeMode: _challengeMode, pendingChallengeDecision: _pendingChallengeDecision, ...oldFields } = current
+      expect(parseSaveData({ ...oldFields, version: 9 })).toBeNull()
+    })
+
+    it('round-trips a migrated save through localStorage exactly like a native current-version save', () => {
+      const current = makeSaveData()
+      const { rivals: _rivals, schoolAssets: _schoolAssets, challengeMode: _challengeMode, pendingChallengeDecision: _pendingChallengeDecision, ...v10Fields } = current
+      expect(parseSaveData({ ...v10Fields, version: 10 })).toEqual(parseSaveData(current))
+    })
   })
 })
 
@@ -188,5 +256,107 @@ describe('localStorage read/write', () => {
     writeSaveToStorage(makeSaveData())
     clearSaveFromStorage()
     expect(loadSaveFromStorage()).toBeNull()
+  })
+})
+
+describe('save slots', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+  })
+
+  it('starts with no slots and no active slot', () => {
+    expect(listSaveSlots()).toEqual([])
+    expect(readActiveSlotId()).toBeNull()
+  })
+
+  it('createSaveSlot registers the slot and makes it active', () => {
+    const id = createSaveSlot('淡水高中')
+    expect(readActiveSlotId()).toBe(id)
+    const slots = listSaveSlots()
+    expect(slots).toHaveLength(1)
+    expect(slots[0]).toMatchObject({ id, label: '淡水高中' })
+  })
+
+  it('writeSaveToSlot then loadSaveFromSlot round-trips the save data', () => {
+    const id = createSaveSlot('淡水高中')
+    const data = makeSaveData()
+    writeSaveToSlot(id, data)
+    expect(loadSaveFromSlot(id)).toEqual(data)
+  })
+
+  it('writeSaveToSlot keeps the slot label and bumps updatedAt', () => {
+    const id = createSaveSlot('淡水高中')
+    const before = listSaveSlots()[0].updatedAt
+    writeSaveToSlot(id, makeSaveData())
+    const after = listSaveSlots().find((slot) => slot.id === id)
+    expect(after?.label).toBe('淡水高中')
+    expect(after?.updatedAt).toBeGreaterThanOrEqual(before)
+  })
+
+  it('supports multiple independent slots', () => {
+    const idA = createSaveSlot('淡水高中')
+    const idB = createSaveSlot('陽明高中')
+    writeSaveToSlot(idA, makeSaveData({ teamName: '淡水高中' }))
+    writeSaveToSlot(idB, makeSaveData({ teamName: '陽明高中' }))
+
+    expect(listSaveSlots()).toHaveLength(2)
+    expect(loadSaveFromSlot(idA)?.teamName).toBe('淡水高中')
+    expect(loadSaveFromSlot(idB)?.teamName).toBe('陽明高中')
+  })
+
+  it('loadSaveFromSlot returns null for an unknown or empty slot', () => {
+    expect(loadSaveFromSlot('does-not-exist')).toBeNull()
+  })
+
+  it('deleteSaveSlot removes the slot and clears the active pointer when it was active', () => {
+    const id = createSaveSlot('淡水高中')
+    writeSaveToSlot(id, makeSaveData())
+
+    deleteSaveSlot(id)
+
+    expect(listSaveSlots()).toEqual([])
+    expect(loadSaveFromSlot(id)).toBeNull()
+    expect(readActiveSlotId()).toBeNull()
+  })
+
+  it('deleteSaveSlot leaves the active pointer untouched when deleting a non-active slot', () => {
+    const idA = createSaveSlot('淡水高中')
+    const idB = createSaveSlot('陽明高中')
+    writeActiveSlotId(idA)
+
+    deleteSaveSlot(idB)
+
+    expect(readActiveSlotId()).toBe(idA)
+    expect(listSaveSlots().map((slot) => slot.id)).toEqual([idA])
+  })
+
+  it('migrateLegacySingleSlotSave moves an old single-key save into a new slot and clears the old key', () => {
+    const data = makeSaveData()
+    writeSaveToStorage(data)
+
+    migrateLegacySingleSlotSave()
+
+    expect(loadSaveFromStorage()).toBeNull()
+    const slots = listSaveSlots()
+    expect(slots).toHaveLength(1)
+    expect(slots[0].label).toBe(data.teamName)
+    expect(readActiveSlotId()).toBe(slots[0].id)
+    expect(loadSaveFromSlot(slots[0].id)).toEqual(data)
+  })
+
+  it('migrateLegacySingleSlotSave is a no-op when slots already exist', () => {
+    createSaveSlot('既有存檔')
+    writeSaveToStorage(makeSaveData())
+
+    migrateLegacySingleSlotSave()
+
+    expect(listSaveSlots()).toHaveLength(1)
+    expect(listSaveSlots()[0].label).toBe('既有存檔')
+    expect(loadSaveFromStorage()).not.toBeNull()
+  })
+
+  it('migrateLegacySingleSlotSave is a no-op when there is no legacy save', () => {
+    migrateLegacySingleSlotSave()
+    expect(listSaveSlots()).toEqual([])
   })
 })

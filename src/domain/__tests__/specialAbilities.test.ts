@@ -39,6 +39,15 @@ describe('unlockedAbilityCount / unlockedAbilities', () => {
     const atHighRep = unlockedAbilities(90)
     expect(atHighRep.slice(0, atLowRep.length)).toEqual(atLowRep)
   })
+
+  it('unlocks one extra ability when a bonus slot is passed in', () => {
+    expect(unlockedAbilityCount(0, 1)).toBe(unlockedAbilityCount(0) + 1)
+    expect(unlockedAbilities(0, 1)).toHaveLength(unlockedAbilities(0).length + 1)
+  })
+
+  it('never unlocks more than the full catalog even with a bonus slot at max reputation', () => {
+    expect(unlockedAbilityCount(100, 1)).toBe(LEARNABLE_SPECIAL_ABILITY_KEYS.length)
+  })
 })
 
 describe('learnableAbilitiesForPlayer', () => {
@@ -51,6 +60,12 @@ describe('learnableAbilitiesForPlayer', () => {
   it('returns nothing once the player already has every unlocked ability', () => {
     const player = makePlayer({ specialAbilities: [...unlockedAbilities(0)] })
     expect(learnableAbilitiesForPlayer(player, 0)).toEqual([])
+  })
+
+  it('includes the bonus-unlocked ability once a bonus slot is passed in', () => {
+    const player = makePlayer({ specialAbilities: [...unlockedAbilities(0)] })
+    expect(learnableAbilitiesForPlayer(player, 0)).toEqual([])
+    expect(learnableAbilitiesForPlayer(player, 0, 1)).toHaveLength(1)
   })
 })
 

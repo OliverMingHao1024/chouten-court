@@ -5,12 +5,13 @@ export interface SaveControlsProps {
   onExport: () => void
   onImport: (file: File) => void
   onNewGame: () => void
+  onSwitchSlot: () => void
 }
 
 // 匯出/匯入先隱藏(功能保留,UI 先不露出),之後要恢復只需拿掉這個開關。
 const EXPORT_IMPORT_ENABLED = false
 
-export function SaveControls({ onExport, onImport, onNewGame }: SaveControlsProps) {
+export function SaveControls({ onExport, onImport, onNewGame, onSwitchSlot }: SaveControlsProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   return (
@@ -36,6 +37,9 @@ export function SaveControls({ onExport, onImport, onNewGame }: SaveControlsProp
           />
         </>
       )}
+      <button type="button" className="save-controls__button" onClick={onSwitchSlot}>
+        切換存檔
+      </button>
       <button type="button" className="save-controls__button save-controls__button--danger" onClick={onNewGame}>
         重新開始
       </button>

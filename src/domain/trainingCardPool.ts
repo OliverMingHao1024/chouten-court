@@ -79,9 +79,17 @@ export function totalCost(cards: PoolCard[], focusStyle: StyleKey | null = null)
   return cards.reduce((sum, card) => sum + cardCost(card, focusStyle), 0)
 }
 
-/** 是否能同時選這些卡:張數不超過每週上限,且總花費不超過剩餘點數。 */
-export function canSelectCards(cards: PoolCard[], remainingPoints: number, focusStyle: StyleKey | null = null): boolean {
-  return cards.length > 0 && cards.length <= MAX_CARDS_PER_WEEK && totalCost(cards, focusStyle) <= remainingPoints
+/**
+ * 是否能同時選這些卡:張數不超過每週上限,且總花費不超過剩餘點數。maxCards 預設
+ * MAX_CARDS_PER_WEEK,學校資產「訓練館」解鎖時由呼叫端傳入 +1 的上限。
+ */
+export function canSelectCards(
+  cards: PoolCard[],
+  remainingPoints: number,
+  focusStyle: StyleKey | null = null,
+  maxCards: number = MAX_CARDS_PER_WEEK,
+): boolean {
+  return cards.length > 0 && cards.length <= maxCards && totalCost(cards, focusStyle) <= remainingPoints
 }
 
 // 同類卡疊加時額外再乘一次的效果倍率(原創數值,待調校)。

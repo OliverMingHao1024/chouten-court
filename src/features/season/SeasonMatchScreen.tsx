@@ -44,6 +44,8 @@ export interface SeasonMatchScreenProps {
   reputation: number
   /** 已永久解鎖「影片分析室」時,不論聲望高低永遠視為已偵察。 */
   alwaysScouted: boolean
+  /** 對手完整名冊;只在已偵察時顯示,純資訊用途,不影響戰力計算。 */
+  opponentRoster: Player[]
   players: Player[]
   /** 上一場正式賽使用的陣容,做為本場的預設起點;沒有上一場紀錄時為 null。 */
   initialLineup: GameLineup | null
@@ -81,6 +83,7 @@ export function SeasonMatchScreen({
   opponentStyle,
   reputation,
   alwaysScouted,
+  opponentRoster,
   players,
   initialLineup,
   lastResult,
@@ -180,10 +183,26 @@ export function SeasonMatchScreen({
       </p>
 
       {isOpponentScouted(reputation) || alwaysScouted ? (
-        <p className="matchup-card__scouting">
-          球探情資:{OPPONENT_STYLE_LABELS[opponentStyle]}・戰力區間 {scoutedStrengthRange(preview.opponentStrength).min}~
-          {scoutedStrengthRange(preview.opponentStrength).max}・王牌弱點:{describeAceWeakness(opponentAce)}
-        </p>
+        <>
+          <p className="matchup-card__scouting">
+            球探情資:{OPPONENT_STYLE_LABELS[opponentStyle]}・戰力區間 {scoutedStrengthRange(preview.opponentStrength).min}~
+            {scoutedStrengthRange(preview.opponentStrength).max}・王牌弱點:{describeAceWeakness(opponentAce)}
+          </p>
+          <details className="matchup-card__opponent-roster">
+            <summary>對手名冊({opponentRoster.length} 人)</summary>
+            <ul>
+              {opponentRoster.map((player) => (
+                <li key={player.id}>
+                  <span className="matchup-card__opponent-roster-name">{player.name}</span>
+                  <span className="matchup-card__opponent-roster-position">
+                    {player.position}・高{player.grade}
+                  </span>
+                  <span className="matchup-card__opponent-roster-grade">{computeOverallGrade(player.attributes)}</span>
+                </li>
+              ))}
+            </ul>
+          </details>
+        </>
       ) : (
         <p className="matchup-card__scouting matchup-card__scouting--locked">
           球探情資:尚未偵察(聲望達到一定程度會自動解鎖)

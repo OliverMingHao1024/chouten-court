@@ -1,3 +1,4 @@
+import { ACHIEVEMENT_DESCRIPTIONS, ACHIEVEMENT_LABELS, type AchievementKey } from '../../domain/achievements'
 import { summarizeCareer, type CareerEndReason } from '../../domain/career'
 import { FINAL4_PLACEMENT_LABEL } from '../../domain/season'
 import type { SeasonRecord } from '../../domain/seasonSummary'
@@ -10,6 +11,7 @@ export interface CareerSummaryScreenProps {
   reason: CareerEndReason
   careerLog: SeasonRecord[]
   graduateLog: string[]
+  achievements: AchievementKey[]
   onNewCareer: () => void
   /** 只有奪冠結束時提供:選擇不退休,直接以同一支球隊帶入下一季(王朝模式)。 */
   onContinueDynasty?: () => void
@@ -27,6 +29,7 @@ export function CareerSummaryScreen({
   reason,
   careerLog,
   graduateLog,
+  achievements,
   onNewCareer,
   onContinueDynasty,
 }: CareerSummaryScreenProps) {
@@ -81,6 +84,20 @@ export function CareerSummaryScreen({
           <ul>
             {graduateLog.slice(-5).map((entry, index) => (
               <li key={index}>{entry}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {achievements.length > 0 && (
+        <div className="career-summary__achievements">
+          <h2>成就</h2>
+          <ul>
+            {achievements.map((key) => (
+              <li key={key}>
+                <span className="career-summary__achievement-label">{ACHIEVEMENT_LABELS[key]}</span>
+                <span className="career-summary__achievement-description">{ACHIEVEMENT_DESCRIPTIONS[key]}</span>
+              </li>
             ))}
           </ul>
         </div>

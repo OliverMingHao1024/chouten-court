@@ -1,7 +1,7 @@
 import { lineupWeight, type GameLineup } from './lineup'
 import { hashSeed, type Rng } from './rng'
 import type { SpecialAbilityKey } from './specialAbilities'
-import type { AttributeKey, Player } from './types'
+import { ATTRIBUTE_KEYS, ATTRIBUTE_LABELS, type AttributeKey, type Player } from './types'
 
 function hasAbility(player: Player, ability: SpecialAbilityKey): boolean {
   return player.specialAbilities.includes(ability)
@@ -18,17 +18,21 @@ export const RECOVERY_INDIVIDUAL_VARIANCE = 2
 export const RECOVERY_GRADE_DELTA: Record<number, number> = { 1: 1, 2: 0, 3: -1 }
 // 特殊能力「快速回復」的每週恢復量加成(原創數值,待調校)。
 export const QUICK_RECOVERY_BONUS = 3
+// 學校資產「恢復中心」的全隊每週體力恢復量加成(原創數值,待調校);跟「快速回復」個人
+// 特殊能力是各自獨立的來源,兩者可以同時疊加,不重複判定。
+export const RECOVERY_CENTER_BONUS = 2
 
 /**
  * 單一球員的每週體力恢復量:基準值疊加「終身固定、由 id 雜湊決定」的個人差異,再疊加年級
- * 差異與「快速回復」特殊能力加成。刻意不讓個性或傷勢狀態影響恢復速度,避免和玻璃體質既有的
- * 受傷機率效果混為一談。
+ * 差異、「快速回復」特殊能力加成,與可選的學校資產(恢復中心)加成。刻意不讓個性或傷勢狀態
+ * 影響恢復速度,避免和玻璃體質既有的受傷機率效果混為一談。schoolBonus 預設 0,不傳入時
+ * 行為與過去完全相同;數值會直接反映在名冊畫面的「每週體力恢復」顯示上,是可感知的變化。
  */
-export function computeRecoveryRate(player: Player): number {
+export function computeRecoveryRate(player: Player, schoolBonus = 0): number {
   const individual = (hashSeed(player.id) % (RECOVERY_INDIVIDUAL_VARIANCE * 2 + 1)) - RECOVERY_INDIVIDUAL_VARIANCE
   const gradeDelta = RECOVERY_GRADE_DELTA[player.grade] ?? 0
   const abilityBonus = hasAbility(player, 'quickRecovery') ? QUICK_RECOVERY_BONUS : 0
-  return BASELINE_RECOVERY + individual + gradeDelta + abilityBonus
+  return BASELINE_RECOVERY + individual + gradeDelta + abilityBonus + schoolBonus
 }
 
 // 受傷機率隨疲勞值線性上升(原創數值,待調校):疲勞 0 時約 2%,疲勞 100 時約 20%。
@@ -42,6 +46,10 @@ export const IRON_BODY_INJURY_MULTIPLIER = 0.7
 export const MAJOR_INJURY_SHARE = 0.3
 // 復出過渡期屬性打 8 折,僅影響比賽表現計算,不修改球員實際屬性數值。
 export const RETURNING_ATTRIBUTE_MULTIPLIER = 0.8
+// 重傷完全康復(復出過渡期倒數結束)時,有一定機率留下永久後遺症:隨機一項屬性永久 -1
+// (原創數值,待調校)。輕傷不會觸發——輕傷從不進入復出過渡期,直接痊癒。
+export const PERMANENT_AFTEREFFECT_CHANCE = 0.2
+export const PERMANENT_AFTEREFFECT_AMOUNT = 1
 // 疲勞值影響比賽表現的係數(原創數值,待調校):疲勞 100 時戰力打 85 折。
 export const FATIGUE_PERFORMANCE_PENALTY = 0.15
 // 賽前預覽用的「高受傷風險」門檻(原創數值,待調校):僅作為警示用的簡單門檻,不對外
@@ -70,8 +78,8 @@ export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))
 }
 
-export function applyFatigueDelta(player: Player, load: number): Player {
-  const fatigue = clamp(player.fatigue + load - computeRecoveryRate(player), FATIGUE_MIN, FATIGUE_MAX)
+export function applyFatigueDelta(player: Player, load: number, recoveryBonus = 0): Player {
+  const fatigue = clamp(player.fatigue + load - computeRecoveryRate(player, recoveryBonus), FATIGUE_MIN, FATIGUE_MAX)
   return { ...player, fatigue }
 }
 
@@ -113,7 +121,10 @@ export function rollForInjury(
   }
 }
 
-/** 每週結算傷勢倒數:輕傷/重傷期滿即可恢復(重傷先進入復出過渡期),與是否有比賽無關。 */
+/**
+ * 每週結算傷勢倒數:輕傷/重傷期滿即可恢復(重傷先進入復出過渡期),與是否有比賽無關。
+ * 復出過渡期倒數結束(等於一次重傷完整走完全程)時,額外滾一次永久後遺症機率。
+ */
 export function tickInjuryRecovery(player: Player, rng: Rng): Player {
   if (player.injuryStatus === 'healthy') return player
 
@@ -123,7 +134,44 @@ export function tickInjuryRecovery(player: Player, rng: Rng): Player {
   if (player.injuryStatus === 'major') {
     return { ...player, injuryStatus: 'returning', injuryWeeksRemaining: 1 + Math.floor(rng() * 2) }
   }
+  if (player.injuryStatus === 'returning' && rng() < PERMANENT_AFTEREFFECT_CHANCE) {
+    const attribute = ATTRIBUTE_KEYS[Math.floor(rng() * ATTRIBUTE_KEYS.length)]
+    return {
+      ...player,
+      injuryStatus: 'healthy',
+      injuryWeeksRemaining: 0,
+      attributes: {
+        ...player.attributes,
+        [attribute]: clamp(player.attributes[attribute] - PERMANENT_AFTEREFFECT_AMOUNT, 0, ATTRIBUTE_MAX),
+      },
+    }
+  }
   return { ...player, injuryStatus: 'healthy', injuryWeeksRemaining: 0 }
+}
+
+/**
+ * 比對康復前後的名冊,找出這週剛好完整走完重傷→復出過渡期→痊癒、且留下永久後遺症
+ * (屬性數值比康復前低)的球員,組出一句附加敘述。純靠屬性數值下降推斷,不額外持久化
+ * 「這是不是後遺症」的旗標——同一週唯一會讓屬性下降的來源就是這個機制,不會跟訓練成長混淆。
+ */
+export function describePermanentAftereffects(before: Player[], after: Player[]): string {
+  const beforeById = new Map(before.map((player) => [player.id, player]))
+  const affected = after.filter((player) => {
+    const previous = beforeById.get(player.id)
+    if (!previous || previous.injuryStatus !== 'returning' || player.injuryStatus !== 'healthy') return false
+    return ATTRIBUTE_KEYS.some((key) => player.attributes[key] < previous.attributes[key])
+  })
+  if (affected.length === 0) return ''
+  return (
+    ' ' +
+    affected
+      .map((player) => {
+        const previous = beforeById.get(player.id)!
+        const attribute = ATTRIBUTE_KEYS.find((key) => player.attributes[key] < previous.attributes[key])!
+        return `${player.name}傷癒歸隊,但留下了永久後遺症(${ATTRIBUTE_LABELS[attribute]}-${PERMANENT_AFTEREFFECT_AMOUNT})。`
+      })
+      .join('')
+  )
 }
 
 export type AttributeWeights = Partial<Record<AttributeKey, number>>
@@ -187,12 +235,13 @@ export function advancePlayerWeek(
   rng: Rng,
   isMatchWeek: boolean,
   majorInjuryWeeks: InjuryDurationRange = DEFAULT_MAJOR_INJURY_WEEKS,
+  recoveryBonus = 0,
 ): Player {
   if (player.injuryStatus === 'minor' || player.injuryStatus === 'major') {
-    return applyFatigueDelta(tickInjuryRecovery(player, rng), 0)
+    return applyFatigueDelta(tickInjuryRecovery(player, rng), 0, recoveryBonus)
   }
   const ticked = player.injuryStatus === 'returning' ? tickInjuryRecovery(player, rng) : player
-  const fatigued = applyFatigueDelta(ticked, applyIronHeartLoadReduction(ticked, load, isMatchWeek))
+  const fatigued = applyFatigueDelta(ticked, applyIronHeartLoadReduction(ticked, load, isMatchWeek), recoveryBonus)
   return isMatchWeek ? rollForInjury(fatigued, rng, majorInjuryWeeks) : fatigued
 }
 

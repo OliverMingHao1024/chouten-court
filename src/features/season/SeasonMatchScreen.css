@@ -123,6 +123,50 @@
   color: var(--text-muted);
 }
 
+.matchup-card__opponent-roster {
+  text-align: left;
+  font-size: 0.75rem;
+}
+
+.matchup-card__opponent-roster summary {
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.matchup-card__opponent-roster ul {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.matchup-card__opponent-roster li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+
+.matchup-card__opponent-roster-name {
+  font-weight: 700;
+  flex: 1;
+}
+
+.matchup-card__opponent-roster-position {
+  color: var(--text-muted);
+}
+
+.matchup-card__opponent-roster-grade {
+  font-weight: 700;
+  color: var(--accent-strong);
+}
+
 .matchup-card__preview {
   display: flex;
   flex-direction: column;

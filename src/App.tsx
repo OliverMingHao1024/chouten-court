@@ -4,6 +4,7 @@ import { generateOpponentName } from './domain/opponentName'
 import { distributePlayerStats } from './domain/boxScoreStats'
 import { generateOpponentAce, opponentAceEraIndex } from './domain/opponentAce'
 import { generateOpponentStyle } from './domain/opponentStyle'
+import { generateOpponentRoster } from './domain/opponentRoster'
 import type { QuarterScore } from './domain/quarterSimulation'
 import { computeComebackMargin, pickOpponentName, pinRival, recordRivalGame, unpinRival, type RivalRecord } from './domain/rivals'
 import {
@@ -21,18 +22,13 @@ import {
   type OfficialPhase,
 } from './domain/officialMatch'
 import type { GameLineup } from './domain/lineup'
-import { computeTeamStrength } from './domain/matchEngine'
+import { computeTeamStrength, describePermanentAftereffects, RECOVERY_CENTER_BONUS } from './domain/matchEngine'
+import type { AchievementKey } from './domain/achievements'
 import { computeTacticAttributeWeights, type GameTactics } from './domain/tactics'
 import { advanceGrades, describeGraduate } from './domain/graduation'
-import {
-  hasReachedInsuranceCap,
-  hasReachedShortChallengeMilestone,
-  isChampionRun,
-  summarizeCareer,
-  type CareerEndReason,
-} from './domain/career'
-import { computeOverallGrade } from './domain/attributeGrade'
-import { appendSchoolHistoryEntry, loadSchoolHistory, type SchoolHistoryEntry } from './domain/schoolHistory'
+import { hasReachedInsuranceCap, type CareerEndReason } from './domain/career'
+import { appendSchoolHistoryEntry, loadSchoolHistory } from './domain/schoolHistory'
+import { buildSchoolHistoryEntry, describeNewInjuries, resolveOfficialGameWeek } from './domain/officialGameWeek'
 import {
   clampAttribute,
   clampFatigue,
@@ -42,26 +38,34 @@ import {
   type EventCard,
 } from './domain/events'
 import { generateCandidatePool, signCandidates, type Candidate } from './domain/recruiting'
-import { applyReputationDelta, computeSeasonReputationDelta, INITIAL_REPUTATION } from './domain/reputation'
+import { applyReputationDelta, INITIAL_REPUTATION } from './domain/reputation'
 import { createInitialRoster, ROSTER_SIZE } from './domain/roster'
 import { createSeededRng, hashSeed } from './domain/rng'
 import { computeScheduleStrip, weeksUntilNextOfficialMatch } from './domain/schedule'
 import { SPECIAL_ABILITY_LABELS } from './domain/specialAbilities'
 import {
-  clearSaveFromStorage,
-  loadSaveFromStorage,
+  createSaveSlot,
+  deleteSaveSlot,
+  listSaveSlots,
+  loadSaveFromSlot,
+  migrateLegacySingleSlotSave,
   parseSaveData,
+  readActiveSlotId,
   SAVE_FORMAT_VERSION,
   serializeSaveData,
-  writeSaveToStorage,
+  writeActiveSlotId,
+  writeSaveToSlot,
   type SaveData,
+  type SaveSlotMeta,
 } from './domain/saveData'
-import { advanceSeasonWeek, FINAL4_PLACEMENT_LABEL, type SeasonGameLogEntry } from './domain/season'
-import { computeSeasonAwards, type SeasonRecord } from './domain/seasonSummary'
+import { SaveSlotScreen } from './features/setup/SaveSlotScreen'
+import type { SeasonGameLogEntry } from './domain/season'
+import type { SeasonRecord } from './domain/seasonSummary'
 import { computeStyleTag } from './domain/styleTag'
 import {
   advanceCardPool,
   createInitialCardPool,
+  MAX_CARDS_PER_WEEK,
   maxTrainingPoints,
   recoverTrainingPoints,
   totalCost,
@@ -69,7 +73,7 @@ import {
 } from './domain/trainingCardPool'
 import { resolveCardSelections, type CardSelection } from './domain/trainingCardResolution'
 import { computeTeamFocusStyle } from './domain/trainingDirection'
-import { ATTRIBUTE_LABELS, INJURY_STATUS_LABELS, type Player } from './domain/types'
+import { ATTRIBUTE_LABELS, type Player } from './domain/types'
 import { PRACTICE_STRENGTHS, type PracticeStrength } from './domain/weeklyAction'
 import { CareerSummaryScreen } from './features/career/CareerSummaryScreen'
 import { ChallengeDecisionDialog } from './features/career/ChallengeDecisionDialog'
@@ -122,6 +126,10 @@ interface Team {
   challengeMode: 'short' | 'long'
   /** 三年挑戰達到里程碑、等待玩家決定繼續或結束;選「繼續」後不會再次出現。 */
   pendingChallengeDecision: boolean
+  /** 純紀錄性質的成就/稱號,只會增加不會被收回,不影響任何數值運算。 */
+  achievements: AchievementKey[]
+  /** 本季至今是否已有球員新增傷勢;每季結束時重置為 false,純粹用來判定「零傷賽季」成就。 */
+  seasonHadInjury: boolean
   /**
    * 賽後摘要待確認:比賽結果已算好,但要等玩家確認摘要後才會真正套用(進入下一週)。
    * 純執行期狀態,不寫入存檔(比照 eventRevealResult)。
@@ -164,6 +172,8 @@ function teamToSaveData(team: Team): SaveData {
     schoolAssets: team.schoolAssets,
     challengeMode: team.challengeMode,
     pendingChallengeDecision: team.pendingChallengeDecision,
+    achievements: team.achievements,
+    seasonHadInjury: team.seasonHadInjury,
   }
 }
 
@@ -172,8 +182,14 @@ function saveDataToTeam(data: SaveData): Team {
 }
 
 function loadInitialTeam(): Team | null {
-  const saved = loadSaveFromStorage()
-  return saved ? saveDataToTeam(saved) : null
+  migrateLegacySingleSlotSave()
+  const activeId = readActiveSlotId()
+  if (!activeId) return null
+  const saved = loadSaveFromSlot(activeId)
+  if (saved) return saveDataToTeam(saved)
+  // 槽位存在但內容解析失敗(格式毀損):自動移除這個槽位,避免存檔選單留著一筆點了也打不開的紀錄。
+  deleteSaveSlot(activeId)
+  return null
 }
 
 function downloadJson(filename: string, contents: string): void {
@@ -190,58 +206,6 @@ function opponentNameForWeek(team: Team): string {
   const rng = createSeededRng(hashSeed(`${team.seed}-${team.totalWeek}-opponent`))
   const fallbackName = generateOpponentName(rng)
   return pickOpponentName(team.rivals, fallbackName, rng)
-}
-
-/**
- * 生涯結束(奪冠或達到保險上限)時組出一筆校史紀錄:只有奪冠生涯才附上當時的奪冠隊陣容
- * 快照(「歷史隊」),其餘生涯結束只留戰績摘要,不佔用歷史隊的資料空間。
- */
-function buildSchoolHistoryEntry(
-  coachName: string,
-  careerLog: SeasonRecord[],
-  reason: CareerEndReason,
-  championRoster: Player[] | null,
-): SchoolHistoryEntry {
-  const summary = summarizeCareer(careerLog, reason)
-  return {
-    coachName,
-    reason,
-    totalSeasons: summary.totalSeasons,
-    totalWins: summary.totalWins,
-    totalLosses: summary.totalLosses,
-    bestPlacementLabel: summary.bestPlacement ? FINAL4_PLACEMENT_LABEL[summary.bestPlacement] : '未曾闖進四強',
-    championRoster: championRoster
-      ? championRoster.map((player) => ({
-          name: player.name,
-          position: player.position,
-          overallGrade: computeOverallGrade(player.attributes),
-        }))
-      : null,
-  }
-}
-
-function describeNewInjuries(before: Player[], after: Player[]): string {
-  const newlyInjured = after.filter(
-    (player, index) => player.injuryStatus !== 'healthy' && before[index].injuryStatus === 'healthy',
-  )
-  if (newlyInjured.length === 0) return ''
-  return (
-    ' ' +
-    newlyInjured
-      .map((player) => `${player.name}${INJURY_STATUS_LABELS[player.injuryStatus]}(預計缺賽 ${player.injuryWeeksRemaining} 週)`)
-      .join('、')
-  )
-}
-
-function describeGameGrowth(roster: Player[], growth: GameGrowthEntry[]): string {
-  if (growth.length === 0) return ''
-  const nameById = new Map(roster.map((player) => [player.id, player.name]))
-  return (
-    ' 實戰成長:' +
-    growth
-      .map((entry) => `${nameById.get(entry.playerId) ?? ''}(${ATTRIBUTE_LABELS[entry.attribute]}+1)`)
-      .join('、')
-  )
 }
 
 /**
@@ -358,7 +322,10 @@ function summarizeResolvedCards(resolvedCards: TrainingCardWeekResult['resolvedC
 }
 
 function runTrainingCardWeek(team: Team, selections: CardSelection[]) {
-  const resolution = resolveCardSelections(team.players, selections, team.seed + team.totalWeek, team.reputation)
+  const resolution = resolveCardSelections(team.players, selections, team.seed + team.totalWeek, team.reputation, {
+    bonusAbilitySlots: hasSchoolAsset(team.schoolAssets, 'coachSpecialization') ? 1 : 0,
+    recoveryBonus: hasSchoolAsset(team.schoolAssets, 'recoveryCenter') ? RECOVERY_CENTER_BONUS : 0,
+  })
 
   const poolRng = createSeededRng(hashSeed(`${team.seed}-${team.totalWeek}-cardpool`))
   const advance = advanceCardPool(team.cardPool, selections.map((selection) => selection.card.id), poolRng)
@@ -375,24 +342,51 @@ function runTrainingCardWeek(team: Team, selections: CardSelection[]) {
     players: resolution.roster,
     cardPool: advance.state,
     trainingPoints,
-    lastResult: summarizeResolvedCards(resolution.resolvedCards),
+    lastResult: summarizeResolvedCards(resolution.resolvedCards) + describePermanentAftereffects(team.players, resolution.roster),
     cardPoolResult: { resolvedCards: resolution.resolvedCards, playerNameById },
+    seasonHadInjury: team.seasonHadInjury || describeNewInjuries(team.players, resolution.roster) !== '',
   }
 }
 
 function App() {
   const [team, setTeam] = useState<Team | null>(loadInitialTeam)
+  const [activeSlotId, setActiveSlotId] = useState<string | null>(readActiveSlotId)
+  const [slots, setSlots] = useState<SaveSlotMeta[]>(listSaveSlots)
+  const [creatingNewSlot, setCreatingNewSlot] = useState(false)
 
   useEffect(() => {
-    if (team) writeSaveToStorage(teamToSaveData(team))
-  }, [team])
+    if (team && activeSlotId) writeSaveToSlot(activeSlotId, teamToSaveData(team))
+  }, [team, activeSlotId])
 
   if (!team) {
+    if (slots.length > 0 && !creatingNewSlot) {
+      return (
+        <SaveSlotScreen
+          slots={slots}
+          onLoad={(id) => {
+            writeActiveSlotId(id)
+            setActiveSlotId(id)
+            const saved = loadSaveFromSlot(id)
+            setTeam(saved ? saveDataToTeam(saved) : null)
+          }}
+          onDelete={(id) => {
+            deleteSaveSlot(id)
+            setSlots(listSaveSlots())
+            if (activeSlotId === id) setActiveSlotId(null)
+          }}
+          onCreateNew={() => setCreatingNewSlot(true)}
+        />
+      )
+    }
     return (
       <SetupScreen
         schoolHistory={loadSchoolHistory()}
         onSubmit={(teamName, coachName, seedInput, challengeMode) => {
           const seed = hashSeed(seedInput ?? `${teamName}:${coachName}`)
+          const slotId = createSaveSlot(`${teamName}・${coachName}`)
+          setActiveSlotId(slotId)
+          setSlots(listSaveSlots())
+          setCreatingNewSlot(false)
           setTeam({
             teamName,
             coachName,
@@ -419,6 +413,8 @@ function App() {
             schoolAssets: [],
             challengeMode,
             pendingChallengeDecision: false,
+            achievements: [],
+            seasonHadInjury: false,
           })
         }}
       />
@@ -433,8 +429,11 @@ function App() {
         reason={team.careerEnded}
         careerLog={team.careerLog}
         graduateLog={team.graduateLog}
+        achievements={team.achievements}
         onNewCareer={() => {
-          clearSaveFromStorage()
+          if (activeSlotId) deleteSaveSlot(activeSlotId)
+          setActiveSlotId(null)
+          setSlots(listSaveSlots())
           setTeam(null)
         }}
         onContinueDynasty={
@@ -488,6 +487,7 @@ function App() {
   const gameIndex = getGameIndexForWeek(phase, weekOfYear)
   const opponentAce = generateOpponentAce(hashSeed(`${team.seed}-ace-${opponentAceEraIndex(year)}`))
   const opponentStyle = generateOpponentStyle(hashSeed(`${team.seed}-style-${opponentAceEraIndex(year)}`))
+  const opponentRoster = generateOpponentRoster(hashSeed(`${team.seed}-roster-${opponentAceEraIndex(year)}`))
   const weeklyEvent =
     phase === 'offseason' && gameIndex === null && !team.recruitingCandidates ? weeklyEventForWeek(team) : null
 
@@ -520,114 +520,52 @@ function App() {
         opponentAce={opponentAce}
         opponentName={opponentNameForWeek(team)}
         lineup={lineup}
+        recoveryBonus={hasSchoolAsset(team.schoolAssets, 'recoveryCenter') ? RECOVERY_CENTER_BONUS : 0}
         onComplete={(gameResult) => {
-          const result = advanceSeasonWeek(team.totalWeek, team.seasonGameLog, gameResult)
           const comebackMargin = computeComebackMargin(gameResult.boxScore.quarters, gameResult.outcome)
           const rivals = recordRivalGame(team.rivals, opponentNameForWeek(team), gameResult.outcome, comebackMargin)
-          let players = result.roster
-          let reputation = team.reputation
-          let graduateLog = team.graduateLog
-          let recruitingCandidates: Candidate[] | null = null
-          let careerLog = team.careerLog
-          let eraCount = team.eraCount
-          let pendingSeasonSummary = team.pendingSeasonSummary
-          let careerEnded: CareerEndReason | null = null
-          let schoolAssets = team.schoolAssets
-          let pendingChallengeDecision = team.pendingChallengeDecision
-          let message =
-            result.message +
-            describeNewInjuries(team.players, result.roster) +
-            describeGameGrowth(result.roster, result.growth)
-
-          if (result.seasonEnded && result.finalPhaseReached) {
-            const seasonYear = getCalendarPosition(team.totalWeek).year
-            const seasonGames = [...team.seasonGameLog, result.gameLogEntry].filter(
-              (entry) => getCalendarPosition(entry.totalWeek).year === seasonYear,
-            )
-            const reputationDelta = computeSeasonReputationDelta(result.finalPhaseReached, result.placement)
-            reputation = applyReputationDelta(reputation, reputationDelta)
-            schoolAssets = evaluateSchoolAssetUnlocks(schoolAssets, reputation)
-            const unlockedThisSeason = newlyUnlockedAssets(team.schoolAssets, schoolAssets)
-            if (unlockedThisSeason.length > 0) {
-              message += ` 永久解鎖學校資產:${unlockedThisSeason.map((key) => SCHOOL_ASSET_LABELS[key]).join('、')}!`
-            }
-
-            const seasonRecord: SeasonRecord = {
-              year: seasonYear,
-              wins: seasonGames.filter((entry) => entry.outcome === 'win').length,
-              losses: seasonGames.filter((entry) => entry.outcome === 'loss').length,
-              finalPhaseReached: result.finalPhaseReached,
-              placement: result.placement,
-              reputationAfter: reputation,
-            }
-            careerLog = [...careerLog, seasonRecord]
-
-            pendingSeasonSummary = {
-              record: seasonRecord,
-              reputationDelta,
-              reputationAfter: reputation,
-              awards: computeSeasonAwards(players),
-            }
-
-            if (isChampionRun(result.placement)) {
-              careerEnded = 'champion'
-              appendSchoolHistoryEntry(buildSchoolHistoryEntry(team.coachName, careerLog, careerEnded, players))
-            } else {
-              const { roster: advancedRoster, graduates } = advanceGrades(players)
-              players = advancedRoster
-
-              if (graduates.length > 0) {
-                eraCount += 1
-                const graduationRng = createSeededRng(hashSeed(`${team.seed}-${result.nextTotalWeek}-graduation`))
-                graduateLog = [
-                  ...graduateLog,
-                  ...graduates.map((graduate) => describeGraduate(graduate, reputation, graduationRng)),
-                ]
-
-                if (hasReachedInsuranceCap(eraCount)) {
-                  careerEnded = 'insuranceCap'
-                  appendSchoolHistoryEntry(buildSchoolHistoryEntry(team.coachName, careerLog, careerEnded, null))
-                } else {
-                  if (
-                    team.challengeMode === 'short' &&
-                    !team.pendingChallengeDecision &&
-                    !hasReachedShortChallengeMilestone(team.eraCount) &&
-                    hasReachedShortChallengeMilestone(eraCount)
-                  ) {
-                    pendingChallengeDecision = true
-                  }
-                  const vacancies = ROSTER_SIZE - players.length
-                  const candidatePoolMultiplier = hasSchoolAsset(schoolAssets, 'scoutingNetwork') ? 4 : 2
-                  recruitingCandidates = generateCandidatePool(
-                    reputation,
-                    vacancies * candidatePoolMultiplier,
-                    hashSeed(`${team.seed}-${result.nextTotalWeek}-recruits`),
-                  )
-                  message += ` 本屆畢業 ${graduates.length} 人,請完成招生補齊名冊。`
-                }
-              }
-            }
-          }
+          const resolved = resolveOfficialGameWeek(
+            {
+              totalWeek: team.totalWeek,
+              players: team.players,
+              seasonGameLog: team.seasonGameLog,
+              reputation: team.reputation,
+              graduateLog: team.graduateLog,
+              careerLog: team.careerLog,
+              eraCount: team.eraCount,
+              schoolAssets: team.schoolAssets,
+              pendingSeasonSummary: team.pendingSeasonSummary,
+              challengeMode: team.challengeMode,
+              pendingChallengeDecision: team.pendingChallengeDecision,
+              coachName: team.coachName,
+              seed: team.seed,
+              achievements: team.achievements,
+              seasonHadInjury: team.seasonHadInjury,
+            },
+            gameResult,
+          )
 
           const nextTeamState: Team = {
             ...team,
-            totalWeek: result.nextTotalWeek,
-            players,
-            reputation,
-            graduateLog,
-            recruitingCandidates,
-            careerLog,
-            eraCount,
-            pendingSeasonSummary,
-            careerEnded,
+            totalWeek: resolved.nextTotalWeek,
+            players: resolved.players,
+            reputation: resolved.reputation,
+            graduateLog: resolved.graduateLog,
+            recruitingCandidates: resolved.recruitingCandidates,
+            careerLog: resolved.careerLog,
+            eraCount: resolved.eraCount,
+            pendingSeasonSummary: resolved.pendingSeasonSummary,
+            careerEnded: resolved.careerEnded,
             lastLineup: lineup,
-            lastResult: message,
-            seasonGameLog: [...team.seasonGameLog, result.gameLogEntry],
+            lastResult: resolved.message,
+            seasonGameLog: resolved.seasonGameLog,
             pendingGameSummary: null,
             livePlay: null,
             rivals,
-            schoolAssets,
-            pendingChallengeDecision,
+            schoolAssets: resolved.schoolAssets,
+            pendingChallengeDecision: resolved.pendingChallengeDecision,
+            achievements: resolved.achievements,
+            seasonHadInjury: resolved.seasonHadInjury,
           }
 
           // 賽後摘要待玩家確認後才真正套用(進入下一週);在那之前畫面維持原本這場比賽的狀態。
@@ -663,6 +601,7 @@ function App() {
         opponentStyle={opponentStyle}
         reputation={team.reputation}
         alwaysScouted={hasSchoolAsset(team.schoolAssets, 'videoAnalysis')}
+        opponentRoster={opponentRoster}
         players={team.players}
         initialLineup={team.lastLineup}
         lastResult={team.lastResult}
@@ -738,6 +677,8 @@ function App() {
         players={team.players}
         reputation={team.reputation}
         opponentNames={practiceOpponentNamesForWeek(team)}
+        maxCardsPerWeek={hasSchoolAsset(team.schoolAssets, 'trainingFacility') ? MAX_CARDS_PER_WEEK + 1 : MAX_CARDS_PER_WEEK}
+        bonusAbilitySlots={hasSchoolAsset(team.schoolAssets, 'coachSpecialization') ? 1 : 0}
         onConfirm={(selections) => {
           setTeam({ ...team, ...runTrainingCardWeek(team, selections) })
         }}
@@ -780,28 +721,47 @@ function App() {
                 window.alert('存檔格式錯誤,無法匯入。')
                 return
               }
+              const slotId = createSaveSlot(parsed.teamName)
+              setActiveSlotId(slotId)
+              setSlots(listSaveSlots())
               setTeam(saveDataToTeam(parsed))
             }
             reader.readAsText(file)
           }}
+          onSwitchSlot={() => {
+            setSlots(listSaveSlots())
+            setCreatingNewSlot(false)
+            setTeam(null)
+          }}
           onNewGame={() => {
             if (!window.confirm('確定要放棄目前進度,開始新遊戲嗎?')) return
-            clearSaveFromStorage()
+            if (activeSlotId) deleteSaveSlot(activeSlotId)
+            setActiveSlotId(null)
+            setSlots(listSaveSlots())
             setTeam(null)
           }}
         />
       }
-      roster={<RosterScreen players={team.players} />}
+      roster={
+        <RosterScreen
+          players={team.players}
+          recoveryBonus={hasSchoolAsset(team.schoolAssets, 'recoveryCenter') ? RECOVERY_CENTER_BONUS : 0}
+        />
+      }
     >
       <GameSummaryDialog
         result={team.pendingGameSummary?.display ?? null}
         onConfirm={() => setTeam(team.pendingGameSummary!.nextTeamState)}
       />
-      <SeasonSummaryDialog result={team.pendingSeasonSummary} />
+      <SeasonSummaryDialog
+        result={team.pendingSeasonSummary}
+        onClose={() => setTeam({ ...team, pendingSeasonSummary: null })}
+      />
       <EventResultDialog result={team.eventRevealResult} />
       <TrainingCardResultDialog result={team.cardPoolResult} />
       <ChallengeDecisionDialog
-        open={team.pendingChallengeDecision}
+        // 等玩家看完並關掉單季總結後才跳出這個提示,避免兩個非阻斷式對話框同時疊在畫面上。
+        open={team.pendingChallengeDecision && !team.pendingSeasonSummary}
         onContinue={() => setTeam({ ...team, pendingChallengeDecision: false })}
         onEnd={() => {
           appendSchoolHistoryEntry(buildSchoolHistoryEntry(team.coachName, team.careerLog, 'shortChallengeComplete', null))

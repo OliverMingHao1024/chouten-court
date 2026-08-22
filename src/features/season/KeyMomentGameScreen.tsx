@@ -31,6 +31,8 @@ export interface KeyMomentGameScreenProps {
   opponentName: string
   lineup: GameLineup
   onComplete: (result: OfficialGameResult) => void
+  /** 學校資產「恢復中心」解鎖時傳入固定加成;省略時 0,行為與過去完全相同。 */
+  recoveryBonus?: number
 }
 
 /**
@@ -47,6 +49,7 @@ export function KeyMomentGameScreen({
   opponentName,
   lineup,
   onComplete,
+  recoveryBonus = 0,
 }: KeyMomentGameScreenProps) {
   const setupRef = useRef<OfficialGameQuarterSetup | null>(null)
   if (!setupRef.current) {
@@ -63,7 +66,16 @@ export function KeyMomentGameScreen({
     completedRef.current = true
     const final = sumQuarters(finalQuarters)
     const outcome = decideOutcome(final, setup.rng)
-    const result = resolveOfficialGameAfterQuarters(roster, phase, setup.rng, lineup, finalQuarters, final, outcome)
+    const result = resolveOfficialGameAfterQuarters(
+      roster,
+      phase,
+      setup.rng,
+      lineup,
+      finalQuarters,
+      final,
+      outcome,
+      recoveryBonus,
+    )
     setQuarters(finalQuarters)
     onComplete(result)
   }
@@ -82,6 +94,10 @@ export function KeyMomentGameScreen({
   }
 
   // 自動推進:沒有卡在決策上、也還沒打完 4 節時,用中性參數(不套用任何決策)模擬下一節。
+  // 依賴陣列刻意只放 [quarters, awaitingDecisionAt]:setup 來自上面的 ref,advance/finish
+  // 是每次 render 都重新定義的一般函式(沒有包 useCallback),真的補進陣列會讓 identity
+  // 每次 render 都變,導致這個 effect 在「quarters/awaitingDecisionAt 根本沒變」時也
+  // 重新觸發,多模擬一節、多消耗一次 rng()——這不是漏寫依賴,是刻意的狀態機邊界。
   useEffect(() => {
     if (completedRef.current || awaitingDecisionAt !== null || quarters.length >= QUARTER_COUNT) return
     const quarter = simulateOneQuarter(setup.teamStrength, setup.opponentStrength, setup.varianceRange, setup.rng)

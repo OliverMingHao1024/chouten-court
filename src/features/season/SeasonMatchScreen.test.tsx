@@ -25,6 +25,7 @@ function renderScreen(overrides: Partial<React.ComponentProps<typeof SeasonMatch
       opponentStyle="fastBreak"
       reputation={50}
       alwaysScouted={false}
+      opponentRoster={players}
       players={players}
       initialLineup={null}
       lastResult={null}
@@ -136,6 +137,7 @@ describe('SeasonMatchScreen', () => {
         opponentStyle="fastBreak"
         reputation={50}
         alwaysScouted={false}
+        opponentRoster={players}
         players={tiredPlayers}
         initialLineup={null}
         lastResult={null}
@@ -253,5 +255,34 @@ describe('SeasonMatchScreen', () => {
       ],
     })
     expect(screen.queryByRole('button', { name: '釘選為宿敵' })).not.toBeInTheDocument()
+  })
+
+  it('shows the opponent roster once scouted, but not before', () => {
+    const opponentRoster = createInitialRoster(2)
+    const { rerender } = renderScreen({ reputation: 54, opponentRoster })
+    expect(screen.queryByText(`對手名冊(${opponentRoster.length} 人)`)).not.toBeInTheDocument()
+
+    rerender(
+      <SeasonMatchScreen
+        gameNumber={2}
+        totalGamesInPhase={4}
+        opponentName="板橋高中"
+        phase="qualifying"
+        opponentAce={{ name: '陳志明', scoring: 90, shooting: 80 }}
+        opponentStyle="fastBreak"
+        reputation={55}
+        alwaysScouted={false}
+        opponentRoster={opponentRoster}
+        players={players}
+        initialLineup={null}
+        lastResult={null}
+        rivals={[]}
+        onPinRival={vi.fn()}
+        onUnpinRival={vi.fn()}
+        onPlayGame={vi.fn()}
+      />,
+    )
+    expect(screen.getByText(`對手名冊(${opponentRoster.length} 人)`)).toBeInTheDocument()
+    expect(screen.getByText(opponentRoster[0].name)).toBeInTheDocument()
   })
 })

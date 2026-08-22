@@ -28,6 +28,18 @@ describe('evaluateSchoolAssetUnlocks', () => {
     const unlocked = evaluateSchoolAssetUnlocks(['scoutingNetwork'], 0)
     expect(unlocked).toContain('scoutingNetwork')
   })
+
+  it('unlocks trainingFacility, recoveryCenter, and coachSpecialization at their own thresholds', () => {
+    expect(evaluateSchoolAssetUnlocks([], SCHOOL_ASSET_REPUTATION_THRESHOLD.trainingFacility)).toContain(
+      'trainingFacility',
+    )
+    expect(evaluateSchoolAssetUnlocks([], SCHOOL_ASSET_REPUTATION_THRESHOLD.recoveryCenter)).toContain(
+      'recoveryCenter',
+    )
+    expect(evaluateSchoolAssetUnlocks([], SCHOOL_ASSET_REPUTATION_THRESHOLD.coachSpecialization)).toContain(
+      'coachSpecialization',
+    )
+  })
 })
 
 describe('hasSchoolAsset', () => {

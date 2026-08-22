@@ -11,9 +11,11 @@ import './RosterScreen.css'
 
 export interface RosterScreenProps {
   players: Player[]
+  /** 學校資產「恢復中心」解鎖時傳入固定加成;省略時 0,顯示與過去完全相同。 */
+  recoveryBonus?: number
 }
 
-export function RosterScreen({ players }: RosterScreenProps) {
+export function RosterScreen({ players, recoveryBonus = 0 }: RosterScreenProps) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null)
   const status = selectedPlayer ? describePlayerStatus(selectedPlayer) : null
@@ -63,7 +65,7 @@ export function RosterScreen({ players }: RosterScreenProps) {
                   {selectedPlayer.styleTag.label}
                 </p>
                 <p className="roster-dialog__recovery">
-                  每週體力恢復 {computeRecoveryRate(selectedPlayer)} 點
+                  每週體力恢復 {computeRecoveryRate(selectedPlayer, recoveryBonus)} 點
                 </p>
                 {selectedPlayer.injuryStatus !== 'healthy' && (
                   <p className={`roster-dialog__injury roster-dialog__injury--${selectedPlayer.injuryStatus}`}>

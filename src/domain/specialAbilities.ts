@@ -77,20 +77,27 @@ export const LEARNABLE_SPECIAL_ABILITY_KEYS: readonly SpecialAbilityKey[] = SPEC
 const MIN_UNLOCKED_ABILITIES = 3
 const MAX_UNLOCKED_ABILITIES = LEARNABLE_SPECIAL_ABILITY_KEYS.length
 
-export function unlockedAbilityCount(reputation: number): number {
-  return Math.round(
-    MIN_UNLOCKED_ABILITIES + (reputation / REPUTATION_MAX) * (MAX_UNLOCKED_ABILITIES - MIN_UNLOCKED_ABILITIES),
+/**
+ * bonusSlots 預設 0(不傳入時行為不變);學校資產「教練專精」解鎖時由呼叫端傳入 +1,
+ * 讓可教學的能力清單多解鎖一項,是直接可見的選項變化,不是隱性數值加成。
+ */
+export function unlockedAbilityCount(reputation: number, bonusSlots = 0): number {
+  return Math.min(
+    MAX_UNLOCKED_ABILITIES,
+    Math.round(
+      MIN_UNLOCKED_ABILITIES + (reputation / REPUTATION_MAX) * (MAX_UNLOCKED_ABILITIES - MIN_UNLOCKED_ABILITIES),
+    ) + bonusSlots,
   )
 }
 
 /** 目前聲望下已解鎖、可嘗試教學的能力清單(依固定順序解鎖,不是隨機挑選)。 */
-export function unlockedAbilities(reputation: number): readonly SpecialAbilityKey[] {
-  return LEARNABLE_SPECIAL_ABILITY_KEYS.slice(0, unlockedAbilityCount(reputation))
+export function unlockedAbilities(reputation: number, bonusSlots = 0): readonly SpecialAbilityKey[] {
+  return LEARNABLE_SPECIAL_ABILITY_KEYS.slice(0, unlockedAbilityCount(reputation, bonusSlots))
 }
 
 /** 該球員目前還能學的能力:已解鎖清單裡,扣掉他已經有的。 */
-export function learnableAbilitiesForPlayer(player: Player, reputation: number): SpecialAbilityKey[] {
-  return unlockedAbilities(reputation).filter((key) => !player.specialAbilities.includes(key))
+export function learnableAbilitiesForPlayer(player: Player, reputation: number, bonusSlots = 0): SpecialAbilityKey[] {
+  return unlockedAbilities(reputation, bonusSlots).filter((key) => !player.specialAbilities.includes(key))
 }
 
 // 學習成功率下限(原創數值,待調校):即使對應屬性很低,也保留一點機會,不完全鎖死。

@@ -123,6 +123,12 @@ describe('totalCost / canSelectCards', () => {
     expect(canSelectCards(cards, 999)).toBe(false)
   })
 
+  it('accepts one more card than the default limit when a higher maxCards is passed in', () => {
+    const cards = Array.from({ length: MAX_CARDS_PER_WEEK + 1 }, () => makeCard({ kind: 'rest' }))
+    expect(canSelectCards(cards, 999, null, MAX_CARDS_PER_WEEK + 1)).toBe(true)
+    expect(canSelectCards(cards, 999, null, MAX_CARDS_PER_WEEK)).toBe(false)
+  })
+
   it('rejects a selection whose total cost exceeds the remaining points', () => {
     const cards = [makeCard({ kind: 'practiceMatch' })]
     expect(canSelectCards(cards, cardCost(cards[0]) - 1)).toBe(false)

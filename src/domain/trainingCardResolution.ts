@@ -71,12 +71,21 @@ export interface CardResolutionResult {
  * 呼叫兩次同一名球員就會恢復兩次。這裡先把每名球員這一週(可能來自多張卡)的負荷與成長
  * 累加起來,每人只呼叫一次 advancePlayerWeek,避免恢復量被重複計算。
  */
+export interface CardResolutionOptions {
+  /** 學校資產「教練專精」解鎖時傳入 1,個別訓練可教學的能力清單多解鎖一項。 */
+  bonusAbilitySlots?: number
+  /** 學校資產「恢復中心」解鎖時傳入固定加成,全隊每週體力恢復量增加。 */
+  recoveryBonus?: number
+}
+
 export function resolveCardSelections(
   roster: Player[],
   selections: CardSelection[],
   seed: number,
   reputation: number,
+  options: CardResolutionOptions = {},
 ): CardResolutionResult {
+  const { bonusAbilitySlots = 0, recoveryBonus = 0 } = options
   const rng = createSeededRng(seed)
   const comboSet = new Set(comboAttributes(selections.map((selection) => selection.card)))
 
@@ -136,7 +145,7 @@ export function resolveCardSelections(
       const ability = selection.ability
       const player = roster.find((candidate) => candidate.id === selection.playerId)
       if (!player) throw new Error(`individualTraining target player not found: ${selection.playerId}`)
-      if (!learnableAbilitiesForPlayer(player, reputation).includes(ability)) {
+      if (!learnableAbilitiesForPlayer(player, reputation, bonusAbilitySlots).includes(ability)) {
         throw new Error(`${player.id} cannot currently learn ${ability} (locked or already known)`)
       }
 
@@ -206,7 +215,7 @@ export function resolveCardSelections(
       grownPlayer = { ...grownPlayer, specialAbilities: [...grownPlayer.specialAbilities, ...learned] }
     }
     const totalLoad = loadByPlayer.get(player.id) ?? 0
-    return advancePlayerWeek(grownPlayer, totalLoad, rng, matchWeekPlayers.has(player.id))
+    return advancePlayerWeek(grownPlayer, totalLoad, rng, matchWeekPlayers.has(player.id), undefined, recoveryBonus)
   })
 
   return { roster: newRoster, resolvedCards }

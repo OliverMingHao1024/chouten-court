@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { SeasonSummaryDialog, type SeasonSummaryResult } from './SeasonSummaryDialog'
 
 function makeResult(overrides: Partial<SeasonSummaryResult> = {}): SeasonSummaryResult {
@@ -46,5 +46,29 @@ describe('SeasonSummaryDialog', () => {
 
     rerender(<SeasonSummaryDialog result={makeResult()} />)
     expect(dialog).toHaveAttribute('open')
+  })
+
+  it('calls onClose when the 關閉 button is clicked', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+    render(<SeasonSummaryDialog result={makeResult()} onClose={onClose} />)
+
+    await user.click(screen.getByRole('button', { name: '關閉' }))
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('calls onClose when the backdrop is clicked', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+    render(<SeasonSummaryDialog result={makeResult()} onClose={onClose} />)
+
+    await user.click(screen.getByRole('dialog'))
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('does not throw when onClose is omitted (backward compatible)', async () => {
+    const user = userEvent.setup()
+    render(<SeasonSummaryDialog result={makeResult()} />)
+    await user.click(screen.getByRole('button', { name: '關閉' }))
   })
 })

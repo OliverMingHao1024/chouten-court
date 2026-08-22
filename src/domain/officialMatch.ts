@@ -137,22 +137,23 @@ export function resolveOfficialGameAfterQuarters(
   quarters: QuarterScore[],
   final: QuarterScore,
   outcome: 'win' | 'loss',
+  recoveryBonus = 0,
 ): OfficialGameResult {
   const majorInjuryWeeks = PHASE_MAJOR_INJURY_WEEKS[phase]
   const growth: GameGrowthEntry[] = []
   const fatiguedRoster = roster.map((player) => {
     if (player.injuryStatus === 'minor' || player.injuryStatus === 'major') {
-      return advancePlayerWeek(player, 0, rng, false)
+      return advancePlayerWeek(player, 0, rng, false, undefined, recoveryBonus)
     }
     // 先發承受完整負荷、主要輪替減半,兩者都會被判定是否受傷;未列入陣容的球員本場沒上場,
     // 直接淨恢復,不參與這場的受傷判定,也沒有實戰成長機會。
     const role = lineupRole(player.id, lineup)
     const fatigued =
       role === 'starter'
-        ? advancePlayerWeek(player, OFFICIAL_MATCH_LOAD, rng, true, majorInjuryWeeks)
+        ? advancePlayerWeek(player, OFFICIAL_MATCH_LOAD, rng, true, majorInjuryWeeks, recoveryBonus)
         : role === 'rotation'
-          ? advancePlayerWeek(player, ROTATION_MATCH_LOAD, rng, true, majorInjuryWeeks)
-          : advancePlayerWeek(player, 0, rng, false)
+          ? advancePlayerWeek(player, ROTATION_MATCH_LOAD, rng, true, majorInjuryWeeks, recoveryBonus)
+          : advancePlayerWeek(player, 0, rng, false, undefined, recoveryBonus)
 
     const baseGrowthChance =
       role === 'starter' ? STARTER_GAME_GROWTH_CHANCE : role === 'rotation' ? ROTATION_GAME_GROWTH_CHANCE : 0
@@ -184,6 +185,7 @@ export function simulateOfficialGame(
   tactics: GameTactics,
   opponentAce: OpponentAce,
   lineup: GameLineup,
+  recoveryBonus = 0,
 ): OfficialGameResult {
   const setup = setupOfficialGameQuarters(roster, phase, seed, tactics, opponentAce, lineup)
   const { quarters, final, outcome } = simulateQuarters(
@@ -192,7 +194,7 @@ export function simulateOfficialGame(
     setup.varianceRange,
     setup.rng,
   )
-  return resolveOfficialGameAfterQuarters(roster, phase, setup.rng, lineup, quarters, final, outcome)
+  return resolveOfficialGameAfterQuarters(roster, phase, setup.rng, lineup, quarters, final, outcome, recoveryBonus)
 }
 
 /**

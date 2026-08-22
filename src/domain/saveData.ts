@@ -1,3 +1,4 @@
+import { ACHIEVEMENT_KEYS, type AchievementKey } from './achievements'
 import type { CareerEndReason } from './career'
 import type { GameLineup } from './lineup'
 import { PHASE_GAME_COUNT } from './officialMatch'
@@ -19,7 +20,41 @@ import {
 } from './types'
 
 export const SAVE_STORAGE_KEY = 'chouten-court:save'
-export const SAVE_FORMAT_VERSION = 13
+export const SAVE_FORMAT_VERSION = 14
+
+// 最舊還願意嘗試升級的存檔版本(原創決策,待調校):版本 10 是這輪功能開始疊加欄位之前的
+// 基準線,再更早的版本沒有留下每次改動的確切欄位差異記錄,升級會不可靠,所以不試著救回來,
+// 沿用既有「格式不符一律拒絕」的行為。10 以後每一版新增了什麼欄位都很清楚,值得補救。
+export const MIN_SUPPORTED_SAVE_VERSION = 10
+
+type RawSaveData = Record<string, unknown>
+
+/**
+ * 每個 key 是「升級前」的版本號,value 是把該版本的存檔資料補上下一版新增欄位的預設值。
+ * 只需要「新增欄位給預設值」,不需要處理欄位重新命名/型別改變——這輪的版本升級都只是
+ * 新增功能,沒有動到既有欄位,所以每個 migration 都很單純。
+ */
+const MIGRATIONS: Record<number, (raw: RawSaveData) => RawSaveData> = {
+  10: (raw) => ({ ...raw, version: 11, rivals: [] }),
+  11: (raw) => ({ ...raw, version: 12, schoolAssets: [] }),
+  12: (raw) => ({ ...raw, version: 13, challengeMode: 'long', pendingChallengeDecision: false }),
+  13: (raw) => ({ ...raw, version: 14, achievements: [], seasonHadInjury: false }),
+}
+
+/**
+ * 沿著 MIGRATIONS 鏈一路升級到 SAVE_FORMAT_VERSION;版本低於 MIN_SUPPORTED_SAVE_VERSION,
+ * 或鏈中斷(某個版本沒有對應的 migration)時,原樣退回,讓後續的版本號檢查照舊拒絕載入。
+ */
+function migrateSaveData(raw: RawSaveData): RawSaveData {
+  let current = raw
+  while (typeof current.version === 'number' && current.version < SAVE_FORMAT_VERSION) {
+    if (current.version < MIN_SUPPORTED_SAVE_VERSION) return current
+    const migrate = MIGRATIONS[current.version]
+    if (!migrate) return current
+    current = migrate(current)
+  }
+  return current
+}
 
 const CHALLENGE_MODES = ['short', 'long']
 
@@ -50,6 +85,9 @@ export interface SaveData {
   schoolAssets: SchoolAssetKey[]
   challengeMode: 'short' | 'long'
   pendingChallengeDecision: boolean
+  achievements: AchievementKey[]
+  /** 本季至今是否已有球員新增傷勢;每季開始重置為 false,純粹用來判定「零傷賽季」成就。 */
+  seasonHadInjury: boolean
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -184,8 +222,9 @@ function isValidSeasonSummaryResult(value: unknown): value is SeasonSummaryResul
 }
 
 /** 匯入/讀檔共用的格式驗證:必要欄位缺漏或型別錯誤一律回傳 null,拒絕載入。 */
-export function parseSaveData(raw: unknown): SaveData | null {
-  if (!isPlainObject(raw)) return null
+export function parseSaveData(rawInput: unknown): SaveData | null {
+  if (!isPlainObject(rawInput)) return null
+  const raw = migrateSaveData(rawInput)
   if (raw.version !== SAVE_FORMAT_VERSION) return null
   if (typeof raw.teamName !== 'string' || raw.teamName.trim().length === 0) return null
   if (typeof raw.coachName !== 'string' || raw.coachName.trim().length === 0) return null
@@ -215,6 +254,13 @@ export function parseSaveData(raw: unknown): SaveData | null {
   }
   if (typeof raw.challengeMode !== 'string' || !CHALLENGE_MODES.includes(raw.challengeMode)) return null
   if (typeof raw.pendingChallengeDecision !== 'boolean') return null
+  if (
+    !Array.isArray(raw.achievements) ||
+    !raw.achievements.every((key) => (ACHIEVEMENT_KEYS as readonly string[]).includes(key as string))
+  ) {
+    return null
+  }
+  if (typeof raw.seasonHadInjury !== 'boolean') return null
 
   return {
     version: raw.version,
@@ -239,6 +285,8 @@ export function parseSaveData(raw: unknown): SaveData | null {
     schoolAssets: raw.schoolAssets as SchoolAssetKey[],
     challengeMode: raw.challengeMode as 'short' | 'long',
     pendingChallengeDecision: raw.pendingChallengeDecision,
+    achievements: raw.achievements as AchievementKey[],
+    seasonHadInjury: raw.seasonHadInjury,
   }
 }
 
@@ -262,4 +310,97 @@ export function writeSaveToStorage(data: SaveData): void {
 
 export function clearSaveFromStorage(): void {
   window.localStorage.removeItem(SAVE_STORAGE_KEY)
+}
+
+// ---- 多存檔槽位 ----
+// 舊版只有單一固定 key(SAVE_STORAGE_KEY)存一份存檔。新版每個槽位各自一個 key
+// (SAVE_SLOT_KEY_PREFIX + id),另外用一個索引 key 記錄所有槽位的 id/名稱/最後更新時間,
+// 方便在還沒載入任何一份存檔內容時就能列出清單。
+
+export interface SaveSlotMeta {
+  id: string
+  label: string
+  updatedAt: number
+}
+
+const SAVE_SLOTS_INDEX_KEY = 'chouten-court:save-slots'
+const SAVE_SLOT_KEY_PREFIX = 'chouten-court:save:'
+const ACTIVE_SLOT_KEY = 'chouten-court:active-slot'
+
+function slotStorageKey(id: string): string {
+  return `${SAVE_SLOT_KEY_PREFIX}${id}`
+}
+
+function isValidSaveSlotMeta(value: unknown): value is SaveSlotMeta {
+  if (!isPlainObject(value)) return false
+  return typeof value.id === 'string' && typeof value.label === 'string' && typeof value.updatedAt === 'number'
+}
+
+export function listSaveSlots(): SaveSlotMeta[] {
+  try {
+    const raw = window.localStorage.getItem(SAVE_SLOTS_INDEX_KEY)
+    if (!raw) return []
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter(isValidSaveSlotMeta)
+  } catch {
+    return []
+  }
+}
+
+function writeSaveSlotsIndex(slots: SaveSlotMeta[]): void {
+  window.localStorage.setItem(SAVE_SLOTS_INDEX_KEY, JSON.stringify(slots))
+}
+
+export function readActiveSlotId(): string | null {
+  return window.localStorage.getItem(ACTIVE_SLOT_KEY)
+}
+
+export function writeActiveSlotId(id: string | null): void {
+  if (id === null) window.localStorage.removeItem(ACTIVE_SLOT_KEY)
+  else window.localStorage.setItem(ACTIVE_SLOT_KEY, id)
+}
+
+/** 新增一個空槽位並設為目前作用中的槽位,回傳新槽位的 id。實際存檔內容要另外呼叫 writeSaveToSlot。 */
+export function createSaveSlot(label: string): string {
+  const id = `slot-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`
+  writeSaveSlotsIndex([...listSaveSlots(), { id, label, updatedAt: Date.now() }])
+  writeActiveSlotId(id)
+  return id
+}
+
+export function loadSaveFromSlot(id: string): SaveData | null {
+  try {
+    const raw = window.localStorage.getItem(slotStorageKey(id))
+    if (!raw) return null
+    return parseSaveData(JSON.parse(raw))
+  } catch {
+    return null
+  }
+}
+
+export function writeSaveToSlot(id: string, data: SaveData): void {
+  window.localStorage.setItem(slotStorageKey(id), serializeSaveData(data))
+  const label = listSaveSlots().find((slot) => slot.id === id)?.label ?? data.teamName
+  const others = listSaveSlots().filter((slot) => slot.id !== id)
+  writeSaveSlotsIndex([...others, { id, label, updatedAt: Date.now() }])
+}
+
+export function deleteSaveSlot(id: string): void {
+  window.localStorage.removeItem(slotStorageKey(id))
+  writeSaveSlotsIndex(listSaveSlots().filter((slot) => slot.id !== id))
+  if (readActiveSlotId() === id) writeActiveSlotId(null)
+}
+
+/**
+ * 把舊版單一固定 key 的存檔搬進槽位系統,只在「還沒有任何槽位」時執行一次;
+ * 舊版存檔搬移後設為作用中槽位並清掉舊 key,讓既有玩家的進度自動接上新系統。
+ */
+export function migrateLegacySingleSlotSave(): void {
+  if (listSaveSlots().length > 0) return
+  const legacy = loadSaveFromStorage()
+  if (!legacy) return
+  const id = createSaveSlot(legacy.teamName)
+  writeSaveToSlot(id, legacy)
+  clearSaveFromStorage()
 }

@@ -205,3 +205,29 @@ describe('resolveCardSelections: multiple simultaneous cards on the same player'
     expect(result.roster[0].specialAbilities).toContain(ability)
   })
 })
+
+describe('resolveCardSelections: options (school assets)', () => {
+  it('allows learning a bonus-unlocked ability once bonusAbilitySlots is passed in', () => {
+    const roster = createInitialRoster(1).map((p) => ({ ...p, specialAbilities: [...unlockedAbilities(0)] }))
+    const target = roster[0]
+    const [bonusAbility] = LEARNABLE_SPECIAL_ABILITY_KEYS.slice(unlockedAbilityCount(0))
+    const card = makeCard({ kind: 'individualTraining', attribute: null })
+
+    expect(() =>
+      resolveCardSelections(roster, [{ card, playerId: target.id, ability: bonusAbility }], 1, 0),
+    ).toThrow()
+
+    const result = resolveCardSelections(roster, [{ card, playerId: target.id, ability: bonusAbility }], 1, 0, {
+      bonusAbilitySlots: 1,
+    })
+    expect(result.resolvedCards[0].kind).toBe('individualTraining')
+  })
+
+  it('lowers ending fatigue by recoveryBonus when passed in', () => {
+    const roster = createInitialRoster(1).map((p) => ({ ...p, fatigue: 80 }))
+    const card = makeCard({ kind: 'teamTraining', attribute: 'three' })
+    const withoutBonus = resolveCardSelections(roster, [{ card }], 5, FULL_REPUTATION)
+    const withBonus = resolveCardSelections(roster, [{ card }], 5, FULL_REPUTATION, { recoveryBonus: 2 })
+    expect(withBonus.roster[0].fatigue).toBe(withoutBonus.roster[0].fatigue - 2)
+  })
+})

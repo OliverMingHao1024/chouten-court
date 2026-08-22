@@ -8,6 +8,8 @@ import {
   computeRecoveryRate,
   computeTeamStrength,
   computeWinProbability,
+  describePermanentAftereffects,
+  PERMANENT_AFTEREFFECT_AMOUNT,
   QUICK_RECOVERY_BONUS,
   RECOVERY_INDIVIDUAL_VARIANCE,
   rollForInjury,
@@ -15,7 +17,7 @@ import {
 } from '../matchEngine'
 import { createSeededRng } from '../rng'
 import { createInitialRoster } from '../roster'
-import type { Player } from '../types'
+import { ATTRIBUTE_KEYS, type Player } from '../types'
 import type { GameLineup } from '../lineup'
 
 function withAbility<T extends Player>(player: T, ability: T['specialAbilities'][number]): T {
@@ -71,6 +73,12 @@ describe('computeRecoveryRate', () => {
     const player = createInitialRoster(1)[0]
     const withQuickRecovery = withAbility(player, 'quickRecovery')
     expect(computeRecoveryRate(withQuickRecovery)).toBe(computeRecoveryRate(player) + QUICK_RECOVERY_BONUS)
+  })
+
+  it('adds an optional school-asset bonus on top of everything else, defaulting to 0', () => {
+    const player = createInitialRoster(1)[0]
+    expect(computeRecoveryRate(player)).toBe(computeRecoveryRate(player, 0))
+    expect(computeRecoveryRate(player, 2)).toBe(computeRecoveryRate(player) + 2)
   })
 })
 
@@ -354,6 +362,81 @@ describe('tickInjuryRecovery', () => {
     }
     expect(current.injuryStatus).toBe('healthy')
   })
+
+  it('never applies a permanent aftereffect when a minor injury recovers', () => {
+    const roster = createInitialRoster(1)
+    for (let seed = 0; seed < 100; seed++) {
+      const rng = createSeededRng(seed)
+      const injured: Player = { ...roster[0], injuryStatus: 'minor', injuryWeeksRemaining: 1 }
+      const recovered = tickInjuryRecovery(injured, rng)
+      expect(recovered.injuryStatus).toBe('healthy')
+      expect(recovered.attributes).toEqual(roster[0].attributes)
+    }
+  })
+
+  it('can, but does not always, leave a permanent attribute reduction once a major injury fully recovers', () => {
+    const roster = createInitialRoster(1)
+    let sawAftereffect = false
+    let sawNoAftereffect = false
+    for (let seed = 0; seed < 300 && !(sawAftereffect && sawNoAftereffect); seed++) {
+      const rng = createSeededRng(seed)
+      const returning: Player = { ...roster[0], injuryStatus: 'returning', injuryWeeksRemaining: 1 }
+      const recovered = tickInjuryRecovery(returning, rng)
+      expect(recovered.injuryStatus).toBe('healthy')
+      const totalBefore = ATTRIBUTE_KEYS.reduce((sum, key) => sum + roster[0].attributes[key], 0)
+      const totalAfter = ATTRIBUTE_KEYS.reduce((sum, key) => sum + recovered.attributes[key], 0)
+      if (totalAfter < totalBefore) {
+        sawAftereffect = true
+        expect(totalBefore - totalAfter).toBe(PERMANENT_AFTEREFFECT_AMOUNT)
+      } else {
+        sawNoAftereffect = true
+      }
+    }
+    expect(sawAftereffect).toBe(true)
+    expect(sawNoAftereffect).toBe(true)
+  })
+
+  it('never reduces an attribute below 0 from a permanent aftereffect', () => {
+    const roster = createInitialRoster(1)
+    const zeroedOut: Player = {
+      ...roster[0],
+      injuryStatus: 'returning',
+      injuryWeeksRemaining: 1,
+      attributes: Object.fromEntries(ATTRIBUTE_KEYS.map((key) => [key, 0])) as Player['attributes'],
+    }
+    for (let seed = 0; seed < 100; seed++) {
+      const recovered = tickInjuryRecovery(zeroedOut, createSeededRng(seed))
+      for (const key of ATTRIBUTE_KEYS) expect(recovered.attributes[key]).toBeGreaterThanOrEqual(0)
+    }
+  })
+})
+
+describe('describePermanentAftereffects', () => {
+  it('returns an empty string when no attribute dropped', () => {
+    const roster = createInitialRoster(1)
+    expect(describePermanentAftereffects(roster, roster)).toBe('')
+  })
+
+  it('describes a player who recovered from a major injury with a permanent attribute reduction', () => {
+    const roster = createInitialRoster(1)
+    const before: Player = { ...roster[0], injuryStatus: 'returning', injuryWeeksRemaining: 1 }
+    const after: Player = {
+      ...before,
+      injuryStatus: 'healthy',
+      injuryWeeksRemaining: 0,
+      attributes: { ...before.attributes, shooting: before.attributes.shooting - PERMANENT_AFTEREFFECT_AMOUNT },
+    }
+    const description = describePermanentAftereffects([before], [after])
+    expect(description).toContain(before.name)
+    expect(description).toContain('永久後遺症')
+  })
+
+  it('ignores attribute drops that are not tied to a returning-to-healthy transition', () => {
+    const roster = createInitialRoster(1)
+    const before = roster[0]
+    const after: Player = { ...before, attributes: { ...before.attributes, shooting: before.attributes.shooting - 1 } }
+    expect(describePermanentAftereffects([before], [after])).toBe('')
+  })
 })
 
 describe('advancePlayerWeek', () => {
@@ -398,6 +481,22 @@ describe('advancePlayerWeek', () => {
     const restResult = advancePlayerWeek(ironHeart, -10, createSeededRng(1), false)
     const plainRestResult = advancePlayerWeek(plain, -10, createSeededRng(1), false)
     expect(restResult.fatigue).toBe(plainRestResult.fatigue)
+  })
+
+  it('lowers ending fatigue by the recovery bonus when one is passed in', () => {
+    const roster = createInitialRoster(1)
+    const player: Player = { ...roster[0], fatigue: 50 }
+    const withoutBonus = advancePlayerWeek(player, 20, createSeededRng(1), false)
+    const withBonus = advancePlayerWeek(player, 20, createSeededRng(1), false, undefined, 2)
+    expect(withBonus.fatigue).toBe(withoutBonus.fatigue - 2)
+  })
+
+  it('applies the recovery bonus even for a sidelined player (only load is ignored, not recovery)', () => {
+    const roster = createInitialRoster(1)
+    const sidelined: Player = { ...roster[0], injuryStatus: 'minor', injuryWeeksRemaining: 3, fatigue: 50 }
+    const withoutBonus = advancePlayerWeek(sidelined, 30, createSeededRng(1), true)
+    const withBonus = advancePlayerWeek(sidelined, 30, createSeededRng(1), true, undefined, 2)
+    expect(withBonus.fatigue).toBe(withoutBonus.fatigue - 2)
   })
 })
 

@@ -540,7 +540,7 @@ HUD 或行程帶必須回答：
 
 補充（2026-08-22）：新增 `rivals.ts`——對手校名原本每週純隨機生成、沒有任何身分延續（`opponentNameForWeek` 每次都重新擲名字），現在玩家可在賽前資訊卡把當週對手「釘選為宿敵」（最多 `MAX_PINNED_RIVALS=3` 所，原創數值，待調校），釘選後這所學校的名字會被記住，`pickOpponentName` 讓已釘選宿敵有 `RIVAL_MATCHUP_CHANCE=35%`（原創數值，待調校）機率成為本場對手，取代原本的隨機校名；每次交手依賽果累加勝負，並用 `computeComebackMargin` 從已經算好的四節比分事後推算「我方最大逆轉分差」（曾經落後過的最大分差，贏球才算）。**跨屆保存**是這個設計的重點：宿敵資料存在 `team.rivals`（存檔版本升到 11，舊存檔會被拒絕，無 migration，符合專案既有慣例），不會因為換屆招生/畢業而重置。`SeasonMatchScreen` 賽前資訊卡在對手是宿敵時顯示「★宿敵・交手 X勝Y敗・最大逆轉 Z分」與取消宿敵按鈕；不是宿敵且清單未滿時顯示「釘選為宿敵」按鈕。**刻意縮小範圍**：只做「釘選學校 + 累積交手戰績」，沒有做校史/歷史隊/經典球員這類更重的資料模型（那些留給校史/歷史隊項目）。
 
-補充（2026-08-22）：新增 `schoolAssets.ts`——聲望達到門檻永久解鎖對應資產,不會因聲望之後下降而收回,呼應 M5「永久學校資產」的設計精神(第一版只做永久升級,不做耐久)。目前實作 2 項,都直接改變選項或資訊、不是不可感知的全隊 `+2%`(M5 的明確要求):**球探網**(聲望 ≥60,原創數值,待調校)——招生候選池從 `vacancies*2` 翻倍成 `vacancies*4`,直接改變招生的選才空間;**影片分析室**(聲望 ≥70,原創數值,待調校)——不論當下聲望高低,永遠視為已偵察對手(繞過 `opponentStyle.ts` 的 `SCOUTING_REPUTATION_THRESHOLD`)。解鎖當下會在賽後摘要/事件結果訊息附加一句「永久解鎖學校資產:OOO!」,`AppShell` 標題列固定顯示「永久資產:OOO」清單。存檔版本升到 12(舊存檔會被拒絕,無 migration,符合既有慣例)。**刻意縮小範圍**:規格原列 5 項資產(訓練館/恢復中心/球探網/影片分析/教練專長),這次只做「改變單一選項/資訊」型的兩項;訓練館(第二個月度方向)、恢復中心(疲勞恢復穩定性,偏向不可感知)、教練專長(整套發展路線系統)工作量明顯更大,留給後續。聲望仍是連續值,沒有引入白球式的離散評判等級。
+補充（2026-08-22）：新增 `schoolAssets.ts`——聲望達到門檻永久解鎖對應資產,不會因聲望之後下降而收回,呼應 M5「永久學校資產」的設計精神(第一版只做永久升級,不做耐久)。目前實作 2 項,都直接改變選項或資訊、不是不可感知的全隊 `+2%`(M5 的明確要求):**球探網**(聲望 ≥60,原創數值,待調校)——招生候選池從 `vacancies*2` 翻倍成 `vacancies*4`,直接改變招生的選才空間;**影片分析室**(聲望 ≥70,原創數值,待調校)——不論當下聲望高低,永遠視為已偵察對手(繞過 `opponentStyle.ts` 的 `SCOUTING_REPUTATION_THRESHOLD`)。解鎖當下會在賽後摘要/事件結果訊息附加一句「永久解鎖學校資產:OOO!」,`AppShell` 標題列固定顯示「永久資產:OOO」清單。存檔版本升到 12(舊存檔會被拒絕,無 migration,符合既有慣例)。**刻意縮小範圍**:規格原列 5 項資產(訓練館/恢復中心/球探網/影片分析/教練專長),這次只做「改變單一選項/資訊」型的兩項;訓練館(第二個月度方向)、恢復中心(疲勞恢復穩定性,偏向不可感知)、教練專長(整套發展路線系統)工作量明顯更大,留給後續(2026-08-23 補上,見本節 V5 補充)。聲望仍是連續值,沒有引入白球式的離散評判等級。
 
 補充（2026-08-22）：新增 `schoolHistory.ts`，用**獨立於單一生涯存檔的 localStorage 鍵**保存跨生涯的校史紀錄——這是刻意的架構決策：「開始新生涯」清除的是 `saveData.ts` 的單一生涯進度，校史必須活在那之外才有意義。生涯結束(奪冠/屆滿/三年挑戰結束)當下組出一筆 `SchoolHistoryEntry`(教練名、結束原因、生涯戰績、最佳戰績、只有奪冠生涯才附的「歷史隊」陣容快照)寫入校史，`SetupScreen` 開局畫面讀出並列出所有過往生涯，故事文案也會依是否有校史切換措辭。**球員成長曲線刻意縮小範圍**：只保留奪冠隊當下的屬性快照(`computeOverallGrade` 綜合評級)，不是逐週時間序列圖表——真正的成長曲線需要對每位球員做多時間點的屬性快照，資料量與工作量明顯更大，這次先驗證「校史本身有沒有感」。
 
@@ -549,6 +549,30 @@ HUD 或行程帶必須回答：
 補充（2026-08-22）：奪冠不再自動結束生涯的「唯一路徑」——`CareerSummaryScreen` 新增「不退休，繼續帶下去(王朝模式)」按鈕(只在 `reason==='champion'` 時顯示)。**刻意選擇風險最低的實作路徑**：沒有更動比賽結算當下(`onComplete` 內)的既有邏輯——奪冠依然立即結束生涯、立即寫入校史，跟長期生涯模式的既有測試行為完全一致；「王朝」按鈕點下去時才**額外**在 `CareerSummaryScreen` 這一層補做原本奪冠會跳過的畢業/招生流程(`advanceGrades`＋條件式招生候選池)，然後把 `careerEnded` 設回 `null`，讓遊戲直接接續下一季——`team.totalWeek`／`reputation`／`careerLog` 在確認賽後摘要時就已經是「下一季開局」的正確值，不需要重算。若王朝模式下又達到保險上限(`eraCount` 達 18)，會照樣寫入校史結束生涯，不會無限循環下去。存檔版本因新增 `rivals`／`schoolAssets`／`challengeMode`／`pendingChallengeDecision` 四個欄位，從 10 一路升到 13(舊存檔會被拒絕，無 migration，符合既有慣例)。
 
 **成功指標**：即使某屆早早淘汰，玩家仍能指出這屆對學校或後續生涯留下了什麼。
+
+### V5：深入研究後的補強項目（進行中）
+
+2026-08-22 對整個專案做了一輪「還有什麼可以改進」的深入研究，找出的缺口逐項補齊，完成一項就在下方補充一段。跳過的項目（雲端同步、BGM/音效、既有 49 個「原創數值,待調校」的平衡調校）已經跟使用者確認過範圍,不在這輪清單內。
+
+- [x] 存檔格式升級改用漸進式遷移鏈,不再是「版本不符就整包拒絕」(見上方 `saveData.ts` 的 migration 說明)。
+- [x] 賽後/球季總結彈窗疊加(dialog stacking)問題修掉,`SeasonSummaryDialog` 新增 `onClose`,`ChallengeDecisionDialog` 改成等玩家關掉球季總結才跳出。
+- [x] 補上 `@vitest/coverage-v8` 測試覆蓋率工具(`npm run test:coverage`)。
+- [x] `App.tsx` 的球季/正式賽收尾邏輯抽成 `officialGameWeek.ts`,純函式、獨立測試,`App.tsx` 只留orchestration。
+- [x] 對手完整名冊(見下方補充)。
+- [x] 本機多存檔槽位(見下方補充)。
+- [x] 永久傷病後遺症(見下方補充;同步修訂了 `docs/spec.md` 第 11 節原本「無永久後遺症」的規劃決策)。
+- [x] 成就/稱號系統(見下方補充;`docs/spec.md` 第 17 節從「MVP 尚未實作」改為已實作)。
+- [x] 訓練館/恢復中心/教練專精三項學校資產(見下方補充,補齊 M5 原列 5 項資產中先前跳過的 3 項)。
+
+補充（2026-08-23）：新增 `opponentRoster.ts` 的 `generateOpponentRoster(seed, size)`,包裝既有的 `createInitialRoster` 產生一份跟我方名冊同規格的完整對手名冊。`SeasonMatchScreen` 在已偵察(`isOpponentScouted(reputation)` 或永久解鎖影片分析室)時,新增一個可展開的「對手名冊」清單,顯示每位球員的姓名/位置/年級評等。**刻意縮小範圍**:純資訊展示,不影響戰力計算——正式賽勝負仍由 `matchEngine.ts` 既有的戰力/戰術模型決定,對手名冊不是「真的在場上打球的 12 人」,只是給玩家多一點資訊感。
+
+補充（2026-08-23）：新增本機多存檔槽位,取代舊版「固定一個 localStorage key、只能存一份」的限制。`saveData.ts` 新增 `listSaveSlots`/`createSaveSlot`/`loadSaveFromSlot`/`writeSaveToSlot`/`deleteSaveSlot`/`readActiveSlotId`/`writeActiveSlotId`,每個槽位各自一個 storage key,另有一個索引 key 記錄所有槽位的名稱與最後更新時間。`migrateLegacySingleSlotSave` 在「還沒有任何槽位」時自動把舊版單一存檔搬進新系統,讓既有玩家的進度不受影響(這也是既有測試不需要大改的原因——舊測試直接寫入舊版 key,啟動時會被自動遷移)。新增 `SaveSlotScreen.tsx`:沒有作用中存檔但已有槽位時顯示存檔清單(可載入/可刪除),沒有任何槽位時直接進 `SetupScreen`(維持原本首次進入的體驗)。`SaveControls` 新增「切換存檔」按鈕,回到存檔選單但不刪除任何資料;既有的「重新開始」維持原本語意(刪除目前這個槽位,不是單純切換)。**刻意縮小範圍**:沒有做槽位數量上限(X4 規格建議 3 個,這裡選擇不設上限,因為本機儲存空間對這種文字/JSON 存檔量級不是實際限制)、沒有做槽位改名 UI(建立時用「校名・教練名」當預設標籤,足以區分)、也沒有做 X4 一併提到的「快轉」與「設定記憶」(訓練方向/陣容/戰術記憶)——那些是獨立的體驗改善,不屬於「多存檔」本身。
+
+補充（2026-08-23）：新增永久傷病後遺症——重傷球員經過「重傷缺賽→復出過渡期屬性打折→痊癒」全程後,`matchEngine.ts` 的 `tickInjuryRecovery` 在過渡期倒數結束的那一刻額外滾一次 `PERMANENT_AFTEREFFECT_CHANCE=0.2`(原創數值,待調校)機率,命中則隨機一項屬性永久 `-1`(`clamp` 到 0 下限,不會扣成負數)。輕傷不會觸發——輕傷從不進入復出過渡期,直接痊癒,跟原本規則一致。新增 `describePermanentAftereffects(before, after)`:純靠「康復前是 returning、康復後是 healthy、且有屬性數值下降」這個條件推斷是否剛好發生了後遺症,不需要在 `Player` 型別新增額外欄位、也不需要升級存檔版本——同一週唯一會讓屬性下降的來源就是這個機制,不會跟訓練成長(只會 +)搞混。這個描述函式接到兩個既有的收尾路徑:正式賽收尾(`officialGameWeek.ts` 的 `resolveOfficialGameWeek`)與訓練週收尾(`App.tsx` 的 `runTrainingCardWeek`),因為「過渡期倒數」本身只跟週數有關、跟當週是否有比賽無關。**刻意縮小範圍**:沒有做「耐久度」或「未來受傷機率上升」這類疊加機制(那類設計會跟玻璃體質/玄鐵之軀既有的受傷機率係數混在一起,語意複雜化),只做規格原先提到的「小幅永久屬性下降」這個最單純的版本。
+
+補充（2026-08-23）：新增 `achievements.ts`,實作 spec.md 第 17 節原本「MVP 尚未實作」的成就/稱號系統,純紀錄性質,不影響任何數值運算。目前 4 項(原創定義,待調校):**全勝賽季**(單季所有正式賽全勝)、**零傷賽季**(單季完全沒有球員新增傷勢——用新增的 `Team.seasonHadInjury` 布林值全季追蹤,每季結束後重置,因為傷勢可能發生在訓練週的練習賽,不只發生在正式賽週)、**大逆轉**(單場正式賽最大逆轉分差達到 `COMEBACK_WIN_MARGIN_THRESHOLD=15` 分後獲勝,重用既有的 `rivals.ts` 的 `computeComebackMargin`)、**連霸八強**(`careerLog` 最近兩屆賽季的 `finalPhaseReached` 都達到八強賽或以上)。成就只會累積、不會被收回,解鎖當下在賽後訊息附加「解鎖成就:OOO!」,生涯總結畫面(`CareerSummaryScreen.tsx`)新增區塊列出所有已解鎖成就與說明。存檔版本升到 14(新增 `achievements`/`seasonHadInjury` 兩個欄位,migration 13→14 補上預設值 `[]`/`false`,舊存檔可正常升級)。**刻意縮小範圍**:只做 4 項最能直接從既有資料(`SeasonRecord`/`boxScore.quarters`)推導的成就,沒有做需要額外資料模型的項目(例如「生涯總得分累積」「特定球員連續先發場次」);也沒有做成就的稀有度分級或展示動畫,純粹是一個名稱+一句說明的清單。
+
+補充（2026-08-23）：補齊 M5 原列 5 項學校資產中先前跳過的 3 項,`SCHOOL_ASSET_KEYS` 從 2 項擴到 5 項,每項都直接改變一個玩家可見的選項或數字,不是不可感知的全隊 `+2%`:**訓練館**(聲望 ≥55,原創數值,待調校)——`trainingCardPool.ts` 的 `canSelectCards` 新增可選的 `maxCards` 參數(預設沿用既有的 `MAX_CARDS_PER_WEEK=3`),解鎖時 `App.tsx` 傳入 `MAX_CARDS_PER_WEEK+1`,`TrainingCardPoolScreen` 每週最多可選卡數變成 4 張,是直接可見的選項增加。**恢復中心**(聲望 ≥65)——`matchEngine.ts` 的 `computeRecoveryRate`/`applyFatigueDelta`/`advancePlayerWeek` 新增可選的 `recoveryBonus`/`schoolBonus` 參數(預設 0,不影響任何既有呼叫),解鎖時全隊每週體力恢復量 `+RECOVERY_CENTER_BONUS=2`(原創數值,待調校),數字直接反映在名冊畫面「每週體力恢復」的顯示上,正式賽(`officialMatch.ts` 的 `resolveOfficialGameAfterQuarters`/`simulateOfficialGame`)與訓練週(`trainingCardResolution.ts` 的 `resolveCardSelections`)都吃得到這個加成。**教練專精**(聲望 ≥75)——`specialAbilities.ts` 的 `unlockedAbilityCount`/`unlockedAbilities`/`learnableAbilitiesForPlayer` 新增可選的 `bonusSlots` 參數(預設 0),解鎖時個別訓練可教學的特殊能力清單多解鎖 1 項(仍受 `MAX_UNLOCKED_ABILITIES` 總量上限保護,不會超過完整能力表)。三項全部走「新增參數、預設值等於過去行為」的做法,舊有呼叫端與測試完全不用改。存檔版本沿用 14,不需要升版——因為 `schoolAssets` 陣列早在 V4 就已經是存檔欄位,新增可能的 key 值不影響既有存檔的解析。
 
 ## 13. 明確不建議現在做
 

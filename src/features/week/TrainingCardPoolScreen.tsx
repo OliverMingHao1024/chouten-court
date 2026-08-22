@@ -74,6 +74,10 @@ export interface TrainingCardPoolScreenProps {
   reputation: number
   opponentNames: Record<PracticeStrength, string>
   onConfirm: (selections: CardSelection[]) => void
+  /** 每週最多可選張數;省略時沿用 MAX_CARDS_PER_WEEK,學校資產「訓練館」解鎖時 +1。 */
+  maxCardsPerWeek?: number
+  /** 個別訓練可教學的特殊能力額外名額;省略時 0,學校資產「教練專精」解鎖時 +1。 */
+  bonusAbilitySlots?: number
 }
 
 interface IndividualChoice {
@@ -89,6 +93,8 @@ export function TrainingCardPoolScreen({
   reputation,
   opponentNames,
   onConfirm,
+  maxCardsPerWeek = MAX_CARDS_PER_WEEK,
+  bonusAbilitySlots = 0,
 }: TrainingCardPoolScreenProps) {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [individualChoices, setIndividualChoices] = useState<Record<string, IndividualChoice>>({})
@@ -102,8 +108,8 @@ export function TrainingCardPoolScreen({
   function toggleCard(card: PoolCard) {
     setSelectedIds((prev) => {
       if (prev.includes(card.id)) return prev.filter((id) => id !== card.id)
-      if (prev.length >= MAX_CARDS_PER_WEEK) return prev
-      if (!canSelectCards([...selectedCards, card], trainingPoints, focusStyle)) return prev
+      if (prev.length >= maxCardsPerWeek) return prev
+      if (!canSelectCards([...selectedCards, card], trainingPoints, focusStyle, maxCardsPerWeek)) return prev
       return [...prev, card.id]
     })
   }
@@ -118,7 +124,9 @@ export function TrainingCardPoolScreen({
   })
 
   const canConfirm =
-    selectedCards.length > 0 && canSelectCards(selectedCards, trainingPoints, focusStyle) && allSubChoicesFilled
+    selectedCards.length > 0 &&
+    canSelectCards(selectedCards, trainingPoints, focusStyle, maxCardsPerWeek) &&
+    allSubChoicesFilled
 
   function handleConfirm() {
     if (!canConfirm) return
@@ -160,7 +168,7 @@ export function TrainingCardPoolScreen({
           const cost = cardCost(card, focusStyle)
           const baseCost = cardCost(card, null)
           const discounted = cost < baseCost
-          const disabled = !selected && (selectedCards.length >= MAX_CARDS_PER_WEEK || cost > remainingAfterSelection)
+          const disabled = !selected && (selectedCards.length >= maxCardsPerWeek || cost > remainingAfterSelection)
           const effectTier = cardEffectTier(card)
           const affinity = card.kind === 'teamTraining' && card.attribute ? computeAffinityHint(card.attribute, players) : null
           return (
@@ -206,7 +214,7 @@ export function TrainingCardPoolScreen({
         .map((card) => {
           const choice = individualChoices[card.id]
           const selectedPlayer = players.find((player) => player.id === choice?.playerId)
-          const learnable = selectedPlayer ? learnableAbilitiesForPlayer(selectedPlayer, reputation) : []
+          const learnable = selectedPlayer ? learnableAbilitiesForPlayer(selectedPlayer, reputation, bonusAbilitySlots) : []
           return (
             <div key={card.id} className="training-card-pool__sub-choice">
               <p className="training-card-pool__sub-choice-label">個別訓練:選球員與要教的特殊能力</p>

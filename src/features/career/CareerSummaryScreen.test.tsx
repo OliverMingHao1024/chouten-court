@@ -18,6 +18,7 @@ describe('CareerSummaryScreen', () => {
         reason="champion"
         careerLog={careerLog}
         graduateLog={['球員01 畢業後獲得職業球隊試訓邀約。']}
+        achievements={[]}
         onNewCareer={() => {}}
       />,
     )
@@ -39,6 +40,7 @@ describe('CareerSummaryScreen', () => {
           { year: 1, wins: 1, losses: 3, finalPhaseReached: 'qualifying', placement: null, reputationAfter: 44 },
         ]}
         graduateLog={[]}
+        achievements={[]}
         onNewCareer={() => {}}
       />,
     )
@@ -55,6 +57,7 @@ describe('CareerSummaryScreen', () => {
         reason="champion"
         careerLog={careerLog}
         graduateLog={[]}
+        achievements={[]}
         onNewCareer={() => {}}
       />,
     )
@@ -76,6 +79,7 @@ describe('CareerSummaryScreen', () => {
         reason="champion"
         careerLog={careerLog}
         graduateLog={[]}
+        achievements={[]}
         onNewCareer={onNewCareer}
       />,
     )
@@ -92,6 +96,7 @@ describe('CareerSummaryScreen', () => {
         reason="champion"
         careerLog={careerLog}
         graduateLog={[]}
+        achievements={[]}
         onNewCareer={() => {}}
       />,
     )
@@ -104,6 +109,7 @@ describe('CareerSummaryScreen', () => {
         reason="champion"
         careerLog={careerLog}
         graduateLog={[]}
+        achievements={[]}
         onNewCareer={() => {}}
         onContinueDynasty={() => {}}
       />,
@@ -121,6 +127,7 @@ describe('CareerSummaryScreen', () => {
         reason="champion"
         careerLog={careerLog}
         graduateLog={[]}
+        achievements={[]}
         onNewCareer={() => {}}
         onContinueDynasty={onContinueDynasty}
       />,
@@ -128,6 +135,39 @@ describe('CareerSummaryScreen', () => {
 
     await user.click(screen.getByRole('button', { name: /王朝模式/ }))
     expect(onContinueDynasty).toHaveBeenCalledOnce()
+  })
+
+  it('shows unlocked achievements with their labels and descriptions', () => {
+    render(
+      <CareerSummaryScreen
+        teamName="淡水高中"
+        coachName="山田"
+        reason="champion"
+        careerLog={careerLog}
+        graduateLog={[]}
+        achievements={['undefeatedSeason', 'comebackWin']}
+        onNewCareer={() => {}}
+      />,
+    )
+
+    expect(screen.getByText('全勝賽季')).toBeInTheDocument()
+    expect(screen.getByText('大逆轉')).toBeInTheDocument()
+  })
+
+  it('does not show an achievements section when nothing has been unlocked', () => {
+    render(
+      <CareerSummaryScreen
+        teamName="淡水高中"
+        coachName="山田"
+        reason="champion"
+        careerLog={careerLog}
+        graduateLog={[]}
+        achievements={[]}
+        onNewCareer={() => {}}
+      />,
+    )
+
+    expect(screen.queryByText('成就')).not.toBeInTheDocument()
   })
 
   it('does not throw when downloading the share card', async () => {
@@ -139,6 +179,7 @@ describe('CareerSummaryScreen', () => {
         reason="champion"
         careerLog={careerLog}
         graduateLog={[]}
+        achievements={[]}
         onNewCareer={() => {}}
       />,
     )
