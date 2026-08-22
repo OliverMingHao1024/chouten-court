@@ -32,6 +32,42 @@
   color: var(--text-muted);
 }
 
+.game-summary-dialog__final-score {
+  margin: 0;
+  text-align: center;
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.game-summary-dialog__quarters {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  font-size: 0.7rem;
+}
+
+.game-summary-dialog__quarters li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.game-summary-dialog__quarter-label {
+  color: var(--text-muted);
+}
+
+.game-summary-dialog__quarter-score {
+  font-weight: 700;
+}
+
 .game-summary-dialog__strength {
   margin: 0;
   text-align: center;
@@ -80,6 +116,10 @@
 }
 
 .game-summary-dialog__player-name {
+  font-weight: 600;
+}
+
+.game-summary-dialog__player-stats {
   font-weight: 600;
 }
 

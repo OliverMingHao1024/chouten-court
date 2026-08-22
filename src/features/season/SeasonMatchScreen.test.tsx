@@ -22,6 +22,8 @@ function renderScreen(overrides: Partial<React.ComponentProps<typeof SeasonMatch
       opponentName="板橋高中"
       phase="qualifying"
       opponentAce={{ name: '陳志明', scoring: 90, shooting: 80 }}
+      opponentStyle="fastBreak"
+      reputation={50}
       players={players}
       initialLineup={null}
       lastResult={null}
@@ -127,6 +129,8 @@ describe('SeasonMatchScreen', () => {
         opponentName="板橋高中"
         phase="qualifying"
         opponentAce={{ name: '陳志明', scoring: 90, shooting: 80 }}
+        opponentStyle="fastBreak"
+        reputation={50}
         players={tiredPlayers}
         initialLineup={null}
         lastResult={null}
@@ -184,5 +188,18 @@ describe('SeasonMatchScreen', () => {
     const noPg = players.map((p) => (p.position === 'PG' ? { ...p, position: 'SF' as const } : p))
     renderScreen({ players: noPg })
     expect(screen.getByText(/缺少主要持球者/)).toBeInTheDocument()
+  })
+
+  it('hides scouting intel below the reputation threshold', () => {
+    renderScreen({ reputation: 54 })
+    expect(screen.getByText(/尚未偵察/)).toBeInTheDocument()
+    expect(screen.queryByText(/戰力區間/)).not.toBeInTheDocument()
+  })
+
+  it('reveals opponent style, strength range, and ace weakness at/above the reputation threshold', () => {
+    renderScreen({ reputation: 55, opponentStyle: 'interior', opponentAce: { name: '陳志明', scoring: 99, shooting: 60 } })
+    expect(screen.getByText(/禁區型/)).toBeInTheDocument()
+    expect(screen.getByText(/戰力區間/)).toBeInTheDocument()
+    expect(screen.getByText(/三分準度較弱/)).toBeInTheDocument()
   })
 })

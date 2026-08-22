@@ -514,11 +514,17 @@ HUD 或行程帶必須回答：
 
 ### V3：比賽真的需要教練（初期）
 
-- [ ] 對手風格與偵察。
-- [ ] 四節比分、BOX、領先曲線、關鍵球員。
+- [x] 對手風格與偵察(資訊層,見下方補充;戰術相性仍是 M2 的未來範圍)。
+- [x] 四節比分、BOX(引擎版四節+個人得分/籃板/助攻,見下方補充;領先曲線/關鍵球員仍未做)。
 - [ ] 2–4 次關鍵回合決策。
 - [ ] 快速結果／關鍵回合兩種速度。
 - [x] 勝敗最多三項原因與下一步建議。
+
+補充(2026-08-22)：新增 `opponentStyle.ts`——對手校隊風格(快攻/外線/禁區/壓迫/防守紀律)沿用 `opponentAce.ts` 同屆固定、換屆重生的種子模式,純敘事資訊,**不影響戰力或勝率計算**(校隊風格真正接上戰術相性/戰力調整是 M2 的範圍,這裡先只做資訊層,降低風險)。新增「偵察」門檻:聲望達到 `SCOUTING_REPUTATION_THRESHOLD`(=55)才視為已偵察,呼應招生/特殊能力既有的聲望解鎖慣例,不需要新增存檔欄位。已偵察時額外顯示對手戰力的模糊區間(`scoutedStrengthRange`,真實值前後各 4 分,不直接洩漏精確數字)與王牌弱點一句話描述(`describeAceWeakness`,比較王牌自己的得分/三分兩項屬性)。`SeasonMatchScreen.tsx` 賽前資訊卡新增對應區塊。
+
+補充(2026-08-22)：四節比分改以**引擎版**落地(討論後放棄了風險較小的敘事版,因為那個版本事後生成分數、不參與模擬過程,之後做「關鍵回合決策」時無法在真實的節/時間點插入互動)。新增 `quarterSimulation.ts` 的 `simulateQuarters(teamStrength, opponentStrength, varianceRange, rng)`,取代 `officialMatch.ts` 的 `simulateOfficialGame` 原本呼叫 `computeMatchWinProbability` 的單次擲骰(`rng() < winProbability`):現在改成真的跑 4 節,每節重新對我方戰力疊加一次隨機噪音(沿用 `computePerformanceVarianceRange` 決定的波動範圍)換算成分差,加總四節分數,**由四節總分決定輸贏**,不再是機率骰;極少數分數打平的情況用一次額外的銅板 rng() 決定勝方,不重擲整場。單場 rng() 消耗量從原本固定 2 次變成固定 12 次(平手時 13 次),但完全不影響既有測試——`officialMatch.test.ts`/`App.test.tsx` 原本就用「跑很多個 seed 找出符合條件的一個」或「跑大量 seed 驗證統計趨勢」的寫法,沒有任何測試假設特定 seed 對應特定輸贏,所以全數維持通過。`OfficialGameResult`/`AdvanceSeasonWeekResult`/`GameSummaryResult` 新增 `boxScore: { quarters, final }` 欄位一路透傳到 `GameSummaryDialog.tsx` 顯示逐節比分。**刻意縮小範圍**:只有正式賽(`simulateOfficialGame`)換成引擎版;練習賽(`weeklyAction.ts` 的 `applyPracticeMatch`)與練習賽訓練卡(`trainingCardResolution.ts`)維持原本的單次擲骰,`computeMatchWinProbability`/`computeWinProbability` 兩個函式都還在用、沒有刪除。賽前預覽(`matchPreview.ts` 的「基準勝率」)也維持不動,概念上仍是「開打前的機率估計」,跟正式開打後的引擎式逐節結果本來就是兩套獨立的呈現。
+
+補充(2026-08-22)：只有逐節團隊比分,沒有個人數據(得分/籃板/助攻)會不夠真實,因此追加 BOX——新增 `boxScoreStats.ts` 的 `distributePlayerStats(teamPoints, roster, lineup, rng)`,把 `simulateQuarters` 算出的官方全隊得分,依出賽權重(沿用 `lineup.ts` 既有的先發6:輪替3 戰力加權)與對應屬性(得分看投籃/三分平均、籃板看籃板、助攻看傳球)分配給每位先發/輪替球員,搭配 ±15% 抖動避免數據精準跟屬性成正比;用「最大餘數法」取整數,確保個人得分加總後精確等於官方全隊得分。籃板/助攻的全隊總量是獨立的原創基準值(34±6、15±4),不受官方比分限制。**刻意縮小範圍,只做全場總計**:不分節,單純是統計式的事後分配,不是真正逐節都各自模擬一次個人數據;用獨立種子(`hashSeed('...boxstats')`)呼叫,完全不影響 `simulateOfficialGame`/`season.ts` 既有的 rng 消耗順序與測試。`GameSummaryDialog.tsx` 的「先發與主要輪替」清單新增得分/籃板/助攻,不另開一個獨立區塊。
 
 **成功指標**：改變陣容或戰術會改變可用的關鍵選項，玩家能理解但不能完全算死結果。
 

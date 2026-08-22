@@ -8,6 +8,7 @@ function makeResult(overrides: Partial<GameSummaryResult> = {}): GameSummaryResu
     outcome: 'win',
     strengthBefore: 60,
     strengthAfter: 58.5,
+    boxScore: { quarters: [{ us: 18, them: 15 }, { us: 17, them: 16 }, { us: 16, them: 15 }, { us: 19, them: 17 }], final: { us: 70, them: 63 } },
     players: [
       {
         playerId: 'p1',
@@ -15,7 +16,7 @@ function makeResult(overrides: Partial<GameSummaryResult> = {}): GameSummaryResu
         role: 'starter',
         fatigueBefore: 20,
         fatigueAfter: 30,
-        grewAttribute: 'three',
+        grewAttribute: 'three', points: 10, rebounds: 5, assists: 2,
       },
       {
         playerId: 'p2',
@@ -23,7 +24,7 @@ function makeResult(overrides: Partial<GameSummaryResult> = {}): GameSummaryResu
         role: 'rotation',
         fatigueBefore: 10,
         fatigueAfter: 15,
-        grewAttribute: null,
+        grewAttribute: null, points: 10, rebounds: 5, assists: 2,
       },
     ],
     newInjuries: [],
@@ -42,6 +43,20 @@ describe('GameSummaryDialog', () => {
     expect(screen.getByText('球員01')).toBeInTheDocument()
     expect(screen.getByText(/20 → 30/)).toBeInTheDocument()
     expect(screen.getByText('三分 +1')).toBeInTheDocument()
+  })
+
+  it('shows each player individual box line (points/rebounds/assists)', () => {
+    render(<GameSummaryDialog result={makeResult()} onConfirm={() => {}} />)
+    expect(screen.getAllByText('10分 5籃 2助攻').length).toBeGreaterThan(0)
+  })
+
+  it('shows the final score and all 4 quarters from the box score', () => {
+    render(<GameSummaryDialog result={makeResult()} onConfirm={() => {}} />)
+
+    expect(screen.getByText('最終比分 70 - 63')).toBeInTheDocument()
+    expect(screen.getByText('第1節')).toBeInTheDocument()
+    expect(screen.getByText('第4節')).toBeInTheDocument()
+    expect(screen.getByText('19 - 17')).toBeInTheDocument()
   })
 
   it('shows new injuries with pre-game fatigue as the contributing factor', () => {
@@ -71,7 +86,7 @@ describe('GameSummaryDialog', () => {
   it('does not show a reasons section when nothing notable happened', () => {
     render(
       <GameSummaryDialog
-        result={makeResult({ players: [{ playerId: 'p1', playerName: '球員01', role: 'starter', fatigueBefore: 20, fatigueAfter: 30, grewAttribute: null }] })}
+        result={makeResult({ players: [{ playerId: 'p1', playerName: '球員01', role: 'starter', fatigueBefore: 20, fatigueAfter: 30, grewAttribute: null, points: 10, rebounds: 5, assists: 2 }] })}
         onConfirm={() => {}}
       />,
     )

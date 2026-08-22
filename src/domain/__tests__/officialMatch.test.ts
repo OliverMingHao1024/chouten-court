@@ -82,6 +82,21 @@ describe('simulateOfficialGame', () => {
     expect(a).toEqual(b)
   })
 
+  it('produces a box score whose 4-quarter final score agrees with the outcome', () => {
+    const roster = createInitialRoster(1)
+    const lineup = fullLineup(roster)
+    for (let seed = 0; seed < 100; seed++) {
+      const result = simulateOfficialGame(roster, 'qualifying', seed, DEFAULT_TACTICS, testAce, lineup)
+      expect(result.boxScore.quarters).toHaveLength(4)
+      // A coin-flip breaks the rare exact tie, so equality is consistent with either outcome.
+      if (result.outcome === 'win') {
+        expect(result.boxScore.final.us).toBeGreaterThanOrEqual(result.boxScore.final.them)
+      } else {
+        expect(result.boxScore.final.us).toBeLessThanOrEqual(result.boxScore.final.them)
+      }
+    }
+  })
+
   it('never grants in-game growth to a bench player (not in the lineup)', () => {
     const roster = createInitialRoster(1)
     const lineup = fullLineup(roster)

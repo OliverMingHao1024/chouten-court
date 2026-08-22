@@ -4,10 +4,12 @@ import {
   advancePlayerWeek,
   ATTRIBUTE_MAX,
   clamp,
-  computeMatchWinProbability,
+  computePerformanceVarianceRange,
+  computeTeamStrength,
   type InjuryDurationRange,
 } from './matchEngine'
 import { computeAceStrengthBonus, type OpponentAce } from './opponentAce'
+import { simulateQuarters, type QuarterScore } from './quarterSimulation'
 import { createSeededRng, type Rng } from './rng'
 import { computeStyleTag } from './styleTag'
 import { computeTacticAttributeWeights, type GameTactics } from './tactics'
@@ -87,6 +89,8 @@ export interface OfficialGameResult {
   roster: Player[]
   /** 本場依出賽角色取得實戰成長的球員清單,供比賽結果摘要顯示。 */
   growth: GameGrowthEntry[]
+  /** 逐節模擬產生的四節比分與最終比分,純粹是輸贏怎麼「翻譯」成分數,供賽後摘要顯示。 */
+  boxScore: { quarters: QuarterScore[]; final: QuarterScore }
 }
 
 export function simulateOfficialGame(
@@ -99,15 +103,11 @@ export function simulateOfficialGame(
 ): OfficialGameResult {
   const rng = createSeededRng(seed)
   const opponentStrength = PHASE_OPPONENT_STRENGTH[phase] + computeAceStrengthBonus(opponentAce)
-  const winProbability = computeMatchWinProbability(
-    roster,
-    opponentStrength,
-    rng,
-    computeTacticAttributeWeights(tactics),
-    lineup,
-    isClutchPhase(phase),
-  )
-  const outcome: 'win' | 'loss' = rng() < winProbability ? 'win' : 'loss'
+  const tacticWeights = computeTacticAttributeWeights(tactics)
+  const clutchActive = isClutchPhase(phase)
+  const teamStrength = computeTeamStrength(roster, tacticWeights, lineup, clutchActive)
+  const varianceRange = computePerformanceVarianceRange(roster, lineup)
+  const { quarters, final, outcome } = simulateQuarters(teamStrength, opponentStrength, varianceRange, rng)
   const majorInjuryWeeks = PHASE_MAJOR_INJURY_WEEKS[phase]
   const growth: GameGrowthEntry[] = []
   const fatiguedRoster = roster.map((player) => {
@@ -141,7 +141,7 @@ export function simulateOfficialGame(
     }
     return fatigued
   })
-  return { outcome, roster: fatiguedRoster, growth }
+  return { outcome, roster: fatiguedRoster, growth, boxScore: { quarters, final } }
 }
 
 /**

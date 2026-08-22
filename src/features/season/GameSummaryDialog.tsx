@@ -1,3 +1,4 @@
+import type { QuarterScore } from '../../domain/quarterSimulation'
 import { ATTRIBUTE_LABELS, INJURY_STATUS_LABELS, type AttributeKey, type InjuryStatus } from '../../domain/types'
 import { useResultDialog } from '../shared/useResultDialog'
 import { deriveGameSummaryNextStep, deriveGameSummaryReasons } from './gameSummaryReasons'
@@ -10,6 +11,10 @@ export interface GameSummaryPlayerEntry {
   fatigueBefore: number
   fatigueAfter: number
   grewAttribute: AttributeKey | null
+  /** 個人數據(得分/籃板/助攻),依全隊官方比分與屬性分配而來,見 boxScoreStats.ts。 */
+  points: number
+  rebounds: number
+  assists: number
 }
 
 export interface GameSummaryInjuryEntry {
@@ -26,6 +31,8 @@ export interface GameSummaryResult {
   strengthAfter: number
   players: GameSummaryPlayerEntry[]
   newInjuries: GameSummaryInjuryEntry[]
+  /** 逐節模擬產生的四節比分與最終比分,直接來自這場比賽真正的模擬結果。 */
+  boxScore: { quarters: QuarterScore[]; final: QuarterScore }
 }
 
 export interface GameSummaryDialogProps {
@@ -46,6 +53,19 @@ function GameSummaryContent({ result, onConfirm }: { result: GameSummaryResult; 
   return (
     <div className="game-summary-dialog__content">
       <h2>{result.outcome === 'win' ? '本場獲勝' : '本場落敗'}</h2>
+      <p className="game-summary-dialog__final-score">
+        最終比分 {result.boxScore.final.us} - {result.boxScore.final.them}
+      </p>
+      <ul className="game-summary-dialog__quarters" aria-label="逐節比分">
+        {result.boxScore.quarters.map((quarter, index) => (
+          <li key={index}>
+            <span className="game-summary-dialog__quarter-label">第{index + 1}節</span>
+            <span className="game-summary-dialog__quarter-score">
+              {quarter.us} - {quarter.them}
+            </span>
+          </li>
+        ))}
+      </ul>
       <p className="game-summary-dialog__strength">
         球隊有效戰力:{result.strengthBefore.toFixed(1)} → {result.strengthAfter.toFixed(1)}(
         {formatSigned(result.strengthAfter - result.strengthBefore)})
@@ -70,6 +90,9 @@ function GameSummaryContent({ result, onConfirm }: { result: GameSummaryResult; 
               {player.role === 'starter' ? '先發' : '輪替'}
             </span>
             <span className="game-summary-dialog__player-name">{player.playerName}</span>
+            <span className="game-summary-dialog__player-stats">
+              {player.points}分 {player.rebounds}籃 {player.assists}助攻
+            </span>
             <span className="game-summary-dialog__player-fatigue">
               疲勞 {player.fatigueBefore} → {player.fatigueAfter}
             </span>

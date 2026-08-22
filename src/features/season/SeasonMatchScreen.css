@@ -84,6 +84,15 @@
   color: var(--text-muted);
 }
 
+.matchup-card__scouting {
+  font-size: 0.75rem;
+  color: var(--accent-strong);
+}
+
+.matchup-card__scouting--locked {
+  color: var(--text-muted);
+}
+
 .matchup-card__preview {
   display: flex;
   flex-direction: column;

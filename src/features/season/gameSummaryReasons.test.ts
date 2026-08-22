@@ -7,8 +7,9 @@ function makeResult(overrides: Partial<GameSummaryResult> = {}): GameSummaryResu
     outcome: 'win',
     strengthBefore: 60,
     strengthAfter: 58,
+    boxScore: { quarters: [{ us: 18, them: 15 }, { us: 17, them: 16 }, { us: 16, them: 15 }, { us: 19, them: 17 }], final: { us: 70, them: 63 } },
     players: [
-      { playerId: 'p1', playerName: '球員01', role: 'starter', fatigueBefore: 20, fatigueAfter: 40, grewAttribute: null },
+      { playerId: 'p1', playerName: '球員01', role: 'starter', fatigueBefore: 20, fatigueAfter: 40, grewAttribute: null, points: 10, rebounds: 5, assists: 2 },
     ],
     newInjuries: [],
     ...overrides,
@@ -32,9 +33,9 @@ describe('deriveGameSummaryReasons', () => {
     const reasons = deriveGameSummaryReasons(
       makeResult({
         players: [
-          { playerId: 'p1', playerName: '疲勞先發', role: 'starter', fatigueBefore: 60, fatigueAfter: 90, grewAttribute: null },
-          { playerId: 'p2', playerName: '疲勞替補', role: 'rotation', fatigueBefore: 60, fatigueAfter: 90, grewAttribute: null },
-          { playerId: 'p3', playerName: '健康先發', role: 'starter', fatigueBefore: 20, fatigueAfter: 30, grewAttribute: null },
+          { playerId: 'p1', playerName: '疲勞先發', role: 'starter', fatigueBefore: 60, fatigueAfter: 90, grewAttribute: null, points: 10, rebounds: 5, assists: 2 },
+          { playerId: 'p2', playerName: '疲勞替補', role: 'rotation', fatigueBefore: 60, fatigueAfter: 90, grewAttribute: null, points: 10, rebounds: 5, assists: 2 },
+          { playerId: 'p3', playerName: '健康先發', role: 'starter', fatigueBefore: 20, fatigueAfter: 30, grewAttribute: null, points: 10, rebounds: 5, assists: 2 },
         ],
       }),
     )
@@ -47,7 +48,7 @@ describe('deriveGameSummaryReasons', () => {
     const reasons = deriveGameSummaryReasons(
       makeResult({
         players: [
-          { playerId: 'p1', playerName: '成長球員', role: 'starter', fatigueBefore: 20, fatigueAfter: 40, grewAttribute: 'three' },
+          { playerId: 'p1', playerName: '成長球員', role: 'starter', fatigueBefore: 20, fatigueAfter: 40, grewAttribute: 'three', points: 10, rebounds: 5, assists: 2 },
         ],
       }),
     )
@@ -63,8 +64,8 @@ describe('deriveGameSummaryReasons', () => {
           { playerName: '傷員B', status: 'major', weeksRemaining: 4, fatigueBeforeGame: 90 },
         ],
         players: [
-          { playerId: 'p1', playerName: '疲勞員', role: 'starter', fatigueBefore: 60, fatigueAfter: 90, grewAttribute: null },
-          { playerId: 'p2', playerName: '成長員', role: 'starter', fatigueBefore: 20, fatigueAfter: 30, grewAttribute: 'iq' },
+          { playerId: 'p1', playerName: '疲勞員', role: 'starter', fatigueBefore: 60, fatigueAfter: 90, grewAttribute: null, points: 10, rebounds: 5, assists: 2 },
+          { playerId: 'p2', playerName: '成長員', role: 'starter', fatigueBefore: 20, fatigueAfter: 30, grewAttribute: 'iq', points: 10, rebounds: 5, assists: 2 },
         ],
       }),
     )
@@ -82,7 +83,7 @@ describe('deriveGameSummaryNextStep', () => {
         outcome: 'loss',
         newInjuries: [{ playerName: '球員02', status: 'major', weeksRemaining: 4, fatigueBeforeGame: 90 }],
         players: [
-          { playerId: 'p1', playerName: '疲勞員', role: 'starter', fatigueBefore: 60, fatigueAfter: 90, grewAttribute: null },
+          { playerId: 'p1', playerName: '疲勞員', role: 'starter', fatigueBefore: 60, fatigueAfter: 90, grewAttribute: null, points: 10, rebounds: 5, assists: 2 },
         ],
       }),
     )
@@ -94,7 +95,7 @@ describe('deriveGameSummaryNextStep', () => {
     const nextStep = deriveGameSummaryNextStep(
       makeResult({
         players: [
-          { playerId: 'p1', playerName: '疲勞員', role: 'starter', fatigueBefore: 60, fatigueAfter: 90, grewAttribute: null },
+          { playerId: 'p1', playerName: '疲勞員', role: 'starter', fatigueBefore: 60, fatigueAfter: 90, grewAttribute: null, points: 10, rebounds: 5, assists: 2 },
         ],
       }),
     )

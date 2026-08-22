@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeAceStrengthBonus, generateOpponentAce, opponentAceEraIndex } from '../opponentAce'
+import { computeAceStrengthBonus, describeAceWeakness, generateOpponentAce, opponentAceEraIndex } from '../opponentAce'
 
 describe('generateOpponentAce', () => {
   it('is deterministic for the same seed', () => {
@@ -23,6 +23,17 @@ describe('computeAceStrengthBonus', () => {
     const weak = { name: 'weak', scoring: 70, shooting: 60 }
     const strong = { name: 'strong', scoring: 99, shooting: 95 }
     expect(computeAceStrengthBonus(strong)).toBeGreaterThan(computeAceStrengthBonus(weak))
+  })
+})
+
+describe('describeAceWeakness', () => {
+  it('flags scoring as the weakness when it is the lower of the two attributes', () => {
+    expect(describeAceWeakness({ name: 'x', scoring: 70, shooting: 90 })).toBe('得分能力較弱')
+  })
+
+  it('flags shooting as the weakness when it is the lower (or equal) of the two attributes', () => {
+    expect(describeAceWeakness({ name: 'x', scoring: 90, shooting: 70 })).toBe('三分準度較弱')
+    expect(describeAceWeakness({ name: 'x', scoring: 80, shooting: 80 })).toBe('三分準度較弱')
   })
 })
 

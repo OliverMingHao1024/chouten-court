@@ -39,6 +39,8 @@ describe('advanceSeasonWeek', () => {
     expect(result.seasonEnded).toBe(false)
     expect(result.finalPhaseReached).toBeNull()
     expect(result.placement).toBeNull()
+    expect(result.boxScore.quarters).toHaveLength(4)
+    expect(result.boxScore.final.us).toBeGreaterThan(result.boxScore.final.them)
   })
 
   it('lets the team continue into the next phase when it wins enough of the phase to advance', () => {

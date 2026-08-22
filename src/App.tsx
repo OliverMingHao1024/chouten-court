@@ -1,7 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { getCalendarPosition, getSeasonPhase, PHASE_LABELS } from './domain/calendar'
 import { generateOpponentName } from './domain/opponentName'
+import { distributePlayerStats } from './domain/boxScoreStats'
 import { generateOpponentAce, opponentAceEraIndex } from './domain/opponentAce'
+import { generateOpponentStyle } from './domain/opponentStyle'
+import type { QuarterScore } from './domain/quarterSimulation'
 import {
   getGameIndexForWeek,
   isClutchPhase,
@@ -189,9 +192,17 @@ function buildGameSummaryDisplay(
   growth: GameGrowthEntry[],
   outcome: 'win' | 'loss',
   phase: OfficialPhase,
+  boxScore: { quarters: QuarterScore[]; final: QuarterScore },
+  statsSeed: number,
 ): GameSummaryResult {
   const afterById = new Map(after.map((player) => [player.id, player]))
   const growthById = new Map(growth.map((entry) => [entry.playerId, entry.attribute]))
+  const statsById = new Map(
+    distributePlayerStats(boxScore.final.us, before, lineup, createSeededRng(statsSeed)).map((entry) => [
+      entry.playerId,
+      entry,
+    ]),
+  )
 
   const roleEntries: Array<{ id: string; role: 'starter' | 'rotation' }> = [
     ...lineup.starters.map((id) => ({ id, role: 'starter' as const })),
@@ -203,6 +214,7 @@ function buildGameSummaryDisplay(
       const beforePlayer = before.find((player) => player.id === id)
       const afterPlayer = afterById.get(id)
       if (!beforePlayer || !afterPlayer) return null
+      const stats = statsById.get(id)
       return {
         playerId: id,
         playerName: afterPlayer.name,
@@ -210,6 +222,9 @@ function buildGameSummaryDisplay(
         fatigueBefore: beforePlayer.fatigue,
         fatigueAfter: afterPlayer.fatigue,
         grewAttribute: growthById.get(id) ?? null,
+        points: stats?.points ?? 0,
+        rebounds: stats?.rebounds ?? 0,
+        assists: stats?.assists ?? 0,
       }
     })
     .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
@@ -234,6 +249,7 @@ function buildGameSummaryDisplay(
     strengthAfter: computeTeamStrength(after, tacticWeights, lineup, clutchActive),
     players,
     newInjuries,
+    boxScore,
   }
 }
 
@@ -358,6 +374,7 @@ function App() {
   const phase = getSeasonPhase(weekOfYear)
   const gameIndex = getGameIndexForWeek(phase, weekOfYear)
   const opponentAce = generateOpponentAce(hashSeed(`${team.seed}-ace-${opponentAceEraIndex(year)}`))
+  const opponentStyle = generateOpponentStyle(hashSeed(`${team.seed}-style-${opponentAceEraIndex(year)}`))
   const weeklyEvent =
     phase === 'offseason' && gameIndex === null && !team.recruitingCandidates ? weeklyEventForWeek(team) : null
 
@@ -387,6 +404,8 @@ function App() {
         opponentName={opponentNameForWeek(team)}
         phase={phase}
         opponentAce={opponentAce}
+        opponentStyle={opponentStyle}
+        reputation={team.reputation}
         players={team.players}
         initialLineup={team.lastLineup}
         lastResult={team.lastResult}
@@ -496,6 +515,8 @@ function App() {
                 result.growth,
                 result.gameLogEntry.outcome,
                 phase,
+                result.boxScore,
+                hashSeed(`${team.seed}-${team.totalWeek}-boxstats`),
               ),
               nextTeamState,
             },

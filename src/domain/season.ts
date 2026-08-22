@@ -11,6 +11,7 @@ import {
 } from './officialMatch'
 import type { GameLineup } from './lineup'
 import type { OpponentAce } from './opponentAce'
+import type { QuarterScore } from './quarterSimulation'
 import type { GameTactics } from './tactics'
 import type { Player } from './types'
 
@@ -33,6 +34,8 @@ export interface AdvanceSeasonWeekResult {
   placement: Final4Placement | null
   /** 本場依出賽角色取得實戰成長的球員清單。 */
   growth: GameGrowthEntry[]
+  /** 逐節模擬產生的四節比分與最終比分,直接透傳自 simulateOfficialGame。 */
+  boxScore: { quarters: QuarterScore[]; final: QuarterScore }
 }
 
 export const FINAL4_PLACEMENT_LABEL: Record<ReturnType<typeof getFinal4Placement>, string> = {
@@ -66,7 +69,7 @@ export function advanceSeasonWeek(
     throw new Error(`week ${weekOfYear} has no official game scheduled in phase ${phase}`)
   }
 
-  const { outcome, roster: fatiguedRoster, growth } = simulateOfficialGame(
+  const { outcome, roster: fatiguedRoster, growth, boxScore } = simulateOfficialGame(
     roster,
     phase,
     seed,
@@ -88,6 +91,7 @@ export function advanceSeasonWeek(
       finalPhaseReached: null,
       placement: null,
       growth,
+      boxScore,
     }
   }
 
@@ -107,6 +111,7 @@ export function advanceSeasonWeek(
       finalPhaseReached: phase,
       placement,
       growth,
+      boxScore,
     }
   }
 
@@ -125,5 +130,6 @@ export function advanceSeasonWeek(
     finalPhaseReached: advanced ? null : phase,
     placement: null,
     growth,
+    boxScore,
   }
 }
