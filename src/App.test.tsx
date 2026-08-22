@@ -44,6 +44,8 @@ function baseSaveData(overrides: Record<string, unknown> = {}) {
     lastLineup: null,
     rivals: [],
     schoolAssets: [],
+    challengeMode: 'long',
+    pendingChallengeDecision: false,
     ...overrides,
   }
 }
@@ -415,6 +417,52 @@ describe('App', () => {
     expect(screen.queryByRole('heading', { name: `招生 — 選出 ${ROSTER_SIZE} 名新生` })).not.toBeInTheDocument()
   })
 
+  it('lets the coach continue the career (dynasty mode) instead of retiring after winning it all', async () => {
+    const maxAttributes = Object.fromEntries(ATTRIBUTE_KEYS.map((key) => [key, 99])) as AttributeSet
+    const players = createInitialRoster(1).map((p) => ({ ...p, grade: 3, attributes: maxAttributes }))
+
+    const aceEraIndex = opponentAceEraIndex(getCalendarPosition(LAST_YEAR3_FINAL4_WEEK).year)
+    const lineup = {
+      starters: players.slice(0, 5).map((p) => p.id),
+      rotation: players.slice(5, 8).map((p) => p.id),
+    }
+    let engineSeed = 0
+    let teamSeed = engineSeed - LAST_YEAR3_FINAL4_WEEK
+    let opponentAce = generateOpponentAce(hashSeed(`${teamSeed}-ace-${aceEraIndex}`))
+    while (
+      simulateOfficialGame(players, 'final4', engineSeed, DEFAULT_TACTICS, opponentAce, lineup).outcome !== 'win'
+    ) {
+      engineSeed++
+      teamSeed = engineSeed - LAST_YEAR3_FINAL4_WEEK
+      opponentAce = generateOpponentAce(hashSeed(`${teamSeed}-ace-${aceEraIndex}`))
+    }
+
+    window.localStorage.setItem(
+      SAVE_STORAGE_KEY,
+      JSON.stringify(
+        baseSaveData({
+          seed: teamSeed,
+          totalWeek: LAST_YEAR3_FINAL4_WEEK,
+          players,
+          seasonGameLog: [{ totalWeek: LAST_YEAR3_FINAL4_WEEK - 1, phase: 'final4', outcome: 'win' }],
+        }),
+      ),
+    )
+
+    const user = userEvent.setup()
+    render(<App />)
+
+    expect(await screen.findByText('第 2 / 2 戰')).toBeInTheDocument()
+    await playOutTheGame(user)
+
+    expect(await screen.findByText('恭喜奪冠!教練生涯圓滿落幕')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /王朝模式/ }))
+
+    // dynasty mode drops the career-end screen and returns to normal play (year 4 begins)
+    expect(screen.queryByText('恭喜奪冠!教練生涯圓滿落幕')).not.toBeInTheDocument()
+    expect(await screen.findByText(/第 4 年/)).toBeInTheDocument()
+  })
+
   it('forces the career to end once the insurance cap of eras is reached, without champion', async () => {
     const players = createInitialRoster(1).map((p) => ({ ...p, grade: 3 }))
     window.localStorage.setItem(
@@ -437,6 +485,74 @@ describe('App', () => {
 
     expect(await screen.findByText('教練生涯屆滿,未能奪冠')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: `招生 — 選出 ${ROSTER_SIZE} 名新生` })).not.toBeInTheDocument()
+  })
+
+  it('offers to continue or end the career once a 三年挑戰 run crosses its milestone', async () => {
+    const players = createInitialRoster(1).map((p) => ({ ...p, grade: 3 }))
+    window.localStorage.setItem(
+      SAVE_STORAGE_KEY,
+      JSON.stringify(
+        baseSaveData({
+          totalWeek: LAST_YEAR3_FINAL4_WEEK,
+          players,
+          seasonGameLog: [{ totalWeek: LAST_YEAR3_FINAL4_WEEK - 1, phase: 'final4', outcome: 'loss' }],
+          eraCount: 2,
+          challengeMode: 'short',
+        }),
+      ),
+    )
+
+    const user = userEvent.setup()
+    render(<App />)
+
+    expect(await screen.findByText('第 2 / 2 戰')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '開打' }))
+    const skipButton = screen.queryByRole('button', { name: /快速結果/ })
+    if (skipButton) await user.click(skipButton)
+    await confirmGameSummary(user)
+
+    const continueButton = await screen.findByRole('button', { name: '繼續帶下去' })
+    expect(screen.getByRole('button', { name: '在此結束,寫進校史' })).toBeInTheDocument()
+
+    await user.click(continueButton)
+    expect(screen.queryByRole('button', { name: '繼續帶下去' })).not.toBeInTheDocument()
+    // choosing to continue does not end the career or write it to school history
+    expect(screen.queryByRole('button', { name: '開始新生涯' })).not.toBeInTheDocument()
+  })
+
+  it('ends the career and records it to school history when the coach stops at the 三年挑戰 milestone', async () => {
+    const players = createInitialRoster(1).map((p) => ({ ...p, grade: 3 }))
+    window.localStorage.setItem(
+      SAVE_STORAGE_KEY,
+      JSON.stringify(
+        baseSaveData({
+          totalWeek: LAST_YEAR3_FINAL4_WEEK,
+          players,
+          seasonGameLog: [{ totalWeek: LAST_YEAR3_FINAL4_WEEK - 1, phase: 'final4', outcome: 'loss' }],
+          eraCount: 2,
+          challengeMode: 'short',
+        }),
+      ),
+    )
+
+    const user = userEvent.setup()
+    const { unmount } = render(<App />)
+
+    expect(await screen.findByText('第 2 / 2 戰')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '開打' }))
+    const skipButton = screen.queryByRole('button', { name: /快速結果/ })
+    if (skipButton) await user.click(skipButton)
+    await confirmGameSummary(user)
+
+    await user.click(await screen.findByRole('button', { name: '在此結束,寫進校史' }))
+
+    expect(await screen.findByText('三年挑戰完成,你選擇在此畫下句點')).toBeInTheDocument()
+    unmount()
+
+    // school history persists independently of the game save, so a fresh mount shows it
+    render(<App />)
+    expect(await screen.findByText('校史')).toBeInTheDocument()
+    expect(screen.getByText(/三年挑戰完成/)).toBeInTheDocument()
   })
 
   // 匯出/匯入存檔 UI 目前先隱藏(見 SaveControls.tsx 的 EXPORT_IMPORT_ENABLED),

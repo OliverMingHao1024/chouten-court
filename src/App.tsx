@@ -24,7 +24,15 @@ import type { GameLineup } from './domain/lineup'
 import { computeTeamStrength } from './domain/matchEngine'
 import { computeTacticAttributeWeights, type GameTactics } from './domain/tactics'
 import { advanceGrades, describeGraduate } from './domain/graduation'
-import { hasReachedInsuranceCap, isChampionRun, type CareerEndReason } from './domain/career'
+import {
+  hasReachedInsuranceCap,
+  hasReachedShortChallengeMilestone,
+  isChampionRun,
+  summarizeCareer,
+  type CareerEndReason,
+} from './domain/career'
+import { computeOverallGrade } from './domain/attributeGrade'
+import { appendSchoolHistoryEntry, loadSchoolHistory, type SchoolHistoryEntry } from './domain/schoolHistory'
 import {
   clampAttribute,
   clampFatigue,
@@ -48,7 +56,7 @@ import {
   writeSaveToStorage,
   type SaveData,
 } from './domain/saveData'
-import { advanceSeasonWeek, type SeasonGameLogEntry } from './domain/season'
+import { advanceSeasonWeek, FINAL4_PLACEMENT_LABEL, type SeasonGameLogEntry } from './domain/season'
 import { computeSeasonAwards, type SeasonRecord } from './domain/seasonSummary'
 import { computeStyleTag } from './domain/styleTag'
 import {
@@ -64,6 +72,7 @@ import { computeTeamFocusStyle } from './domain/trainingDirection'
 import { ATTRIBUTE_LABELS, INJURY_STATUS_LABELS, type Player } from './domain/types'
 import { PRACTICE_STRENGTHS, type PracticeStrength } from './domain/weeklyAction'
 import { CareerSummaryScreen } from './features/career/CareerSummaryScreen'
+import { ChallengeDecisionDialog } from './features/career/ChallengeDecisionDialog'
 import { EventResultDialog, type EventRevealResult } from './features/events/EventResultDialog'
 import { EventScreen } from './features/events/EventScreen'
 import { RecruitingScreen } from './features/recruiting/RecruitingScreen'
@@ -109,6 +118,10 @@ interface Team {
   rivals: RivalRecord[]
   /** 聲望達門檻永久解鎖的學校資產,只會增加不會因聲望下降而收回。 */
   schoolAssets: SchoolAssetKey[]
+  /** 開局選擇的執教模式;短局(three)在達到里程碑時會跳出繼續/結束的提示。 */
+  challengeMode: 'short' | 'long'
+  /** 三年挑戰達到里程碑、等待玩家決定繼續或結束;選「繼續」後不會再次出現。 */
+  pendingChallengeDecision: boolean
   /**
    * 賽後摘要待確認:比賽結果已算好,但要等玩家確認摘要後才會真正套用(進入下一週)。
    * 純執行期狀態,不寫入存檔(比照 eventRevealResult)。
@@ -149,6 +162,8 @@ function teamToSaveData(team: Team): SaveData {
     lastLineup: team.lastLineup,
     rivals: team.rivals,
     schoolAssets: team.schoolAssets,
+    challengeMode: team.challengeMode,
+    pendingChallengeDecision: team.pendingChallengeDecision,
   }
 }
 
@@ -175,6 +190,34 @@ function opponentNameForWeek(team: Team): string {
   const rng = createSeededRng(hashSeed(`${team.seed}-${team.totalWeek}-opponent`))
   const fallbackName = generateOpponentName(rng)
   return pickOpponentName(team.rivals, fallbackName, rng)
+}
+
+/**
+ * 生涯結束(奪冠或達到保險上限)時組出一筆校史紀錄:只有奪冠生涯才附上當時的奪冠隊陣容
+ * 快照(「歷史隊」),其餘生涯結束只留戰績摘要,不佔用歷史隊的資料空間。
+ */
+function buildSchoolHistoryEntry(
+  coachName: string,
+  careerLog: SeasonRecord[],
+  reason: CareerEndReason,
+  championRoster: Player[] | null,
+): SchoolHistoryEntry {
+  const summary = summarizeCareer(careerLog, reason)
+  return {
+    coachName,
+    reason,
+    totalSeasons: summary.totalSeasons,
+    totalWins: summary.totalWins,
+    totalLosses: summary.totalLosses,
+    bestPlacementLabel: summary.bestPlacement ? FINAL4_PLACEMENT_LABEL[summary.bestPlacement] : '未曾闖進四強',
+    championRoster: championRoster
+      ? championRoster.map((player) => ({
+          name: player.name,
+          position: player.position,
+          overallGrade: computeOverallGrade(player.attributes),
+        }))
+      : null,
+  }
 }
 
 function describeNewInjuries(before: Player[], after: Player[]): string {
@@ -347,7 +390,8 @@ function App() {
   if (!team) {
     return (
       <SetupScreen
-        onSubmit={(teamName, coachName, seedInput) => {
+        schoolHistory={loadSchoolHistory()}
+        onSubmit={(teamName, coachName, seedInput, challengeMode) => {
           const seed = hashSeed(seedInput ?? `${teamName}:${coachName}`)
           setTeam({
             teamName,
@@ -373,6 +417,8 @@ function App() {
             livePlay: null,
             rivals: [],
             schoolAssets: [],
+            challengeMode,
+            pendingChallengeDecision: false,
           })
         }}
       />
@@ -391,6 +437,48 @@ function App() {
           clearSaveFromStorage()
           setTeam(null)
         }}
+        onContinueDynasty={
+          team.careerEnded === 'champion'
+            ? () => {
+                // 王朝模式:不清存檔、不開新生涯,直接以奪冠當下的球隊狀態接續下一季——
+                // team.totalWeek/reputation/careerLog 早在確認賽後摘要時就已經套用到位,
+                // 這裡只需要補做原本奪冠會跳過的畢業/招生流程。
+                const { roster: advancedRoster, graduates } = advanceGrades(team.players)
+                let players = advancedRoster
+                let graduateLog = team.graduateLog
+                let recruitingCandidates: Candidate[] | null = null
+                let eraCount = team.eraCount
+                if (graduates.length > 0) {
+                  eraCount += 1
+                  const graduationRng = createSeededRng(hashSeed(`${team.seed}-${team.totalWeek}-graduation-dynasty`))
+                  graduateLog = [
+                    ...graduateLog,
+                    ...graduates.map((graduate) => describeGraduate(graduate, team.reputation, graduationRng)),
+                  ]
+                  const vacancies = ROSTER_SIZE - players.length
+                  const candidatePoolMultiplier = hasSchoolAsset(team.schoolAssets, 'scoutingNetwork') ? 4 : 2
+                  recruitingCandidates = generateCandidatePool(
+                    team.reputation,
+                    vacancies * candidatePoolMultiplier,
+                    hashSeed(`${team.seed}-${team.totalWeek}-recruits-dynasty`),
+                  )
+                }
+                const careerEndedByAge: CareerEndReason | null = hasReachedInsuranceCap(eraCount) ? 'insuranceCap' : null
+                if (careerEndedByAge) {
+                  appendSchoolHistoryEntry(buildSchoolHistoryEntry(team.coachName, team.careerLog, careerEndedByAge, null))
+                }
+                setTeam({
+                  ...team,
+                  players,
+                  graduateLog,
+                  recruitingCandidates,
+                  eraCount,
+                  careerEnded: careerEndedByAge,
+                  lastResult: careerEndedByAge ? team.lastResult : '王朝模式:帶著奪冠榮耀邁向新的一季。',
+                })
+              }
+            : undefined
+        }
       />
     )
   }
@@ -445,6 +533,7 @@ function App() {
           let pendingSeasonSummary = team.pendingSeasonSummary
           let careerEnded: CareerEndReason | null = null
           let schoolAssets = team.schoolAssets
+          let pendingChallengeDecision = team.pendingChallengeDecision
           let message =
             result.message +
             describeNewInjuries(team.players, result.roster) +
@@ -482,6 +571,7 @@ function App() {
 
             if (isChampionRun(result.placement)) {
               careerEnded = 'champion'
+              appendSchoolHistoryEntry(buildSchoolHistoryEntry(team.coachName, careerLog, careerEnded, players))
             } else {
               const { roster: advancedRoster, graduates } = advanceGrades(players)
               players = advancedRoster
@@ -496,7 +586,16 @@ function App() {
 
                 if (hasReachedInsuranceCap(eraCount)) {
                   careerEnded = 'insuranceCap'
+                  appendSchoolHistoryEntry(buildSchoolHistoryEntry(team.coachName, careerLog, careerEnded, null))
                 } else {
+                  if (
+                    team.challengeMode === 'short' &&
+                    !team.pendingChallengeDecision &&
+                    !hasReachedShortChallengeMilestone(team.eraCount) &&
+                    hasReachedShortChallengeMilestone(eraCount)
+                  ) {
+                    pendingChallengeDecision = true
+                  }
                   const vacancies = ROSTER_SIZE - players.length
                   const candidatePoolMultiplier = hasSchoolAsset(schoolAssets, 'scoutingNetwork') ? 4 : 2
                   recruitingCandidates = generateCandidatePool(
@@ -528,6 +627,7 @@ function App() {
             livePlay: null,
             rivals,
             schoolAssets,
+            pendingChallengeDecision,
           }
 
           // 賽後摘要待玩家確認後才真正套用(進入下一週);在那之前畫面維持原本這場比賽的狀態。
@@ -700,6 +800,14 @@ function App() {
       <SeasonSummaryDialog result={team.pendingSeasonSummary} />
       <EventResultDialog result={team.eventRevealResult} />
       <TrainingCardResultDialog result={team.cardPoolResult} />
+      <ChallengeDecisionDialog
+        open={team.pendingChallengeDecision}
+        onContinue={() => setTeam({ ...team, pendingChallengeDecision: false })}
+        onEnd={() => {
+          appendSchoolHistoryEntry(buildSchoolHistoryEntry(team.coachName, team.careerLog, 'shortChallengeComplete', null))
+          setTeam({ ...team, pendingChallengeDecision: false, careerEnded: 'shortChallengeComplete' })
+        }}
+      />
       {actionPanel}
     </AppShell>
   )

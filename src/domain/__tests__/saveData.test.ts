@@ -36,6 +36,8 @@ function makeSaveData(overrides: Partial<SaveData> = {}): SaveData {
     lastLineup: null,
     rivals: [],
     schoolAssets: [],
+    challengeMode: 'long',
+    pendingChallengeDecision: false,
     ...overrides,
   }
 }

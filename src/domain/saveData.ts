@@ -19,11 +19,13 @@ import {
 } from './types'
 
 export const SAVE_STORAGE_KEY = 'chouten-court:save'
-export const SAVE_FORMAT_VERSION = 12
+export const SAVE_FORMAT_VERSION = 13
+
+const CHALLENGE_MODES = ['short', 'long']
 
 const OFFICIAL_PHASES = Object.keys(PHASE_GAME_COUNT)
 const FINAL4_PLACEMENTS = ['champion', 'runnerUp', 'third', 'fourth']
-const CAREER_END_REASONS = ['champion', 'insuranceCap']
+const CAREER_END_REASONS = ['champion', 'insuranceCap', 'shortChallengeComplete']
 
 export interface SaveData {
   version: number
@@ -46,6 +48,8 @@ export interface SaveData {
   lastLineup: GameLineup | null
   rivals: RivalRecord[]
   schoolAssets: SchoolAssetKey[]
+  challengeMode: 'short' | 'long'
+  pendingChallengeDecision: boolean
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -209,6 +213,8 @@ export function parseSaveData(raw: unknown): SaveData | null {
   ) {
     return null
   }
+  if (typeof raw.challengeMode !== 'string' || !CHALLENGE_MODES.includes(raw.challengeMode)) return null
+  if (typeof raw.pendingChallengeDecision !== 'boolean') return null
 
   return {
     version: raw.version,
@@ -231,6 +237,8 @@ export function parseSaveData(raw: unknown): SaveData | null {
     lastLineup: raw.lastLineup as GameLineup | null,
     rivals: raw.rivals as RivalRecord[],
     schoolAssets: raw.schoolAssets as SchoolAssetKey[],
+    challengeMode: raw.challengeMode as 'short' | 'long',
+    pendingChallengeDecision: raw.pendingChallengeDecision,
   }
 }
 

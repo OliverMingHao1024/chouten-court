@@ -6,7 +6,7 @@ import type { SeasonRecord } from './seasonSummary'
 // 上限也對應從 6 調整為 18,延續原本「約 18 年」的生涯長度精神,不追週數精算。
 export const INSURANCE_MAX_ERAS = 18
 
-export type CareerEndReason = 'champion' | 'insuranceCap'
+export type CareerEndReason = 'champion' | 'insuranceCap' | 'shortChallengeComplete'
 
 export function isChampionRun(placement: Final4Placement | null): boolean {
   return placement === 'champion'
@@ -14,6 +14,15 @@ export function isChampionRun(placement: Final4Placement | null): boolean {
 
 export function hasReachedInsuranceCap(erasCompleted: number): boolean {
   return erasCompleted >= INSURANCE_MAX_ERAS
+}
+
+// 三年挑戰模式(呼應白球のキセキ／栄冠ナイン系列「短局結束後可接長局」的設計):eraCount
+// (約當生涯年數,見上方註解)達到這個門檻時,若玩家開局選了短局模式,會跳出提示問是否要
+// 就此結束、把這段故事寫進校史,或者轉為長期生涯繼續帶下去。
+export const SHORT_CHALLENGE_ERAS = 3
+
+export function hasReachedShortChallengeMilestone(erasCompleted: number): boolean {
+  return erasCompleted >= SHORT_CHALLENGE_ERAS
 }
 
 const PLACEMENT_RANK: Record<Final4Placement, number> = {

@@ -84,6 +84,52 @@ describe('CareerSummaryScreen', () => {
     expect(onNewCareer).toHaveBeenCalled()
   })
 
+  it('shows a 王朝模式 continue button only when onContinueDynasty is provided', () => {
+    const { rerender } = render(
+      <CareerSummaryScreen
+        teamName="淡水高中"
+        coachName="山田"
+        reason="champion"
+        careerLog={careerLog}
+        graduateLog={[]}
+        onNewCareer={() => {}}
+      />,
+    )
+    expect(screen.queryByRole('button', { name: /王朝模式/ })).not.toBeInTheDocument()
+
+    rerender(
+      <CareerSummaryScreen
+        teamName="淡水高中"
+        coachName="山田"
+        reason="champion"
+        careerLog={careerLog}
+        graduateLog={[]}
+        onNewCareer={() => {}}
+        onContinueDynasty={() => {}}
+      />,
+    )
+    expect(screen.getByRole('button', { name: /王朝模式/ })).toBeInTheDocument()
+  })
+
+  it('calls onContinueDynasty when the dynasty button is clicked', async () => {
+    const user = userEvent.setup()
+    const onContinueDynasty = vi.fn()
+    render(
+      <CareerSummaryScreen
+        teamName="淡水高中"
+        coachName="山田"
+        reason="champion"
+        careerLog={careerLog}
+        graduateLog={[]}
+        onNewCareer={() => {}}
+        onContinueDynasty={onContinueDynasty}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: /王朝模式/ }))
+    expect(onContinueDynasty).toHaveBeenCalledOnce()
+  })
+
   it('does not throw when downloading the share card', async () => {
     const user = userEvent.setup()
     render(

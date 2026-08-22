@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   hasReachedInsuranceCap,
+  hasReachedShortChallengeMilestone,
   INSURANCE_MAX_ERAS,
   isChampionRun,
+  SHORT_CHALLENGE_ERAS,
   summarizeCareer,
 } from '../career'
 import type { SeasonRecord } from '../seasonSummary'
@@ -20,6 +22,14 @@ describe('hasReachedInsuranceCap', () => {
     expect(hasReachedInsuranceCap(INSURANCE_MAX_ERAS - 1)).toBe(false)
     expect(hasReachedInsuranceCap(INSURANCE_MAX_ERAS)).toBe(true)
     expect(hasReachedInsuranceCap(INSURANCE_MAX_ERAS + 1)).toBe(true)
+  })
+})
+
+describe('hasReachedShortChallengeMilestone', () => {
+  it('is false below the milestone and true at/above it', () => {
+    expect(hasReachedShortChallengeMilestone(SHORT_CHALLENGE_ERAS - 1)).toBe(false)
+    expect(hasReachedShortChallengeMilestone(SHORT_CHALLENGE_ERAS)).toBe(true)
+    expect(hasReachedShortChallengeMilestone(SHORT_CHALLENGE_ERAS + 1)).toBe(true)
   })
 })
 
