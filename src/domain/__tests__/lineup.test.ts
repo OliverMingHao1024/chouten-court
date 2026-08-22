@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest'
 import {
   analyzeLineupComposition,
   completeLineup,
+  countStarterPositionMismatches,
   lineupRole,
   lineupWeight,
+  positionMismatchMultiplier,
+  POSITION_MISMATCH_PENALTY,
   ROTATION_COUNT,
   ROTATION_WEIGHT,
   sanitizeLineup,
@@ -162,5 +165,58 @@ describe('analyzeLineupComposition', () => {
     expect(warnings.missingBallHandler).toBe(false)
     expect(warnings.missingInterior).toBe(false)
     expect(warnings.overconcentrated).toBe(false)
+  })
+})
+
+describe('countStarterPositionMismatches', () => {
+  function makeRosterWithPositions(positions: Position[]): Player[] {
+    return createInitialRoster(1).map((p, i) => ({ ...p, position: positions[i] ?? 'SF' }))
+  }
+
+  it('finds no mismatches when the starting five cover all five positions exactly once', () => {
+    const roster = makeRosterWithPositions(['PG', 'SG', 'SF', 'PF', 'C'])
+    const starters = roster.slice(0, 5).map((p) => p.id)
+    expect(countStarterPositionMismatches(roster, starters)).toBe(0)
+  })
+
+  it('counts one mismatch for a missing position and one for the duplicate that displaced it', () => {
+    // Two SGs, zero Cs: SG is duplicated (1 mismatch) and C is missing (1 mismatch).
+    const roster = makeRosterWithPositions(['PG', 'SG', 'SF', 'PF', 'SG'])
+    const starters = roster.slice(0, 5).map((p) => p.id)
+    expect(countStarterPositionMismatches(roster, starters)).toBe(2)
+  })
+
+  it('counts a duplicated position as exactly one mismatch regardless of how many extra copies', () => {
+    // Three PGs (2 extra), zero SF, zero C: 1 duplicate-position mismatch + 2 missing-position mismatches.
+    const roster = makeRosterWithPositions(['PG', 'PG', 'PG', 'SG', 'PF'])
+    const starters = roster.slice(0, 5).map((p) => p.id)
+    expect(countStarterPositionMismatches(roster, starters)).toBe(3)
+  })
+
+  it('treats a starting five smaller than the full complement as missing every uncovered position', () => {
+    const roster = makeRosterWithPositions(['PG'])
+    const starters = [roster[0].id]
+    // Only PG is covered; SG/SF/PF/C are all missing.
+    expect(countStarterPositionMismatches(roster, starters)).toBe(4)
+  })
+
+  it('ignores rotation and bench players entirely', () => {
+    const roster = makeRosterWithPositions(['PG', 'SG', 'SF', 'PF', 'C', 'PG', 'PG', 'PG'])
+    const starters = roster.slice(0, 5).map((p) => p.id)
+    expect(countStarterPositionMismatches(roster, starters)).toBe(0)
+  })
+})
+
+describe('positionMismatchMultiplier', () => {
+  it('is 1 (no penalty) with zero mismatches', () => {
+    expect(positionMismatchMultiplier(0)).toBe(1)
+  })
+
+  it('reduces effective strength by POSITION_MISMATCH_PENALTY per mismatch', () => {
+    expect(positionMismatchMultiplier(2)).toBeCloseTo(1 - 2 * POSITION_MISMATCH_PENALTY, 10)
+  })
+
+  it('never goes below 0 even with an extreme mismatch count', () => {
+    expect(positionMismatchMultiplier(100)).toBe(0)
   })
 })

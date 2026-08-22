@@ -28,6 +28,7 @@ export function RosterScreen({ players, recoveryBonus = 0 }: RosterScreenProps) 
             <button
               type="button"
               className="roster-tile"
+              data-position={player.position}
               onClick={() => {
                 setSelectedPlayer(player)
                 dialogRef.current?.showModal()
@@ -37,7 +38,7 @@ export function RosterScreen({ players, recoveryBonus = 0 }: RosterScreenProps) 
               <FatigueBar fatigue={player.fatigue} />
               <span className="roster-tile__name">{player.name}</span>
               <span className="roster-tile__position">
-                {player.position} · 高{player.grade}
+                <span className="roster-tile__position-badge">{player.position}</span> · 高{player.grade}
               </span>
               <span className="roster-tile__grade">{computeOverallGrade(player.attributes)}</span>
               {player.injuryStatus !== 'healthy' && (
@@ -61,8 +62,10 @@ export function RosterScreen({ players, recoveryBonus = 0 }: RosterScreenProps) 
               <div>
                 <h3>{selectedPlayer.name}</h3>
                 <p>
-                  {selectedPlayer.position} · 高{selectedPlayer.grade} · {selectedPlayer.height}cm ·{' '}
-                  {selectedPlayer.styleTag.label}
+                  <span className="roster-dialog__position-badge" data-position={selectedPlayer.position}>
+                    {selectedPlayer.position}
+                  </span>{' '}
+                  · 高{selectedPlayer.grade} · {selectedPlayer.height}cm · {selectedPlayer.styleTag.label}
                 </p>
                 <p className="roster-dialog__recovery">
                   每週體力恢復 {computeRecoveryRate(selectedPlayer, recoveryBonus)} 點

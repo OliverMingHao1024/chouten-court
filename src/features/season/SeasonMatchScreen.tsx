@@ -3,6 +3,7 @@ import { computeOverallGrade } from '../../domain/attributeGrade'
 import {
   analyzeLineupComposition,
   completeLineup,
+  POSITION_MISMATCH_PENALTY,
   ROTATION_COUNT,
   sanitizeLineup,
   STARTER_COUNT,
@@ -217,6 +218,8 @@ export function SeasonMatchScreen({
         <p>
           目前戰力 {preview.teamStrength.toFixed(1)}
           {preview.fatiguePenalty > 0 && `(疲勞折損 -${preview.fatiguePenalty.toFixed(1)})`}
+          {preview.positionMismatchCount > 0 &&
+            `(位置缺口 -${Math.round(preview.positionMismatchCount * POSITION_MISMATCH_PENALTY * 100)}%)`}
         </p>
         <p>
           戰術強化:
@@ -268,6 +271,11 @@ export function SeasonMatchScreen({
             {composition.missingBallHandler && '缺少主要持球者(PG)。'}
             {composition.missingInterior && '缺少內線球員(C/PF)。'}
             {composition.overconcentrated && '陣容位置過度集中。'}
+          </p>
+        )}
+        {preview.positionMismatchCount > 0 && (
+          <p className="matchup-card__position-warning">
+            先發五人有 {preview.positionMismatchCount} 個位置缺席或重複,不影響開打,但戰力已打折。
           </p>
         )}
         <div className="matchup-card__lineup-grid" role="group" aria-label="先發與主要輪替">

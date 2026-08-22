@@ -1,14 +1,31 @@
 :root {
-  --bg: #f4f1ea;
+  /* 運動能量版配色(2026-08-23 調整):參考「実況パワフルプロ野球」/栄冠ナイン系列的球類
+     生涯模擬 UI 慣例——冷色調背景襯托飽和主色、深色第二色作為曆法/位置強調、卡片一律
+     帶陰影與立體感,取代原本偏溫暖紙感的配色。主色沿用籃球橘,只提高飽和度與對比。 */
+  --bg: #eef1f6;
   --bg-elevated: #ffffff;
-  --text: #2a2420;
-  --text-muted: #746b60;
-  --border: #e3ddd1;
-  --accent: #d9622b;
-  --accent-strong: #b84e1f;
-  --accent-bg: rgba(217, 98, 43, 0.12);
+  --text: #1c2430;
+  --text-muted: #63707f;
+  --border: #d7dde6;
+  --accent: #ef6c1f;
+  --accent-strong: #c94f0f;
+  --accent-bg: rgba(239, 108, 31, 0.12);
+  /* 第二強調色(深藍):用於曆法/週次、次要標籤等不適合用主色的資訊,呼應球類轉播 HUD
+     常見的「主色(隊伍色)+ 深色(資訊色)」雙色系統。 */
+  --accent-secondary: #1d3a63;
+  --accent-secondary-bg: rgba(29, 58, 99, 0.1);
   --win: #2f9e57;
-  --loss: #c1432f;
+  --loss: #d64545;
+  --warning: #d97706;
+  --danger: #dc2626;
+  --shadow-card: 0 2px 8px rgba(30, 41, 59, 0.08);
+  /* 位置色碼(原創配色,不隨深色模式變動):讓名冊/陣容一眼就能依位置分色辨識,呼應球類
+     模擬遊戲常見的「位置色塊」慣例。 */
+  --position-pg: #2f6fed;
+  --position-sg: #0e9488;
+  --position-sf: #ef6c1f;
+  --position-pf: #7c3aed;
+  --position-c: #475569;
   --shell-max-width: 520px;
   --radius: 12px;
   --space-1: 4px;
@@ -31,16 +48,21 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #17140f;
-    --bg-elevated: #241f18;
-    --text: #f1ece2;
-    --text-muted: #a89d8d;
-    --border: #3a332a;
-    --accent: #f4813a;
-    --accent-strong: #ff9a5a;
-    --accent-bg: rgba(244, 129, 58, 0.18);
+    --bg: #10151d;
+    --bg-elevated: #1a212c;
+    --text: #eef1f6;
+    --text-muted: #93a1b0;
+    --border: #2a3341;
+    --accent: #ff8a3d;
+    --accent-strong: #ffab6b;
+    --accent-bg: rgba(255, 138, 61, 0.18);
+    --accent-secondary: #6ea1e8;
+    --accent-secondary-bg: rgba(110, 161, 232, 0.16);
     --win: #4cbb75;
-    --loss: #e5695a;
+    --loss: #ef6b6b;
+    --warning: #f0a94e;
+    --danger: #ef6b6b;
+    --shadow-card: 0 2px 10px rgba(0, 0, 0, 0.4);
   }
 }
 
@@ -105,6 +127,7 @@ input {
   font: inherit;
   color: var(--text);
   background: var(--bg-elevated);
+  box-shadow: var(--shadow-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: var(--space-2) var(--space-3);

@@ -285,4 +285,27 @@ describe('SeasonMatchScreen', () => {
     expect(screen.getByText(`對手名冊(${opponentRoster.length} 人)`)).toBeInTheDocument()
     expect(screen.getByText(opponentRoster[0].name)).toBeInTheDocument()
   })
+
+  it('shows a position-mismatch penalty when the starting five leave positions uncovered', () => {
+    const mismatchedPlayers = createInitialRoster(1).map((p, i) => (i < 5 ? { ...p, position: 'PG' as const } : p))
+    renderScreen({
+      players: mismatchedPlayers,
+      initialLineup: {
+        starters: mismatchedPlayers.slice(0, 5).map((p) => p.id),
+        rotation: mismatchedPlayers.slice(5, 8).map((p) => p.id),
+      },
+    })
+    expect(screen.getByText(/位置缺口/)).toBeInTheDocument()
+    expect(screen.getByText(/先發五人有 \d+ 個位置缺席或重複/)).toBeInTheDocument()
+  })
+
+  it('does not show a position-mismatch penalty for a naturally balanced starting five', () => {
+    renderScreen({
+      initialLineup: {
+        starters: players.slice(0, 5).map((p) => p.id),
+        rotation: players.slice(5, 8).map((p) => p.id),
+      },
+    })
+    expect(screen.queryByText(/位置缺口/)).not.toBeInTheDocument()
+  })
 })

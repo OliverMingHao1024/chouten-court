@@ -1,5 +1,6 @@
 .training-card-pool {
   background: var(--bg-elevated);
+  box-shadow: var(--shadow-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: var(--space-4);
@@ -44,11 +45,27 @@
   gap: 2px;
   background: var(--bg);
   border: 1px solid var(--border);
+  border-top: 3px solid var(--border);
   border-radius: var(--radius);
   padding: var(--space-2);
   cursor: pointer;
   color: inherit;
   font: inherit;
+}
+
+/* 卡種色碼:全隊訓練=主色、個別訓練=第二色、練習賽=勝場綠、休養=中性灰,
+   讓卡池一眼就能依種類分色辨識,不必逐字讀「卡種」標籤。 */
+.training-card-pool__card[data-kind='teamTraining'] {
+  border-top-color: var(--accent);
+}
+.training-card-pool__card[data-kind='individualTraining'] {
+  border-top-color: var(--accent-secondary);
+}
+.training-card-pool__card[data-kind='practiceMatch'] {
+  border-top-color: var(--win);
+}
+.training-card-pool__card[data-kind='rest'] {
+  border-top-color: var(--text-muted);
 }
 
 .training-card-pool__card:disabled {
@@ -58,6 +75,7 @@
 
 .training-card-pool__card--selected {
   border-color: var(--accent-strong);
+  border-top-color: var(--accent-strong);
   background: var(--accent-bg);
 }
 

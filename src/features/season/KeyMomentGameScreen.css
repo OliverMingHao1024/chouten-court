@@ -1,5 +1,6 @@
 .key-moment-game {
   background: var(--bg-elevated);
+  box-shadow: var(--shadow-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: var(--space-5) var(--space-4);

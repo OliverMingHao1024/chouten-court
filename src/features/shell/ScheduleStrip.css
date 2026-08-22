@@ -7,7 +7,8 @@
 .schedule-strip__next-match {
   margin: 0 0 var(--space-1);
   font-size: 0.75rem;
-  color: var(--text-muted);
+  color: var(--accent-secondary);
+  font-weight: 600;
 }
 
 .schedule-strip__slots {
@@ -26,8 +27,10 @@
   gap: 2px;
   padding: var(--space-1);
   border-radius: var(--radius);
+  background: var(--bg-elevated);
   border: 1px solid var(--border);
   text-align: center;
+  transition: transform 0.15s ease;
 }
 
 .schedule-strip__slot-timing {
@@ -45,14 +48,22 @@
 }
 
 .schedule-strip__slot--past {
-  opacity: 0.6;
+  opacity: 0.55;
 }
 
+/* 「本週」是這條時間帶上唯一該被一眼認出的格子:實心主色、放大、帶陰影,
+   呼應球類轉播 HUD 把「現在」跟其他資訊明顯分開的慣例。 */
 .schedule-strip__slot--current {
-  border-color: var(--accent-strong);
-  background: var(--accent-bg);
+  border-color: var(--accent);
+  background: var(--accent);
+  box-shadow: var(--shadow-card);
+  transform: scale(1.06);
+}
+
+.schedule-strip__slot--current .schedule-strip__slot-timing {
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .schedule-strip__slot--current .schedule-strip__slot-content {
-  color: var(--accent-strong);
+  color: white;
 }

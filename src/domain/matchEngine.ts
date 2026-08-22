@@ -1,4 +1,4 @@
-import { lineupWeight, type GameLineup } from './lineup'
+import { countStarterPositionMismatches, lineupWeight, positionMismatchMultiplier, type GameLineup } from './lineup'
 import { hashSeed, type Rng } from './rng'
 import type { SpecialAbilityKey } from './specialAbilities'
 import { ATTRIBUTE_KEYS, ATTRIBUTE_LABELS, type AttributeKey, type Player } from './types'
@@ -252,7 +252,9 @@ export function advancePlayerWeek(
  * 安全退回未加權平均,避免除以 0。clutchActive 為 true 時(八強/四強階段),抗壓型個性與
  * 「抗壓王牌」特殊能力的球員有效表現各自額外加成;有 lineup 且先發中有隊長型球員、或帶
  * 「隊魂領袖」「鎖喉夾擊」特殊能力的球員時,各自額外加上一次性的團隊戰力加成(同一類來源
- * 多人同時先發不重複疊加,但不同來源之間可以疊加)。
+ * 多人同時先發不重複疊加,但不同來源之間可以疊加)。加權平均算出來後,還會乘上
+ * `positionMismatchMultiplier`(見 lineup.ts):先發五人若有位置缺席或重複,依問題數打折,
+ * 不阻擋開打,只是戰力受影響;隊長/特殊能力的一次性加成在這之後才加上,不受位置懲罰影響。
  */
 export function computeTeamStrength(
   roster: Player[],
@@ -278,12 +280,15 @@ export function computeTeamStrength(
     const weighted = pool.map((player) => ({ player, weight: lineupWeight(player.id, lineup) }))
     const totalWeight = weighted.reduce((sum, { weight }) => sum + weight, 0)
     if (totalWeight > 0) {
+      const mismatchCount = countStarterPositionMismatches(roster, lineup.starters)
+      const positionMultiplier = positionMismatchMultiplier(mismatchCount)
       return (
-        weighted.reduce(
+        (weighted.reduce(
           (sum, { player, weight }) => sum + effectiveAttributeAverage(player, attributeWeights, clutchActive) * weight,
           0,
         ) /
-          totalWeight +
+          totalWeight) *
+          positionMultiplier +
         startBonus
       )
     }

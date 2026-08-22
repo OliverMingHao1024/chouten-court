@@ -105,4 +105,21 @@ describe('computeMatchPreview', () => {
     expect(computeMatchPreview(roster, lineup, DEFAULT_TACTICS, 'quarterfinal', testAce).clutchBonusActive).toBe(true)
     expect(computeMatchPreview(roster, lineup, DEFAULT_TACTICS, 'final4', testAce).clutchBonusActive).toBe(true)
   })
+
+  it('reports zero position mismatches for a naturally balanced starting five', () => {
+    const roster = createInitialRoster(1)
+    const lineup = fullLineup(roster)
+    expect(computeMatchPreview(roster, lineup, DEFAULT_TACTICS, 'qualifying', testAce).positionMismatchCount).toBe(0)
+  })
+
+  it('reports position mismatches and a lower team strength when the starting five duplicate a position', () => {
+    const roster = createInitialRoster(1).map((p, i) => (i < 5 ? { ...p, position: 'PG' as const } : p))
+    const lineup = fullLineup(roster)
+    const preview = computeMatchPreview(roster, lineup, DEFAULT_TACTICS, 'qualifying', testAce)
+    expect(preview.positionMismatchCount).toBeGreaterThan(0)
+
+    const balancedRoster = createInitialRoster(1)
+    const balancedPreview = computeMatchPreview(balancedRoster, lineup, DEFAULT_TACTICS, 'qualifying', testAce)
+    expect(preview.teamStrength).toBeLessThan(balancedPreview.teamStrength)
+  })
 })

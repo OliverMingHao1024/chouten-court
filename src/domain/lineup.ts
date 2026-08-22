@@ -1,4 +1,4 @@
-import { ATTRIBUTE_KEYS, type Player, type Position } from './types'
+import { ATTRIBUTE_KEYS, POSITIONS, type Player, type Position } from './types'
 
 export const STARTER_COUNT = 5
 export const ROTATION_COUNT = 3
@@ -117,4 +117,29 @@ export function analyzeLineupComposition(roster: Player[], lineup: GameLineup): 
     missingInterior: !INTERIOR_POSITIONS.some((position) => (counts[position] ?? 0) > 0),
     overconcentrated: Object.values(counts).some((count) => (count ?? 0) >= OVERCONCENTRATION_THRESHOLD),
   }
+}
+
+// 先發位置涵蓋懲罰(原創數值,待調校):先發五人中,每個位置(PG/SG/SF/PF/C)「完全缺席」
+// 或「重複超過一人」都各算一次問題,每次問題讓隊伍有效戰力打折。刻意設計成軟性懲罰,不是
+// 強制五個位置各排一人——傷病潮時仍要能湊出先發正常開打,只是戰力會受影響,呼應
+// analyzeLineupComposition 一直以來「不阻擋開打」的設計精神,只是這次是真的會影響戰力,
+// 不再只是純文字提示。只看先發(不含輪替/未上場),因為只有先發才承受完整比賽負荷與戰力權重。
+export const POSITION_MISMATCH_PENALTY = 0.03
+
+export function countStarterPositionMismatches(roster: Player[], starters: string[]): number {
+  const counts = new Map<Position, number>()
+  for (const id of starters) {
+    const player = roster.find((candidate) => candidate.id === id)
+    if (!player) continue
+    counts.set(player.position, (counts.get(player.position) ?? 0) + 1)
+  }
+  return POSITIONS.reduce((problems, position) => {
+    const count = counts.get(position) ?? 0
+    return count === 0 || count >= 2 ? problems + 1 : problems
+  }, 0)
+}
+
+/** 每一次位置問題讓隊伍有效戰力打折 POSITION_MISMATCH_PENALTY,下限 0(不會變成負戰力)。 */
+export function positionMismatchMultiplier(mismatchCount: number): number {
+  return Math.max(0, 1 - mismatchCount * POSITION_MISMATCH_PENALTY)
 }

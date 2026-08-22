@@ -1,4 +1,4 @@
-import { lineupRole, type GameLineup } from './lineup'
+import { countStarterPositionMismatches, lineupRole, type GameLineup } from './lineup'
 import { computeRecoveryRate, computeTeamStrength, computeWinProbability, HIGH_FATIGUE_RISK_THRESHOLD } from './matchEngine'
 import { computeAceStrengthBonus, type OpponentAce } from './opponentAce'
 import {
@@ -38,6 +38,9 @@ export interface MatchPreview {
   captainBonusActive: boolean
   /** 目前賽制階段是否讓抗壓型球員的加成生效(僅八強/四強)。 */
   clutchBonusActive: boolean
+  /** 先發五人位置涵蓋問題數(缺席或重複的位置各算一次);已反映在 teamStrength 裡,
+   * 這裡額外提供給賽前畫面顯示具體問題數與換算後的戰力折損百分比。 */
+  positionMismatchCount: number
 }
 
 export function computeMatchPreview(
@@ -75,5 +78,6 @@ export function computeMatchPreview(
       (id) => roster.find((player) => player.id === id)?.personality === 'captain',
     ),
     clutchBonusActive: clutchActive,
+    positionMismatchCount: countStarterPositionMismatches(roster, lineup.starters),
   }
 }

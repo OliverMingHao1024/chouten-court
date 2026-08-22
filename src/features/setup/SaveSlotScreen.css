@@ -47,6 +47,7 @@
   align-items: flex-start;
   gap: 2px;
   background: var(--bg-elevated);
+  box-shadow: var(--shadow-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: var(--space-3) var(--space-4);

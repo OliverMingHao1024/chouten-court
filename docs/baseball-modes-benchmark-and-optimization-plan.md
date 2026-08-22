@@ -563,6 +563,7 @@ HUD 或行程帶必須回答：
 - [x] 永久傷病後遺症(見下方補充;同步修訂了 `docs/spec.md` 第 11 節原本「無永久後遺症」的規劃決策)。
 - [x] 成就/稱號系統(見下方補充;`docs/spec.md` 第 17 節從「MVP 尚未實作」改為已實作)。
 - [x] 訓練館/恢復中心/教練專精三項學校資產(見下方補充,補齊 M5 原列 5 項資產中先前跳過的 3 項)。
+- [x] 先發位置涵蓋軟性懲罰(見下方補充;第 7 節「位置組合僅警告」的規劃決策首次真正影響戰力)。
 
 補充（2026-08-23）：新增 `opponentRoster.ts` 的 `generateOpponentRoster(seed, size)`,包裝既有的 `createInitialRoster` 產生一份跟我方名冊同規格的完整對手名冊。`SeasonMatchScreen` 在已偵察(`isOpponentScouted(reputation)` 或永久解鎖影片分析室)時,新增一個可展開的「對手名冊」清單,顯示每位球員的姓名/位置/年級評等。**刻意縮小範圍**:純資訊展示,不影響戰力計算——正式賽勝負仍由 `matchEngine.ts` 既有的戰力/戰術模型決定,對手名冊不是「真的在場上打球的 12 人」,只是給玩家多一點資訊感。
 
@@ -573,6 +574,8 @@ HUD 或行程帶必須回答：
 補充（2026-08-23）：新增 `achievements.ts`,實作 spec.md 第 17 節原本「MVP 尚未實作」的成就/稱號系統,純紀錄性質,不影響任何數值運算。目前 4 項(原創定義,待調校):**全勝賽季**(單季所有正式賽全勝)、**零傷賽季**(單季完全沒有球員新增傷勢——用新增的 `Team.seasonHadInjury` 布林值全季追蹤,每季結束後重置,因為傷勢可能發生在訓練週的練習賽,不只發生在正式賽週)、**大逆轉**(單場正式賽最大逆轉分差達到 `COMEBACK_WIN_MARGIN_THRESHOLD=15` 分後獲勝,重用既有的 `rivals.ts` 的 `computeComebackMargin`)、**連霸八強**(`careerLog` 最近兩屆賽季的 `finalPhaseReached` 都達到八強賽或以上)。成就只會累積、不會被收回,解鎖當下在賽後訊息附加「解鎖成就:OOO!」,生涯總結畫面(`CareerSummaryScreen.tsx`)新增區塊列出所有已解鎖成就與說明。存檔版本升到 14(新增 `achievements`/`seasonHadInjury` 兩個欄位,migration 13→14 補上預設值 `[]`/`false`,舊存檔可正常升級)。**刻意縮小範圍**:只做 4 項最能直接從既有資料(`SeasonRecord`/`boxScore.quarters`)推導的成就,沒有做需要額外資料模型的項目(例如「生涯總得分累積」「特定球員連續先發場次」);也沒有做成就的稀有度分級或展示動畫,純粹是一個名稱+一句說明的清單。
 
 補充（2026-08-23）：補齊 M5 原列 5 項學校資產中先前跳過的 3 項,`SCHOOL_ASSET_KEYS` 從 2 項擴到 5 項,每項都直接改變一個玩家可見的選項或數字,不是不可感知的全隊 `+2%`:**訓練館**(聲望 ≥55,原創數值,待調校)——`trainingCardPool.ts` 的 `canSelectCards` 新增可選的 `maxCards` 參數(預設沿用既有的 `MAX_CARDS_PER_WEEK=3`),解鎖時 `App.tsx` 傳入 `MAX_CARDS_PER_WEEK+1`,`TrainingCardPoolScreen` 每週最多可選卡數變成 4 張,是直接可見的選項增加。**恢復中心**(聲望 ≥65)——`matchEngine.ts` 的 `computeRecoveryRate`/`applyFatigueDelta`/`advancePlayerWeek` 新增可選的 `recoveryBonus`/`schoolBonus` 參數(預設 0,不影響任何既有呼叫),解鎖時全隊每週體力恢復量 `+RECOVERY_CENTER_BONUS=2`(原創數值,待調校),數字直接反映在名冊畫面「每週體力恢復」的顯示上,正式賽(`officialMatch.ts` 的 `resolveOfficialGameAfterQuarters`/`simulateOfficialGame`)與訓練週(`trainingCardResolution.ts` 的 `resolveCardSelections`)都吃得到這個加成。**教練專精**(聲望 ≥75)——`specialAbilities.ts` 的 `unlockedAbilityCount`/`unlockedAbilities`/`learnableAbilitiesForPlayer` 新增可選的 `bonusSlots` 參數(預設 0),解鎖時個別訓練可教學的特殊能力清單多解鎖 1 項(仍受 `MAX_UNLOCKED_ABILITIES` 總量上限保護,不會超過完整能力表)。三項全部走「新增參數、預設值等於過去行為」的做法,舊有呼叫端與測試完全不用改。存檔版本沿用 14,不需要升版——因為 `schoolAssets` 陣列早在 V4 就已經是存檔欄位,新增可能的 key 值不影響既有存檔的解析。
+
+補充（2026-08-23）：新增先發位置涵蓋軟性懲罰,回應「上場人員是否要依位置強制一人一位,或上錯位置給予懲罰」的提問。研究後判斷:強制五個位置各一人比較貼近棒球「一人一守位」的硬規則,籃球本身允許小球/雙塔等非典型陣容,而且會重現 `lineup.ts` 原本就刻意避開的風險——傷病潮時可能湊不出合法先發,直接卡關;因此採用比使用者原提兩案都更折衷的方案:**軟性戰力懲罰**。新增 `lineup.ts` 的 `countStarterPositionMismatches(roster, starters)`:只看先發五人(不含輪替/未上場),PG/SG/SF/PF/C 五個位置中,每個「完全缺席」或「重複超過一人」的位置各算一次問題;`positionMismatchMultiplier(mismatchCount)` 讓隊伍有效戰力依問題數打折,每次 `POSITION_MISMATCH_PENALTY=0.03`(原創數值,待調校),下限 0。`matchEngine.ts` 的 `computeTeamStrength` 在算完先發/輪替加權平均後、加上隊長等一次性團隊加成前,乘上這個倍率——先發五人剛好一人一位置時倍率是 1,完全不影響任何既有測試(`createInitialRoster` 保證名冊前 5 人天生涵蓋五個不同位置,大多數既有測試的 5 人先發因此本來就不觸發懲罰)。`matchPreview.ts` 的 `MatchPreview` 新增 `positionMismatchCount` 欄位,`SeasonMatchScreen.tsx` 在「目前戰力」旁顯示具體折損百分比,並在既有的位置組合警告區塊下方加一行明確說明「先發五人有 N 個位置缺席或重複」。**刻意不做**:沒有把 `analyzeLineupComposition` 既有的「缺主力持球者/缺內線/過度集中」三個категорical 警告改掉或合併,兩套機制並存——舊的是對全部 8 個上場名額的粗略分類提示,新的是對先發 5 人的精確位置涵蓋計算,語意不同,沒有必要二選一,分類提示保留給想看更細診斷的玩家參考。也沒有做位置槽位指派 UI(仍是自由選 5 人,不用逐一指定「這位打 PG、那位打 C」),維持專案一貫的最小可行 UI。
 
 ## 13. 明確不建議現在做
 

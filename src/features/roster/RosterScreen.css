@@ -14,11 +14,30 @@
   align-items: center;
   gap: 2px;
   background: var(--bg-elevated);
+  box-shadow: var(--shadow-card);
   border: 1px solid var(--border);
+  border-top: 3px solid var(--border);
   border-radius: var(--radius);
   padding: var(--space-1);
   cursor: pointer;
   color: inherit;
+}
+
+/* 位置色碼:一眼依邊框顏色分辨場上位置,呼應球類模擬遊戲常見的「位置色塊」慣例。 */
+.roster-tile[data-position='PG'] {
+  border-top-color: var(--position-pg);
+}
+.roster-tile[data-position='SG'] {
+  border-top-color: var(--position-sg);
+}
+.roster-tile[data-position='SF'] {
+  border-top-color: var(--position-sf);
+}
+.roster-tile[data-position='PF'] {
+  border-top-color: var(--position-pf);
+}
+.roster-tile[data-position='C'] {
+  border-top-color: var(--position-c);
 }
 
 .roster-tile__name {
@@ -33,6 +52,50 @@
 .roster-tile__position {
   font-size: 0.6rem;
   color: var(--text-muted);
+}
+
+.roster-tile__position-badge {
+  font-weight: 700;
+}
+
+.roster-tile[data-position='PG'] .roster-tile__position-badge {
+  color: var(--position-pg);
+}
+.roster-tile[data-position='SG'] .roster-tile__position-badge {
+  color: var(--position-sg);
+}
+.roster-tile[data-position='SF'] .roster-tile__position-badge {
+  color: var(--position-sf);
+}
+.roster-tile[data-position='PF'] .roster-tile__position-badge {
+  color: var(--position-pf);
+}
+.roster-tile[data-position='C'] .roster-tile__position-badge {
+  color: var(--position-c);
+}
+
+.roster-dialog__position-badge {
+  font-weight: 700;
+  padding: 1px 8px;
+  border-radius: 999px;
+  color: white;
+  font-size: 0.8rem;
+}
+
+.roster-dialog__position-badge[data-position='PG'] {
+  background: var(--position-pg);
+}
+.roster-dialog__position-badge[data-position='SG'] {
+  background: var(--position-sg);
+}
+.roster-dialog__position-badge[data-position='SF'] {
+  background: var(--position-sf);
+}
+.roster-dialog__position-badge[data-position='PF'] {
+  background: var(--position-pf);
+}
+.roster-dialog__position-badge[data-position='C'] {
+  background: var(--position-c);
 }
 
 .roster-tile__grade {
@@ -91,6 +154,7 @@
   border-radius: var(--radius);
   padding: 0;
   background: var(--bg-elevated);
+  box-shadow: var(--shadow-card);
   color: var(--text);
   max-width: min(90vw, 400px);
 }

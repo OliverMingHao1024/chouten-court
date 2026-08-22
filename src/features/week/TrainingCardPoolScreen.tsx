@@ -176,6 +176,7 @@ export function TrainingCardPoolScreen({
               <button
                 type="button"
                 className={`training-card-pool__card${selected ? ' training-card-pool__card--selected' : ''}`}
+                data-kind={card.kind}
                 disabled={disabled}
                 onClick={() => toggleCard(card)}
               >

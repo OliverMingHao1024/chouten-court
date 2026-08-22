@@ -15,6 +15,7 @@ import {
   rollForInjury,
   tickInjuryRecovery,
 } from '../matchEngine'
+import { countStarterPositionMismatches, positionMismatchMultiplier } from '../lineup'
 import { createSeededRng } from '../rng'
 import { createInitialRoster } from '../roster'
 import { ATTRIBUTE_KEYS, type Player } from '../types'
@@ -135,9 +136,15 @@ describe('computeTeamStrength', () => {
       attributes: { shooting: 0, three: 0, rebound: 0, pass: 0, defense: 0, athletic: 0, iq: i === 0 ? 90 : 0 },
       personality: 'steady' as const, // avoid the captain-in-starters bonus interfering with the exact value below
     }))
-    // Only player 0 (the one with a non-zero attribute) is in the lineup, as a starter.
+    // Only player 0 (the one with a non-zero attribute) is in the lineup, as a starter. A single-player
+    // "starting five" leaves 4 positions uncovered, so the position-mismatch penalty (see lineup.ts) applies
+    // on top of the raw weighted average this test is actually isolating.
     const lineup: GameLineup = { starters: [roster[0].id], rotation: [] }
-    expect(computeTeamStrength(roster, undefined, lineup)).toBeCloseTo(90 / 7, 5)
+    const mismatchCount = countStarterPositionMismatches(roster, lineup.starters)
+    expect(computeTeamStrength(roster, undefined, lineup)).toBeCloseTo(
+      (90 / 7) * positionMismatchMultiplier(mismatchCount),
+      5,
+    )
   })
 
   it('gives a starter more influence than a rotation player at the same attributes', () => {
@@ -178,6 +185,23 @@ describe('computeTeamStrength', () => {
 
     expect(computeTeamStrength(oneCaptain, undefined, lineup)).toBeGreaterThan(baseline)
     expect(computeTeamStrength(twoCaptains, undefined, lineup)).toBe(computeTeamStrength(oneCaptain, undefined, lineup))
+  })
+
+  it('reduces team strength when the starting five leave positions uncovered', () => {
+    const roster = createInitialRoster(1).map((p) => ({
+      ...p,
+      attributes: { shooting: 60, three: 60, rebound: 60, pass: 60, defense: 60, athletic: 60, iq: 60 },
+      personality: 'steady' as const,
+    }))
+    // roster.slice(0, 5) is guaranteed one-of-each position by createInitialRoster's assignment scheme.
+    const balancedLineup: GameLineup = { starters: roster.slice(0, 5).map((p) => p.id), rotation: [] }
+    const balancedStrength = computeTeamStrength(roster, undefined, balancedLineup)
+
+    const mismatchedRoster = roster.map((p, i) => (i < 5 ? { ...p, position: 'PG' as const } : p))
+    const mismatchedLineup: GameLineup = { starters: mismatchedRoster.slice(0, 5).map((p) => p.id), rotation: [] }
+    const mismatchedStrength = computeTeamStrength(mismatchedRoster, undefined, mismatchedLineup)
+
+    expect(mismatchedStrength).toBeLessThan(balancedStrength)
   })
 
   it('does not grant the captain bonus when the captain is only in the rotation', () => {
