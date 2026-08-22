@@ -83,3 +83,25 @@ export function canScheduleAnotherPracticeMatch(
   const currentMonth = monthIndexOf(weekOfYear)
   return !practiceMatchWeeksThisYear.some((week) => monthIndexOf(week) === currentMonth)
 }
+
+// 台灣高中學年慣例九月開學(原創簡化:48 週剛好切成 12 個月、每月固定 4 週,不對應真實
+// 月曆天數,呼應既有 monthIndexOf 練習賽月度上限用的同一套分月),月份標籤從 9 月開始
+// 輪流到隔年 8 月。
+const MONTH_LABELS_STARTING_SEPTEMBER = [
+  '9月',
+  '10月',
+  '11月',
+  '12月',
+  '1月',
+  '2月',
+  '3月',
+  '4月',
+  '5月',
+  '6月',
+  '7月',
+  '8月',
+] as const
+
+export function getMonthLabel(weekOfYear: number): string {
+  return MONTH_LABELS_STARTING_SEPTEMBER[monthIndexOf(weekOfYear) % MONTH_LABELS_STARTING_SEPTEMBER.length]
+}

@@ -124,8 +124,19 @@ async function advanceWeeksRepeatedly(user: ReturnType<typeof userEvent.setup>, 
   }
 }
 
-// Clicking 開打 now only computes the result and shows a game-summary dialog; the week
-// only actually advances once the coach confirms it via "繼續".
+// Clicking 開打 enters the quarter-by-quarter key-moment screen instead of resolving the
+// game immediately; "快速結果" skips straight to the final result. The week only actually
+// advances once the coach confirms the resulting game-summary dialog via "繼續".
+async function playOutTheGame(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: '開打' }))
+  // React flushes the key-moment screen's chained auto-advance effects synchronously, so by
+  // the time the click above resolves the game may already be fully decided (no key moment
+  // was close enough to trigger a decision) and the skip button will already be gone.
+  const skipButton = screen.queryByRole('button', { name: /快速結果/ })
+  if (skipButton) await user.click(skipButton)
+  await confirmGameSummary(user)
+}
+
 async function confirmGameSummary(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await screen.findByRole('button', { name: '繼續' }))
 }
@@ -273,8 +284,7 @@ describe('App', () => {
     await advanceWeeksRepeatedly(user, 26)
 
     await screen.findByText('第 1 / 4 戰')
-    await user.click(screen.getByRole('button', { name: '開打' }))
-    await confirmGameSummary(user)
+    await playOutTheGame(user)
 
     expect(await screen.findByText('第 2 / 4 戰')).toBeInTheDocument()
   })
@@ -294,12 +304,12 @@ describe('App', () => {
     const user = userEvent.setup()
     const { unmount } = await buildTeam(user)
     await advanceWeeksRepeatedly(user, 1)
-    await screen.findByText('第 1 年 第 2 週')
+    await screen.findByText(/^第 1 年 第 2 週/)
     unmount()
 
     render(<App />)
 
-    expect(await screen.findByText('第 1 年 第 2 週')).toBeInTheDocument()
+    expect(await screen.findByText(/^第 1 年 第 2 週/)).toBeInTheDocument()
     expect(screen.queryByLabelText('教練名稱')).not.toBeInTheDocument()
   })
 
@@ -336,8 +346,7 @@ describe('App', () => {
     render(<App />)
 
     expect(await screen.findByText('第 2 / 2 戰')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: '開打' }))
-    await confirmGameSummary(user)
+    await playOutTheGame(user)
 
     expect(await screen.findByText(/畢業 12 人/)).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: `招生 — 選出 ${ROSTER_SIZE} 名新生` })).toBeInTheDocument()
@@ -352,7 +361,7 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: '確認名單' }))
 
     expect(screen.queryByRole('heading', { name: `招生 — 選出 ${ROSTER_SIZE} 名新生` })).not.toBeInTheDocument()
-    expect(await screen.findByText('第 4 年 第 1 週')).toBeInTheDocument()
+    expect(await screen.findByText(/^第 4 年 第 1 週/)).toBeInTheDocument()
     expect(document.querySelector('.training-card-pool')).toBeInTheDocument()
   })
 
@@ -396,8 +405,7 @@ describe('App', () => {
     render(<App />)
 
     expect(await screen.findByText('第 2 / 2 戰')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: '開打' }))
-    await confirmGameSummary(user)
+    await playOutTheGame(user)
 
     expect(await screen.findByText('恭喜奪冠!教練生涯圓滿落幕')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '開始新生涯' })).toBeInTheDocument()
@@ -423,8 +431,7 @@ describe('App', () => {
     render(<App />)
 
     expect(await screen.findByText('第 2 / 2 戰')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: '開打' }))
-    await confirmGameSummary(user)
+    await playOutTheGame(user)
 
     expect(await screen.findByText('教練生涯屆滿,未能奪冠')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: `招生 — 選出 ${ROSTER_SIZE} 名新生` })).not.toBeInTheDocument()

@@ -4,15 +4,12 @@ import {
   didAdvancePhase,
   getFinal4Placement,
   getGameIndexForWeek,
-  simulateOfficialGame,
   type Final4Placement,
   type GameGrowthEntry,
+  type OfficialGameResult,
   type OfficialPhase,
 } from './officialMatch'
-import type { GameLineup } from './lineup'
-import type { OpponentAce } from './opponentAce'
 import type { QuarterScore } from './quarterSimulation'
-import type { GameTactics } from './tactics'
 import type { Player } from './types'
 
 export interface SeasonGameLogEntry {
@@ -50,14 +47,15 @@ function nextYearStart(totalWeek: number): number {
   return year * WEEKS_PER_YEAR + 1
 }
 
+/**
+ * 依季曆推進一週的正式賽戰績與晉級判斷。這場比賽本身要怎麼模擬(全自動一次算完,或是
+ * 逐節搭配關鍵回合決策讓玩家介入)是呼叫端的事,這裡只接手「已經算好的比賽結果」,
+ * 純粹做戰績/晉級/訊息的簿記,不再自己呼叫 simulateOfficialGame。
+ */
 export function advanceSeasonWeek(
-  roster: Player[],
   totalWeek: number,
   gameLog: SeasonGameLogEntry[],
-  seed: number,
-  tactics: GameTactics,
-  opponentAce: OpponentAce,
-  lineup: GameLineup,
+  gameResult: OfficialGameResult,
 ): AdvanceSeasonWeekResult {
   const { year, weekOfYear } = getCalendarPosition(totalWeek)
   const phase = getSeasonPhase(weekOfYear)
@@ -69,14 +67,7 @@ export function advanceSeasonWeek(
     throw new Error(`week ${weekOfYear} has no official game scheduled in phase ${phase}`)
   }
 
-  const { outcome, roster: fatiguedRoster, growth, boxScore } = simulateOfficialGame(
-    roster,
-    phase,
-    seed,
-    tactics,
-    opponentAce,
-    lineup,
-  )
+  const { outcome, roster: fatiguedRoster, growth, boxScore } = gameResult
   const gameLogEntry: SeasonGameLogEntry = { totalWeek, phase, outcome }
 
   const isLastGameOfPhase = gameIndex === PHASE_GAME_COUNT[phase] - 1

@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { getCalendarPosition, getSeasonPhase, PHASE_LABELS } from './domain/calendar'
+import { getCalendarPosition, getMonthLabel, getSeasonPhase, PHASE_LABELS } from './domain/calendar'
 import { generateOpponentName } from './domain/opponentName'
 import { distributePlayerStats } from './domain/boxScoreStats'
 import { generateOpponentAce, opponentAceEraIndex } from './domain/opponentAce'
@@ -61,6 +61,7 @@ import { EventScreen } from './features/events/EventScreen'
 import { RecruitingScreen } from './features/recruiting/RecruitingScreen'
 import { RosterScreen } from './features/roster/RosterScreen'
 import { GameSummaryDialog, type GameSummaryResult } from './features/season/GameSummaryDialog'
+import { KeyMomentGameScreen } from './features/season/KeyMomentGameScreen'
 import { SeasonMatchScreen } from './features/season/SeasonMatchScreen'
 import { SeasonSummaryDialog, type SeasonSummaryResult } from './features/season/SeasonSummaryDialog'
 import { SetupScreen } from './features/setup/SetupScreen'
@@ -101,6 +102,12 @@ interface Team {
    * 純執行期狀態,不寫入存檔(比照 eventRevealResult)。
    */
   pendingGameSummary: PendingGameSummary | null
+  /**
+   * 玩家確認開打、進入逐節互動畫面後鎖定的戰術/陣容,比賽本身(含逐節模擬與可能的關鍵
+   * 回合決策)完成前維持這個畫面。純執行期狀態,不寫入存檔(比照 eventRevealResult)——
+   * 進行到一半離開/重整會直接放棄這場比賽,回到賽前畫面重新開打。
+   */
+  livePlay: { lineup: GameLineup; tactics: GameTactics } | null
 }
 
 interface PendingGameSummary {
@@ -132,7 +139,7 @@ function teamToSaveData(team: Team): SaveData {
 }
 
 function saveDataToTeam(data: SaveData): Team {
-  return { ...data, cardPoolResult: null, eventRevealResult: null, pendingGameSummary: null }
+  return { ...data, cardPoolResult: null, eventRevealResult: null, pendingGameSummary: null, livePlay: null }
 }
 
 function loadInitialTeam(): Team | null {
@@ -348,6 +355,7 @@ function App() {
             careerEnded: null,
             lastLineup: null,
             pendingGameSummary: null,
+            livePlay: null,
           })
         }}
       />
@@ -396,29 +404,19 @@ function App() {
         }}
       />
     )
-  } else if (phase !== 'offseason' && gameIndex !== null) {
+  } else if (phase !== 'offseason' && gameIndex !== null && team.livePlay) {
+    const { lineup, tactics } = team.livePlay
     actionPanel = (
-      <SeasonMatchScreen
-        gameNumber={gameIndex + 1}
-        totalGamesInPhase={PHASE_GAME_COUNT[phase]}
-        opponentName={opponentNameForWeek(team)}
+      <KeyMomentGameScreen
+        roster={team.players}
         phase={phase}
+        seed={team.seed + team.totalWeek}
+        tactics={tactics}
         opponentAce={opponentAce}
-        opponentStyle={opponentStyle}
-        reputation={team.reputation}
-        players={team.players}
-        initialLineup={team.lastLineup}
-        lastResult={team.lastResult}
-        onPlayGame={(tactics, lineup) => {
-          const result = advanceSeasonWeek(
-            team.players,
-            team.totalWeek,
-            team.seasonGameLog,
-            team.seed + team.totalWeek,
-            tactics,
-            opponentAce,
-            lineup,
-          )
+        opponentName={opponentNameForWeek(team)}
+        lineup={lineup}
+        onComplete={(gameResult) => {
+          const result = advanceSeasonWeek(team.totalWeek, team.seasonGameLog, gameResult)
           let players = result.roster
           let reputation = team.reputation
           let graduateLog = team.graduateLog
@@ -501,26 +499,46 @@ function App() {
             lastResult: message,
             seasonGameLog: [...team.seasonGameLog, result.gameLogEntry],
             pendingGameSummary: null,
+            livePlay: null,
           }
 
           // 賽後摘要待玩家確認後才真正套用(進入下一週);在那之前畫面維持原本這場比賽的狀態。
           setTeam({
             ...team,
+            livePlay: null,
             pendingGameSummary: {
               display: buildGameSummaryDisplay(
                 team.players,
-                result.roster,
+                gameResult.roster,
                 lineup,
                 tactics,
-                result.growth,
-                result.gameLogEntry.outcome,
+                gameResult.growth,
+                gameResult.outcome,
                 phase,
-                result.boxScore,
+                gameResult.boxScore,
                 hashSeed(`${team.seed}-${team.totalWeek}-boxstats`),
               ),
               nextTeamState,
             },
           })
+        }}
+      />
+    )
+  } else if (phase !== 'offseason' && gameIndex !== null) {
+    actionPanel = (
+      <SeasonMatchScreen
+        gameNumber={gameIndex + 1}
+        totalGamesInPhase={PHASE_GAME_COUNT[phase]}
+        opponentName={opponentNameForWeek(team)}
+        phase={phase}
+        opponentAce={opponentAce}
+        opponentStyle={opponentStyle}
+        reputation={team.reputation}
+        players={team.players}
+        initialLineup={team.lastLineup}
+        lastResult={team.lastResult}
+        onPlayGame={(tactics, lineup) => {
+          setTeam({ ...team, livePlay: { tactics, lineup } })
         }}
       />
     )
@@ -592,6 +610,7 @@ function App() {
       reputation={team.reputation}
       year={year}
       weekOfYear={weekOfYear}
+      monthLabel={getMonthLabel(weekOfYear)}
       phaseLabel={PHASE_LABELS[phase]}
       scheduleStrip={
         <ScheduleStrip

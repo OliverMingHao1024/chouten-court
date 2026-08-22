@@ -1,0 +1,111 @@
+.key-moment-game {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-5) var(--space-4);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.key-moment-game__opponent {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.key-moment-game__score {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+
+.key-moment-game__quarters {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  font-size: 0.7rem;
+}
+
+.key-moment-game__quarters li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.key-moment-game__quarter-label {
+  color: var(--text-muted);
+}
+
+.key-moment-game__quarter-score {
+  font-weight: 700;
+}
+
+.key-moment-game__decision {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--accent-strong);
+  border-radius: var(--radius);
+  background: var(--accent-bg);
+}
+
+.key-moment-game__decision-prompt {
+  margin: 0;
+  font-weight: 700;
+}
+
+.key-moment-game__option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.key-moment-game__option:hover {
+  border-color: var(--accent-strong);
+}
+
+.key-moment-game__option-label {
+  font-weight: 700;
+}
+
+.key-moment-game__option-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.key-moment-game__skip {
+  align-self: center;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.key-moment-game__skip:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
+}

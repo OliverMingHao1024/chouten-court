@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
   getCalendarPosition,
+  getMonthLabel,
   getPhaseWeekRange,
   getSeasonPhase,
   isPracticeMatchAllowed,
   canScheduleAnotherPracticeMatch,
+  WEEKS_PER_YEAR,
 } from '../calendar'
 
 describe('getCalendarPosition', () => {
@@ -98,5 +100,26 @@ describe('canScheduleAnotherPracticeMatch', () => {
 
   it('also respects the offseason/blackout restriction', () => {
     expect(canScheduleAnotherPracticeMatch(30, [])).toBe(false)
+  })
+})
+
+describe('getMonthLabel', () => {
+  it('starts the school year at 9月 (Taiwanese high schools start in September)', () => {
+    expect(getMonthLabel(1)).toBe('9月')
+    expect(getMonthLabel(4)).toBe('9月')
+  })
+
+  it('advances a month every 4 weeks', () => {
+    expect(getMonthLabel(5)).toBe('10月')
+    expect(getMonthLabel(9)).toBe('11月')
+  })
+
+  it('wraps around the calendar year to 1月 after 12月', () => {
+    expect(getMonthLabel(13)).toBe('12月')
+    expect(getMonthLabel(17)).toBe('1月')
+  })
+
+  it('ends the school year at 8月 on the last week of the year', () => {
+    expect(getMonthLabel(WEEKS_PER_YEAR)).toBe('8月')
   })
 })

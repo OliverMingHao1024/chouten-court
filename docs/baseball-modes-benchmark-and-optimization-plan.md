@@ -481,7 +481,7 @@ HUD 或行程帶必須回答：
 
 ## 12. 建議實作路線：四個可獨立交付的版本
 
-目前總覽：**基礎 MVP 已完成；V1 已完成；V2 已完成；V3 僅完成賽後原因層；V4 尚未開始。**
+目前總覽：**基礎 MVP 已完成；V1 已完成；V2 已完成；V3 已完成；V4 尚未開始。**
 
 ### V1：每週都看得懂（已完成）
 
@@ -512,17 +512,19 @@ HUD 或行程帶必須回答：
 
 **成功指標**：相同名冊下，不同玩家能形成至少兩種合理培養路線，而不是永遠選同一屬性。
 
-### V3：比賽真的需要教練（初期）
+### V3：比賽真的需要教練（已完成）
 
 - [x] 對手風格與偵察(資訊層,見下方補充;戰術相性仍是 M2 的未來範圍)。
 - [x] 四節比分、BOX(引擎版四節+個人得分/籃板/助攻,見下方補充;領先曲線/關鍵球員仍未做)。
-- [ ] 2–4 次關鍵回合決策。
-- [ ] 快速結果／關鍵回合兩種速度。
+- [x] 2–4 次關鍵回合決策(真互動版,見下方補充)。
+- [x] 快速結果／關鍵回合兩種速度(隨時可按「快速結果」跳過剩餘節數與決策)。
 - [x] 勝敗最多三項原因與下一步建議。
 
 補充(2026-08-22)：新增 `opponentStyle.ts`——對手校隊風格(快攻/外線/禁區/壓迫/防守紀律)沿用 `opponentAce.ts` 同屆固定、換屆重生的種子模式,純敘事資訊,**不影響戰力或勝率計算**(校隊風格真正接上戰術相性/戰力調整是 M2 的範圍,這裡先只做資訊層,降低風險)。新增「偵察」門檻:聲望達到 `SCOUTING_REPUTATION_THRESHOLD`(=55)才視為已偵察,呼應招生/特殊能力既有的聲望解鎖慣例,不需要新增存檔欄位。已偵察時額外顯示對手戰力的模糊區間(`scoutedStrengthRange`,真實值前後各 4 分,不直接洩漏精確數字)與王牌弱點一句話描述(`describeAceWeakness`,比較王牌自己的得分/三分兩項屬性)。`SeasonMatchScreen.tsx` 賽前資訊卡新增對應區塊。
 
 補充(2026-08-22)：四節比分改以**引擎版**落地(討論後放棄了風險較小的敘事版,因為那個版本事後生成分數、不參與模擬過程,之後做「關鍵回合決策」時無法在真實的節/時間點插入互動)。新增 `quarterSimulation.ts` 的 `simulateQuarters(teamStrength, opponentStrength, varianceRange, rng)`,取代 `officialMatch.ts` 的 `simulateOfficialGame` 原本呼叫 `computeMatchWinProbability` 的單次擲骰(`rng() < winProbability`):現在改成真的跑 4 節,每節重新對我方戰力疊加一次隨機噪音(沿用 `computePerformanceVarianceRange` 決定的波動範圍)換算成分差,加總四節分數,**由四節總分決定輸贏**,不再是機率骰;極少數分數打平的情況用一次額外的銅板 rng() 決定勝方,不重擲整場。單場 rng() 消耗量從原本固定 2 次變成固定 12 次(平手時 13 次),但完全不影響既有測試——`officialMatch.test.ts`/`App.test.tsx` 原本就用「跑很多個 seed 找出符合條件的一個」或「跑大量 seed 驗證統計趨勢」的寫法,沒有任何測試假設特定 seed 對應特定輸贏,所以全數維持通過。`OfficialGameResult`/`AdvanceSeasonWeekResult`/`GameSummaryResult` 新增 `boxScore: { quarters, final }` 欄位一路透傳到 `GameSummaryDialog.tsx` 顯示逐節比分。**刻意縮小範圍**:只有正式賽(`simulateOfficialGame`)換成引擎版;練習賽(`weeklyAction.ts` 的 `applyPracticeMatch`)與練習賽訓練卡(`trainingCardResolution.ts`)維持原本的單次擲骰,`computeMatchWinProbability`/`computeWinProbability` 兩個函式都還在用、沒有刪除。賽前預覽(`matchPreview.ts` 的「基準勝率」)也維持不動,概念上仍是「開打前的機率估計」,跟正式開打後的引擎式逐節結果本來就是兩套獨立的呈現。
+
+補充(2026-08-22)：關鍵回合決策採**真互動版**——玩家的選擇真的會改變剩下比賽的模擬參數,不是事後標記的敘事。核心是把原本一次算完 4 節的 `simulateOfficialGame` 拆成三段:`setupOfficialGameQuarters`(算好戰力/波動範圍與這場比賽專屬的 rng)、`quarterSimulation.ts` 新增的 `simulateOneQuarter`(單節模擬,可傳入 `QuarterModifier` 疊加分差加成與波動倍率)、`resolveOfficialGameAfterQuarters`(四節結束後接續同一個 rng 做疲勞/受傷/成長結算)。`simulateOfficialGame` 仍保留,只是變成呼叫這三段的便利包裝(全自動、無決策),對外行為完全不變。新增 `keyMoments.ts`:分差在 ±6 分內(原創數值,待調校)才視為「膠著」,在第 1~3 節結束後(0-based `isKeyMomentTrigger`)可能跳出決策,最後一節結束後不再詢問;四個選項(加速反攻/穩紮穩打/收縮防守/交給球員自由發揮)各自對應不同的 `marginBonus`/`varianceMultiplier`,`auto` 選項的效果完全等於中性(不套用任何加成),數學上跟全自動模擬一致。新增 `KeyMomentGameScreen.tsx`:用 `useRef` 持有這場比賽專屬的 rng 與戰力參數(在 React render 之間保持同一個有狀態的 rng 實例),`useEffect` 鏈自動逐節推進,分差夠接近時暫停跳出決策 UI;玩家隨時可以按「快速結果」跳過剩餘節數與所有決策,直接用中性參數把剩下的節數模擬完——這就是「快速結果／關鍵回合兩種速度」的實作,兩種路徑最終都走同一套 `resolveOfficialGameAfterQuarters` 收尾。**架構調整**:`season.ts` 的 `advanceSeasonWeek` 不再自己呼叫 `simulateOfficialGame`,改成接手「已經算好的 `OfficialGameResult`」——因為現在比賽結果可能來自全自動一次算完,也可能來自玩家逐節互動,`season.ts` 不需要也不該關心過程,只做戰績/晉級簿記。`App.tsx` 新增 `team.livePlay` 這個純執行期狀態(不寫入存檔,離開/重整會直接放棄這場進行到一半的比賽,回到賽前畫面重新開打),點擊「開打」先鎖定戰術/陣容進入 `KeyMomentGameScreen`,比賽完成後才呼叫 `advanceSeasonWeek` 走原本的賽季推進流程。
 
 補充(2026-08-22)：只有逐節團隊比分,沒有個人數據(得分/籃板/助攻)會不夠真實,因此追加 BOX——新增 `boxScoreStats.ts` 的 `distributePlayerStats(teamPoints, roster, lineup, rng)`,把 `simulateQuarters` 算出的官方全隊得分,依出賽權重(沿用 `lineup.ts` 既有的先發6:輪替3 戰力加權)與對應屬性(得分看投籃/三分平均、籃板看籃板、助攻看傳球)分配給每位先發/輪替球員,搭配 ±15% 抖動避免數據精準跟屬性成正比;用「最大餘數法」取整數,確保個人得分加總後精確等於官方全隊得分。籃板/助攻的全隊總量是獨立的原創基準值(34±6、15±4),不受官方比分限制。**刻意縮小範圍,只做全場總計**:不分節,單純是統計式的事後分配,不是真正逐節都各自模擬一次個人數據;用獨立種子(`hashSeed('...boxstats')`)呼叫,完全不影響 `simulateOfficialGame`/`season.ts` 既有的 rng 消耗順序與測試。`GameSummaryDialog.tsx` 的「先發與主要輪替」清單新增得分/籃板/助攻,不另開一個獨立區塊。
 

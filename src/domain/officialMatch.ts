@@ -93,21 +93,51 @@ export interface OfficialGameResult {
   boxScore: { quarters: QuarterScore[]; final: QuarterScore }
 }
 
-export function simulateOfficialGame(
+export interface OfficialGameQuarterSetup {
+  /** 從 seed 建立、狀態隨每次呼叫而變的 rng;必須全程沿用同一個實例,才能讓「先跑幾節、
+   * 中途插入關鍵回合決策、再接著跑剩下的節」跟「一次跑完四節」消耗的亂數序列前後一致。 */
+  rng: Rng
+  teamStrength: number
+  opponentStrength: number
+  varianceRange: number
+}
+
+/**
+ * 算出模擬四節比分所需的固定參數(我方戰力、對手戰力、表現波動範圍)與這場比賽專屬的
+ * rng。拆成獨立函式是為了讓「全自動一次跑完」跟「逐節搭配關鍵回合決策」共用同一套setup,
+ * 不必各自重算一次戰力。
+ */
+export function setupOfficialGameQuarters(
   roster: Player[],
   phase: OfficialPhase,
   seed: number,
   tactics: GameTactics,
   opponentAce: OpponentAce,
   lineup: GameLineup,
-): OfficialGameResult {
+): OfficialGameQuarterSetup {
   const rng = createSeededRng(seed)
   const opponentStrength = PHASE_OPPONENT_STRENGTH[phase] + computeAceStrengthBonus(opponentAce)
   const tacticWeights = computeTacticAttributeWeights(tactics)
   const clutchActive = isClutchPhase(phase)
   const teamStrength = computeTeamStrength(roster, tacticWeights, lineup, clutchActive)
   const varianceRange = computePerformanceVarianceRange(roster, lineup)
-  const { quarters, final, outcome } = simulateQuarters(teamStrength, opponentStrength, varianceRange, rng)
+  return { rng, teamStrength, opponentStrength, varianceRange }
+}
+
+/**
+ * 四節比分與輸贏都已經確定後,接續同一個 rng 完成疲勞/受傷/實戰成長結算。不管四節是一次
+ * 跑完、還是逐節搭配關鍵回合決策跑完,這段收尾邏輯完全相同,只在乎「最終的四節比分與輸贏
+ * 是什麼」,不在乎過程怎麼跑出來的。
+ */
+export function resolveOfficialGameAfterQuarters(
+  roster: Player[],
+  phase: OfficialPhase,
+  rng: Rng,
+  lineup: GameLineup,
+  quarters: QuarterScore[],
+  final: QuarterScore,
+  outcome: 'win' | 'loss',
+): OfficialGameResult {
   const majorInjuryWeeks = PHASE_MAJOR_INJURY_WEEKS[phase]
   const growth: GameGrowthEntry[] = []
   const fatiguedRoster = roster.map((player) => {
@@ -142,6 +172,27 @@ export function simulateOfficialGame(
     return fatigued
   })
   return { outcome, roster: fatiguedRoster, growth, boxScore: { quarters, final } }
+}
+
+/**
+ * 全自動一次跑完四節(不觸發任何關鍵回合決策),供「快速結果」路徑與既有呼叫端使用。
+ */
+export function simulateOfficialGame(
+  roster: Player[],
+  phase: OfficialPhase,
+  seed: number,
+  tactics: GameTactics,
+  opponentAce: OpponentAce,
+  lineup: GameLineup,
+): OfficialGameResult {
+  const setup = setupOfficialGameQuarters(roster, phase, seed, tactics, opponentAce, lineup)
+  const { quarters, final, outcome } = simulateQuarters(
+    setup.teamStrength,
+    setup.opponentStrength,
+    setup.varianceRange,
+    setup.rng,
+  )
+  return resolveOfficialGameAfterQuarters(roster, phase, setup.rng, lineup, quarters, final, outcome)
 }
 
 /**
