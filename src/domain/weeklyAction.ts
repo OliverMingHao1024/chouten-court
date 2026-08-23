@@ -14,7 +14,11 @@ const ROLL_GROWTH: Record<number, number> = {
   6: 3,
 }
 
-export const TRAINING_LOAD = 8
+// 2026-08-24 從 8 調降到 6(原創數值,待調校):全隊訓練卡的負荷是套用到「整個名冊」
+// 每人身上,疊多張同屬性卡(觸發連鎖加成)最容易把全隊體力一次推高很多,是「體力耗盡過快」
+// 回饋裡影響最大的單一因素;連同 matchEngine.ts 的 BASELINE_RECOVERY 一起調整,讓積極訓練
+// 的取捨依然存在,但不會一週就把整隊操到疲勞警戒線。
+export const TRAINING_LOAD = 6
 
 // 全隊休養:不練習、沒有成長,換取確定且比訓練更大的體力恢復(原創數值,待調校)。
 export const TEAM_REST_LOAD = -10

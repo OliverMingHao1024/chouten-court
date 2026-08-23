@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   advancePlayerWeek,
   applyFatigueDelta,
+  BASELINE_RECOVERY,
   clamp,
   computeMatchWinProbability,
   computePerformanceVarianceRange,
@@ -53,8 +54,12 @@ describe('computeRecoveryRate', () => {
   it('stays within the declared individual variance band around the baseline', () => {
     const roster = createInitialRoster(1)
     for (const player of roster) {
-      expect(computeRecoveryRate({ ...player, grade: 2 })).toBeGreaterThanOrEqual(10 - RECOVERY_INDIVIDUAL_VARIANCE)
-      expect(computeRecoveryRate({ ...player, grade: 2 })).toBeLessThanOrEqual(10 + RECOVERY_INDIVIDUAL_VARIANCE)
+      expect(computeRecoveryRate({ ...player, grade: 2 })).toBeGreaterThanOrEqual(
+        BASELINE_RECOVERY - RECOVERY_INDIVIDUAL_VARIANCE,
+      )
+      expect(computeRecoveryRate({ ...player, grade: 2 })).toBeLessThanOrEqual(
+        BASELINE_RECOVERY + RECOVERY_INDIVIDUAL_VARIANCE,
+      )
     }
   })
 

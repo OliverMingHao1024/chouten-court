@@ -10,7 +10,11 @@ function hasAbility(player: Player, ability: SpecialAbilityKey): boolean {
 export const FATIGUE_MIN = 0
 export const FATIGUE_MAX = 100
 export const ATTRIBUTE_MAX = 99
-export const BASELINE_RECOVERY = 10
+// 2026-08-24 從 10 調高到 12(原創數值,待調校):實際試玩回饋每週訓練後體力耗盡過快,
+// 尤其是疊多張全隊訓練卡湊同屬性連鎖加成時,體力淨增幅明顯高於單純訓練/練習賽帶來的節奏
+// 感——調高基準回復量讓「不特意休養也大致撐得住」的容錯空間變大,休養卡與練習賽的取捨
+// 依然有意義,不是把疲勞系統拿掉。
+export const BASELINE_RECOVERY = 12
 // 恢復能力的個別差異(原創數值,待調校):與受傷抗性(玻璃體質的高受傷機率)是各自獨立的概念,
 // 差異幅度刻意壓低,不足以讓特定球員必然無法或必然適合擔任主力。由球員 id 雜湊決定,終身固定。
 export const RECOVERY_INDIVIDUAL_VARIANCE = 2

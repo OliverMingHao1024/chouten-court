@@ -56,6 +56,12 @@
   gap: var(--space-2);
 }
 
+/* 選中且需要子選項(個別訓練/練習賽)的卡,連同下方展開的子選項一起佔滿整列,讓選項
+   就在選中的卡片下面出現,不用往下捲到另一個彙整區塊找。 */
+.training-card-pool__grid-item--expanded {
+  grid-column: 1 / -1;
+}
+
 .training-card-pool__card {
   width: 100%;
   display: flex;
@@ -136,6 +142,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  margin-top: var(--space-2);
   padding: var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius);

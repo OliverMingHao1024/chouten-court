@@ -98,6 +98,24 @@ describe('TrainingCardPoolScreen', () => {
     expect(selected).toHaveLength(MAX_CARDS_PER_WEEK)
   })
 
+  it('shows the sub-choice panel inside the selected card itself, not in a separate section', async () => {
+    const user = userEvent.setup()
+    const card = makeCard({ id: 'a', kind: 'individualTraining', attribute: null })
+    const { container } = render(
+      <TrainingCardPoolScreen pool={makePool([card])} trainingPoints={10} maxTrainingPoints={10} players={players} reputation={100} opponentNames={opponentNames} onConfirm={() => {}} />,
+    )
+    // 選之前,那張卡所在的格子還沒展開。
+    const listItem = screen.getByRole('button', { name: /個別訓練/ }).closest('li')!
+    expect(listItem.querySelector('.training-card-pool__sub-choice')).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: /個別訓練/ }))
+
+    // 選了之後,子選項就在同一個 <li> 裡面,不是頁面上另一個獨立區塊。
+    expect(listItem.querySelector('.training-card-pool__sub-choice')).not.toBeNull()
+    expect(listItem).toHaveClass('training-card-pool__grid-item--expanded')
+    expect(container.querySelectorAll('.training-card-pool__sub-choice')).toHaveLength(1)
+  })
+
   it('disables a card whose cost would exceed the remaining points', () => {
     const cards = [makeCard({ id: 'a', kind: 'practiceMatch', attribute: null })]
     render(

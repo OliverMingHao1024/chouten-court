@@ -206,8 +206,14 @@ export function TrainingCardPoolScreen({
           const disabled = !selected && (selectedCards.length >= maxCardsPerWeek || cost > remainingAfterSelection)
           const effectTier = cardEffectTier(card)
           const affinity = card.kind === 'teamTraining' && card.attribute ? computeAffinityHint(card.attribute, players) : null
+          // 選中且需要子選項的卡,連同子選項一起佔滿整列(見下方 CSS),讓選項就在選中的
+          // 那張卡下面展開,不用往下捲到另一個彙整區塊找。
+          const expanded = selected && (card.kind === 'individualTraining' || card.kind === 'practiceMatch')
           return (
-            <li key={card.id}>
+            <li
+              key={card.id}
+              className={expanded ? 'training-card-pool__grid-item--expanded' : undefined}
+            >
               <button
                 type="button"
                 className={`training-card-pool__card${selected ? ' training-card-pool__card--selected' : ''}`}
@@ -249,83 +255,80 @@ export function TrainingCardPoolScreen({
                   </span>
                 )}
               </button>
+
+              {selected && card.kind === 'individualTraining' && (
+                <div className="training-card-pool__sub-choice">
+                  <p className="training-card-pool__sub-choice-label">選球員與要教的特殊能力</p>
+                  <select
+                    aria-label={`${card.id}-player`}
+                    value={individualChoices[card.id]?.playerId ?? ''}
+                    onChange={(e) =>
+                      setIndividualChoices((prev) => ({ ...prev, [card.id]: { playerId: e.target.value } }))
+                    }
+                  >
+                    <option value="" disabled>
+                      選球員
+                    </option>
+                    {players
+                      .filter((player) => player.injuryStatus === 'healthy' || player.injuryStatus === 'returning')
+                      .map((player) => (
+                        <option key={player.id} value={player.id}>
+                          {player.name}
+                        </option>
+                      ))}
+                  </select>
+                  {(() => {
+                    const choice = individualChoices[card.id]
+                    const selectedPlayer = players.find((player) => player.id === choice?.playerId)
+                    if (!selectedPlayer) return null
+                    const learnable = learnableAbilitiesForPlayer(selectedPlayer, reputation, bonusAbilitySlots)
+                    return (
+                      <div className="training-card-pool__attribute-picker" role="group" aria-label="個別訓練能力">
+                        {learnable.length === 0 && (
+                          <p className="training-card-pool__sub-choice-label">
+                            {selectedPlayer.name}已經學會目前解鎖的所有特殊能力
+                          </p>
+                        )}
+                        {learnable.map((ability) => (
+                          <button
+                            key={ability}
+                            type="button"
+                            className={`training-card-pool__attribute-button${choice?.ability === ability ? ' training-card-pool__attribute-button--selected' : ''}`}
+                            onClick={() =>
+                              setIndividualChoices((prev) => ({ ...prev, [card.id]: { ...prev[card.id], ability } }))
+                            }
+                          >
+                            {SPECIAL_ABILITY_LABELS[ability]}
+                          </button>
+                        ))}
+                      </div>
+                    )
+                  })()}
+                </div>
+              )}
+
+              {selected && card.kind === 'practiceMatch' && (
+                <div className="training-card-pool__sub-choice">
+                  <p className="training-card-pool__sub-choice-label">選對手強度</p>
+                  <div className="training-card-pool__options">
+                    {PRACTICE_STRENGTHS.map((strength) => (
+                      <button
+                        key={strength}
+                        type="button"
+                        className={`training-card-pool__option${strengthChoices[card.id] === strength ? ' training-card-pool__option--selected' : ''}`}
+                        onClick={() => setStrengthChoices((prev) => ({ ...prev, [card.id]: strength }))}
+                      >
+                        <span className="training-card-pool__option-label">{opponentNames[strength]}</span>
+                        <span className="training-card-pool__option-rate">{STRENGTH_LABELS[strength]}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </li>
           )
         })}
       </ul>
-
-      {selectedCards
-        .filter((card) => card.kind === 'individualTraining')
-        .map((card) => {
-          const choice = individualChoices[card.id]
-          const selectedPlayer = players.find((player) => player.id === choice?.playerId)
-          const learnable = selectedPlayer ? learnableAbilitiesForPlayer(selectedPlayer, reputation, bonusAbilitySlots) : []
-          return (
-            <div key={card.id} className="training-card-pool__sub-choice">
-              <p className="training-card-pool__sub-choice-label">個別訓練:選球員與要教的特殊能力</p>
-              <select
-                aria-label={`${card.id}-player`}
-                value={choice?.playerId ?? ''}
-                onChange={(e) =>
-                  setIndividualChoices((prev) => ({ ...prev, [card.id]: { playerId: e.target.value } }))
-                }
-              >
-                <option value="" disabled>
-                  選球員
-                </option>
-                {players
-                  .filter((player) => player.injuryStatus === 'healthy' || player.injuryStatus === 'returning')
-                  .map((player) => (
-                    <option key={player.id} value={player.id}>
-                      {player.name}
-                    </option>
-                  ))}
-              </select>
-              {selectedPlayer && (
-                <div className="training-card-pool__attribute-picker" role="group" aria-label="個別訓練能力">
-                  {learnable.length === 0 && (
-                    <p className="training-card-pool__sub-choice-label">
-                      {selectedPlayer.name}已經學會目前解鎖的所有特殊能力
-                    </p>
-                  )}
-                  {learnable.map((ability) => (
-                    <button
-                      key={ability}
-                      type="button"
-                      className={`training-card-pool__attribute-button${choice?.ability === ability ? ' training-card-pool__attribute-button--selected' : ''}`}
-                      onClick={() =>
-                        setIndividualChoices((prev) => ({ ...prev, [card.id]: { ...prev[card.id], ability } }))
-                      }
-                    >
-                      {SPECIAL_ABILITY_LABELS[ability]}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )
-        })}
-
-      {selectedCards
-        .filter((card) => card.kind === 'practiceMatch')
-        .map((card) => (
-          <div key={card.id} className="training-card-pool__sub-choice">
-            <p className="training-card-pool__sub-choice-label">練習賽:選對手強度</p>
-            <div className="training-card-pool__options">
-              {PRACTICE_STRENGTHS.map((strength) => (
-                <button
-                  key={strength}
-                  type="button"
-                  className={`training-card-pool__option${strengthChoices[card.id] === strength ? ' training-card-pool__option--selected' : ''}`}
-                  onClick={() => setStrengthChoices((prev) => ({ ...prev, [card.id]: strength }))}
-                >
-                  <span className="training-card-pool__option-label">{opponentNames[strength]}</span>
-                  <span className="training-card-pool__option-rate">{STRENGTH_LABELS[strength]}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        ))}
 
       <button type="button" className="button-primary" disabled={!canConfirm} onClick={handleConfirm}>
         確認本週訓練
