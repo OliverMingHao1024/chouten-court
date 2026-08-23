@@ -13,6 +13,7 @@ import {
   type TrainingCardPoolState,
 } from '../../domain/trainingCardPool'
 import type { CardSelection } from '../../domain/trainingCardResolution'
+import { suggestTrainingCardSelections } from '../../domain/trainingCardSuggestion'
 import { computeTeamFocusStyle, FOCUS_DISCOUNT } from '../../domain/trainingDirection'
 import { ATTRIBUTE_LABELS, PERSONALITY_LABELS, type AttributeKey, type Player } from '../../domain/types'
 import {
@@ -114,6 +115,35 @@ export function TrainingCardPoolScreen({
     })
   }
 
+  /**
+   * 快速選擇:不想每週細調時,一鍵套用依「效果強度/花費」性價比選出的組合,個別訓練/
+   * 練習賽的子選項也一併給合理預設;套用後仍是一般的已選狀態,可以再手動調整或取消,
+   * 不會直接送出。呼應陣容畫面既有的「一鍵建議陣容」設計。
+   */
+  function applyQuickPick() {
+    const suggestions = suggestTrainingCardSelections(
+      pool,
+      players,
+      trainingPoints,
+      reputation,
+      maxCardsPerWeek,
+      bonusAbilitySlots,
+    )
+    setSelectedIds(suggestions.map((selection) => selection.card.id))
+    const nextIndividualChoices: Record<string, IndividualChoice> = {}
+    const nextStrengthChoices: Record<string, PracticeStrength> = {}
+    for (const selection of suggestions) {
+      if (selection.card.kind === 'individualTraining') {
+        nextIndividualChoices[selection.card.id] = { playerId: selection.playerId, ability: selection.ability }
+      }
+      if (selection.card.kind === 'practiceMatch' && selection.strength) {
+        nextStrengthChoices[selection.card.id] = selection.strength
+      }
+    }
+    setIndividualChoices(nextIndividualChoices)
+    setStrengthChoices(nextStrengthChoices)
+  }
+
   const allSubChoicesFilled = selectedCards.every((card) => {
     if (card.kind === 'individualTraining') {
       const choice = individualChoices[card.id]
@@ -154,13 +184,18 @@ export function TrainingCardPoolScreen({
         </p>
       )}
 
-      <p className="training-card-pool__points">
-        訓練點數 {trainingPoints - selectedCards.reduce((sum, card) => sum + cardCost(card, focusStyle), 0)} /{' '}
-        {maxTrainingPoints}
-        {selectedCards.length > 0 && (
-          <span className="training-card-pool__points-preview">(已選 {selectedCards.length} 張,剩餘 {remainingAfterSelection})</span>
-        )}
-      </p>
+      <div className="training-card-pool__points-row">
+        <p className="training-card-pool__points">
+          訓練點數 {trainingPoints - selectedCards.reduce((sum, card) => sum + cardCost(card, focusStyle), 0)} /{' '}
+          {maxTrainingPoints}
+          {selectedCards.length > 0 && (
+            <span className="training-card-pool__points-preview">(已選 {selectedCards.length} 張,剩餘 {remainingAfterSelection})</span>
+          )}
+        </p>
+        <button type="button" className="training-card-pool__quick-pick" onClick={applyQuickPick}>
+          快速選擇
+        </button>
+      </div>
 
       <ul className="training-card-pool__grid" role="group" aria-label="訓練卡池">
         {pool.cards.map((card) => {

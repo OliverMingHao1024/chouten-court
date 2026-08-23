@@ -131,6 +131,65 @@ describe('TrainingCardPoolScreen', () => {
     expect(onConfirm).toHaveBeenCalledWith([{ card, strength: 'weak' }])
   })
 
+  it('quick-pick selects cards, fills sub-choices, and can be confirmed directly', async () => {
+    const user = userEvent.setup()
+    const onConfirm = vi.fn()
+    const restCard = makeCard({ id: 'rest', kind: 'rest', attribute: null, age: 0 })
+    const individualCard = makeCard({ id: 'individual', kind: 'individualTraining', attribute: null, age: 0 })
+    render(
+      <TrainingCardPoolScreen
+        pool={makePool([restCard, individualCard])}
+        trainingPoints={10}
+        maxTrainingPoints={10}
+        players={players}
+        reputation={100}
+        opponentNames={opponentNames}
+        onConfirm={onConfirm}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: '快速選擇' }))
+
+    expect(screen.getByRole('button', { name: /休養/ })).toHaveClass('training-card-pool__card--selected')
+    expect(screen.getByRole('button', { name: /個別訓練/ })).toHaveClass('training-card-pool__card--selected')
+    // 個別訓練子選項應該已經有預設的球員/能力,不需要再手動選才能確認
+    expect(screen.getByRole('button', { name: '確認本週訓練' })).toBeEnabled()
+
+    await user.click(screen.getByRole('button', { name: '確認本週訓練' }))
+    expect(onConfirm).toHaveBeenCalledOnce()
+    const selections = onConfirm.mock.calls[0][0]
+    expect(selections).toHaveLength(2)
+    const individualSelection = selections.find((s: { card: PoolCard }) => s.card.id === 'individual')
+    expect(individualSelection.playerId).toBeDefined()
+    expect(individualSelection.ability).toBeDefined()
+  })
+
+  it('quick-pick can be re-applied to replace a manual selection', async () => {
+    const user = userEvent.setup()
+    const restCard = makeCard({ id: 'rest', kind: 'rest', attribute: null, age: 0 })
+    const teamCard = makeCard({ id: 'team', kind: 'teamTraining', attribute: 'three', age: 0 })
+    render(
+      <TrainingCardPoolScreen
+        pool={makePool([restCard, teamCard])}
+        trainingPoints={3}
+        maxTrainingPoints={10}
+        players={players}
+        reputation={100}
+        opponentNames={opponentNames}
+        onConfirm={() => {}}
+      />,
+    )
+
+    // 手動選一張(不同於快速選擇會選的那張),再用快速選擇覆蓋掉。
+    await user.click(screen.getByRole('button', { name: /三分/ }))
+    expect(screen.getByRole('button', { name: /三分/ })).toHaveClass('training-card-pool__card--selected')
+
+    await user.click(screen.getByRole('button', { name: '快速選擇' }))
+    // 預算只有 1 點,快速選擇只買得起休養卡(cost 1),三分卡(cost 3)會被換掉。
+    expect(screen.getByRole('button', { name: /休養/ })).toHaveClass('training-card-pool__card--selected')
+    expect(screen.getByRole('button', { name: /三分/ })).not.toHaveClass('training-card-pool__card--selected')
+  })
+
   it('resets the selection after confirming', async () => {
     const user = userEvent.setup()
     const card = makeCard({ id: 'a', kind: 'rest', attribute: null })
