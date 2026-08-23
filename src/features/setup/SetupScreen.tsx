@@ -1,6 +1,13 @@
 import { useId, useState } from 'react'
 import { generateCoachName } from '../../domain/nameGenerator'
 import type { SchoolHistoryEntry } from '../../domain/schoolHistory'
+import {
+  STARTING_SCENARIO_DESCRIPTIONS,
+  STARTING_SCENARIO_LABELS,
+  STARTING_SCENARIOS,
+  type StartingScenario,
+} from '../../domain/startingScenario'
+import { HallOfFameDialog } from './HallOfFameDialog'
 import './SetupScreen.css'
 
 export type ChallengeMode = 'short' | 'long'
@@ -13,6 +20,7 @@ export interface SetupScreenProps {
     coachName: string,
     seedInput: string | undefined,
     challengeMode: ChallengeMode,
+    scenario: StartingScenario,
   ) => void
 }
 
@@ -30,6 +38,7 @@ export function SetupScreen({ schoolHistory, onSubmit }: SetupScreenProps) {
   const [coachName, setCoachName] = useState(() => generateCoachName(Math.random))
   const [seedInput, setSeedInput] = useState('')
   const [challengeMode, setChallengeMode] = useState<ChallengeMode>('long')
+  const [scenario, setScenario] = useState<StartingScenario>('standard')
 
   const canSubmit = coachName.trim().length > 0
 
@@ -58,7 +67,10 @@ export function SetupScreen({ schoolHistory, onSubmit }: SetupScreenProps) {
 
       {schoolHistory.length > 0 && (
         <div className="setup__history">
-          <h2 className="setup__history-title">校史</h2>
+          <div className="setup__history-header">
+            <h2 className="setup__history-title">校史</h2>
+            <HallOfFameDialog schoolHistory={schoolHistory} />
+          </div>
           <ul className="setup__history-list">
             {[...schoolHistory].reverse().map((entry, index) => (
               <li key={index} className="setup__history-entry">
@@ -82,9 +94,27 @@ export function SetupScreen({ schoolHistory, onSubmit }: SetupScreenProps) {
           event.preventDefault()
           if (!canSubmit) return
           const trimmedSeed = seedInput.trim()
-          onSubmit(TEAM_NAME, coachName.trim(), trimmedSeed.length > 0 ? trimmedSeed : undefined, challengeMode)
+          onSubmit(TEAM_NAME, coachName.trim(), trimmedSeed.length > 0 ? trimmedSeed : undefined, challengeMode, scenario)
         }}
       >
+        <div className="setup__field">
+          <span>開局情境</span>
+          <div className="setup__mode-row" role="radiogroup" aria-label="開局情境">
+            {STARTING_SCENARIOS.map((option) => (
+              <label key={option} className="setup__mode-option">
+                <input
+                  type="radio"
+                  name="scenario"
+                  value={option}
+                  checked={scenario === option}
+                  onChange={() => setScenario(option)}
+                />
+                {STARTING_SCENARIO_LABELS[option]}
+              </label>
+            ))}
+          </div>
+          <p className="setup__mode-hint">{STARTING_SCENARIO_DESCRIPTIONS[scenario]}</p>
+        </div>
         <div className="setup__field">
           <span>執教模式</span>
           <div className="setup__mode-row" role="radiogroup" aria-label="執教模式">

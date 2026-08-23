@@ -67,6 +67,7 @@ export function buildSchoolHistoryEntry(
   careerLog: SeasonRecord[],
   reason: CareerEndReason,
   championRoster: Player[] | null,
+  graduateLog: string[] = [],
 ): SchoolHistoryEntry {
   const summary = summarizeCareer(careerLog, reason)
   return {
@@ -76,6 +77,7 @@ export function buildSchoolHistoryEntry(
     totalWins: summary.totalWins,
     totalLosses: summary.totalLosses,
     bestPlacementLabel: summary.bestPlacement ? FINAL4_PLACEMENT_LABEL[summary.bestPlacement] : '未曾闖進四強',
+    notableGraduates: graduateLog.slice(-5),
     championRoster: championRoster
       ? championRoster.map((player) => ({
           name: player.name,
@@ -199,7 +201,7 @@ export function resolveOfficialGameWeek(
 
     if (isChampionRun(result.placement)) {
       careerEnded = 'champion'
-      appendSchoolHistoryEntry(buildSchoolHistoryEntry(state.coachName, careerLog, careerEnded, players))
+      appendSchoolHistoryEntry(buildSchoolHistoryEntry(state.coachName, careerLog, careerEnded, players, graduateLog))
     } else {
       const { roster: advancedRoster, graduates } = advanceGrades(players)
       players = advancedRoster
@@ -214,7 +216,7 @@ export function resolveOfficialGameWeek(
 
         if (hasReachedInsuranceCap(eraCount)) {
           careerEnded = 'insuranceCap'
-          appendSchoolHistoryEntry(buildSchoolHistoryEntry(state.coachName, careerLog, careerEnded, null))
+          appendSchoolHistoryEntry(buildSchoolHistoryEntry(state.coachName, careerLog, careerEnded, null, graduateLog))
         } else {
           if (
             state.challengeMode === 'short' &&

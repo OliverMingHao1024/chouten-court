@@ -79,4 +79,31 @@ describe('createInitialRoster', () => {
       expect(player.height).toBeLessThanOrEqual(max)
     }
   })
+
+  it('shifts every attribute by attributeShift when provided, defaulting to no shift', () => {
+    const baseline = createInitialRoster(1)
+    const shiftedUp = createInitialRoster(1, undefined, 10)
+    const shiftedDown = createInitialRoster(1, undefined, -10)
+    for (let i = 0; i < baseline.length; i++) {
+      for (const key of Object.keys(baseline[i].attributes) as (keyof typeof baseline)[]) {
+        expect(shiftedUp[i].attributes[key as never]).toBe(baseline[i].attributes[key as never] + 10)
+        expect(shiftedDown[i].attributes[key as never]).toBe(baseline[i].attributes[key as never] - 10)
+      }
+    }
+  })
+
+  it('clamps a shifted attribute to the global attribute bounds instead of overflowing', () => {
+    const roster = createInitialRoster(1, undefined, 1000)
+    for (const player of roster) {
+      for (const value of Object.values(player.attributes)) {
+        expect(value).toBeLessThanOrEqual(99)
+      }
+    }
+    const zeroedOut = createInitialRoster(1, undefined, -1000)
+    for (const player of zeroedOut) {
+      for (const value of Object.values(player.attributes)) {
+        expect(value).toBeGreaterThanOrEqual(0)
+      }
+    }
+  })
 })

@@ -43,6 +43,7 @@
   gap: 4px;
   background: var(--bg);
   border: 1px solid var(--border);
+  border-top: 3px solid var(--border);
   border-radius: var(--radius);
   padding: var(--space-2);
   cursor: pointer;
@@ -50,9 +51,47 @@
   text-align: left;
 }
 
+/* 位置色碼:與名冊畫面(RosterScreen)一致,一眼分辨候選人場上位置。 */
+.recruiting-card__candidate[data-position='PG'] {
+  border-top-color: var(--position-pg);
+}
+.recruiting-card__candidate[data-position='SG'] {
+  border-top-color: var(--position-sg);
+}
+.recruiting-card__candidate[data-position='SF'] {
+  border-top-color: var(--position-sf);
+}
+.recruiting-card__candidate[data-position='PF'] {
+  border-top-color: var(--position-pf);
+}
+.recruiting-card__candidate[data-position='C'] {
+  border-top-color: var(--position-c);
+}
+
 .recruiting-card__candidate--selected {
   border-color: var(--accent-strong);
+  border-top-color: var(--accent-strong);
   box-shadow: 0 0 0 1px var(--accent-strong);
+}
+
+.recruiting-card__candidate-position {
+  font-weight: 700;
+}
+
+.recruiting-card__candidate[data-position='PG'] .recruiting-card__candidate-position {
+  color: var(--position-pg);
+}
+.recruiting-card__candidate[data-position='SG'] .recruiting-card__candidate-position {
+  color: var(--position-sg);
+}
+.recruiting-card__candidate[data-position='SF'] .recruiting-card__candidate-position {
+  color: var(--position-sf);
+}
+.recruiting-card__candidate[data-position='PF'] .recruiting-card__candidate-position {
+  color: var(--position-pf);
+}
+.recruiting-card__candidate[data-position='C'] .recruiting-card__candidate-position {
+  color: var(--position-c);
 }
 
 .recruiting-card__candidate-name {

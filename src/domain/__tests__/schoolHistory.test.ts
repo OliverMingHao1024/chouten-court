@@ -12,6 +12,7 @@ function makeEntry(overrides: Partial<SchoolHistoryEntry> = {}): SchoolHistoryEn
     totalLosses: 8,
     bestPlacementLabel: '亞軍',
     championRoster: null,
+    notableGraduates: [],
     ...overrides,
   }
 }
@@ -33,6 +34,15 @@ describe('loadSchoolHistory', () => {
   it('returns an empty array when the stored value is not an array of valid entries', () => {
     window.localStorage.setItem(SCHOOL_HISTORY_STORAGE_KEY, JSON.stringify([{ coachName: 123 }]))
     expect(loadSchoolHistory()).toEqual([])
+  })
+
+  it('normalizes a pre-existing entry with no notableGraduates field to an empty array, instead of rejecting the whole history', () => {
+    const { notableGraduates: _omitted, ...legacyEntry } = makeEntry({ coachName: '舊資料教練' })
+    window.localStorage.setItem(SCHOOL_HISTORY_STORAGE_KEY, JSON.stringify([legacyEntry]))
+    const history = loadSchoolHistory()
+    expect(history).toHaveLength(1)
+    expect(history[0].coachName).toBe('舊資料教練')
+    expect(history[0].notableGraduates).toEqual([])
   })
 })
 
@@ -61,6 +71,12 @@ describe('appendSchoolHistoryEntry', () => {
     })
     appendSchoolHistoryEntry(entry)
     expect(loadSchoolHistory()[0].championRoster).toEqual([{ name: '王小明', position: 'PG', overallGrade: 'S' }])
+  })
+
+  it('round-trips notableGraduates when provided', () => {
+    const entry = makeEntry({ notableGraduates: ['王小明畢業後獲得職業球隊試訓邀約。'] })
+    appendSchoolHistoryEntry(entry)
+    expect(loadSchoolHistory()[0].notableGraduates).toEqual(['王小明畢業後獲得職業球隊試訓邀約。'])
   })
 
   it('caps the stored history at MAX_SCHOOL_HISTORY_ENTRIES, dropping the oldest first', () => {

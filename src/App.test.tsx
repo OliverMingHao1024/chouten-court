@@ -161,6 +161,17 @@ describe('App', () => {
     expect(roster).toHaveLength(12)
   })
 
+  it('starts with a higher reputation when the 老牌名校接班 starting scenario is chosen', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.clear(screen.getByLabelText('教練名稱'))
+    await user.type(screen.getByLabelText('教練名稱'), '山田')
+    await user.click(screen.getByRole('radio', { name: '老牌名校接班' }))
+    await user.click(screen.getByRole('button', { name: '建隊' }))
+
+    expect(await screen.findByText(/聲望 80/)).toBeInTheDocument()
+  })
+
   it('reproduces the same roster when the same seed code is entered again', async () => {
     async function buildWithSeed() {
       window.localStorage.clear()

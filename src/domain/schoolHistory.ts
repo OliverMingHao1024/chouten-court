@@ -16,6 +16,8 @@ export interface SchoolHistoryEntry {
   bestPlacementLabel: string
   /** 只有奪冠生涯才會保留當時的奪冠隊陣容快照(「歷史隊」);其餘生涯結束時為 null。 */
   championRoster: HistoricalPlayerSnapshot[] | null
+  /** 這屆生涯結束時的畢業生後日談精華(最近幾筆),供名人堂彙整展示。 */
+  notableGraduates: string[]
 }
 
 const SCHOOL_HISTORY_STORAGE_KEY = 'chouten-court:school-history'
@@ -38,7 +40,13 @@ function isValidHistoricalPlayerSnapshot(value: unknown): value is HistoricalPla
   return true
 }
 
-function isValidSchoolHistoryEntry(value: unknown): value is SchoolHistoryEntry {
+/**
+ * notableGraduates 是後補欄位:舊資料沒有這個欄位時仍視為有效(校史的定位就是「什麼都不會
+ * 被清空」,新增欄位不該讓既有玩家的整份校史因格式檢查失敗而被判定無效、直接消失)。
+ */
+function isValidSchoolHistoryEntry(
+  value: unknown,
+): value is Omit<SchoolHistoryEntry, 'notableGraduates'> & { notableGraduates?: unknown } {
   if (!isPlainObject(value)) return false
   if (typeof value.coachName !== 'string') return false
   if (typeof value.reason !== 'string' || !CAREER_END_REASONS.includes(value.reason)) return false
@@ -47,6 +55,11 @@ function isValidSchoolHistoryEntry(value: unknown): value is SchoolHistoryEntry 
   if (typeof value.bestPlacementLabel !== 'string') return false
   if (value.championRoster !== null) {
     if (!Array.isArray(value.championRoster) || !value.championRoster.every(isValidHistoricalPlayerSnapshot)) {
+      return false
+    }
+  }
+  if (value.notableGraduates !== undefined) {
+    if (!Array.isArray(value.notableGraduates) || !value.notableGraduates.every((g) => typeof g === 'string')) {
       return false
     }
   }
@@ -60,7 +73,10 @@ export function loadSchoolHistory(): SchoolHistoryEntry[] {
     if (!raw) return []
     const parsed: unknown = JSON.parse(raw)
     if (!Array.isArray(parsed) || !parsed.every(isValidSchoolHistoryEntry)) return []
-    return parsed
+    return parsed.map((entry) => ({
+      ...entry,
+      notableGraduates: Array.isArray(entry.notableGraduates) ? entry.notableGraduates : [],
+    }))
   } catch {
     return []
   }

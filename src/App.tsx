@@ -38,7 +38,8 @@ import {
   type EventCard,
 } from './domain/events'
 import { generateCandidatePool, signCandidates, type Candidate } from './domain/recruiting'
-import { applyReputationDelta, INITIAL_REPUTATION } from './domain/reputation'
+import { applyReputationDelta } from './domain/reputation'
+import { STARTING_SCENARIO_ATTRIBUTE_SHIFT, STARTING_SCENARIO_REPUTATION } from './domain/startingScenario'
 import { createInitialRoster, ROSTER_SIZE } from './domain/roster'
 import { createSeededRng, hashSeed } from './domain/rng'
 import { computeScheduleStrip, weeksUntilNextOfficialMatch } from './domain/schedule'
@@ -381,25 +382,26 @@ function App() {
     return (
       <SetupScreen
         schoolHistory={loadSchoolHistory()}
-        onSubmit={(teamName, coachName, seedInput, challengeMode) => {
+        onSubmit={(teamName, coachName, seedInput, challengeMode, scenario) => {
           const seed = hashSeed(seedInput ?? `${teamName}:${coachName}`)
           const slotId = createSaveSlot(`${teamName}・${coachName}`)
           setActiveSlotId(slotId)
           setSlots(listSaveSlots())
           setCreatingNewSlot(false)
+          const startingReputation = STARTING_SCENARIO_REPUTATION[scenario]
           setTeam({
             teamName,
             coachName,
             seed,
             totalWeek: 1,
-            players: createInitialRoster(seed),
+            players: createInitialRoster(seed, ROSTER_SIZE, STARTING_SCENARIO_ATTRIBUTE_SHIFT[scenario]),
             lastResult: null,
             seasonGameLog: [],
             cardPool: createInitialCardPool(createSeededRng(hashSeed(`${seed}-cardpool-init`))),
-            trainingPoints: maxTrainingPoints(INITIAL_REPUTATION),
+            trainingPoints: maxTrainingPoints(startingReputation),
             cardPoolResult: null,
             eventRevealResult: null,
-            reputation: INITIAL_REPUTATION,
+            reputation: startingReputation,
             graduateLog: [],
             recruitingCandidates: null,
             careerLog: [],
@@ -464,7 +466,9 @@ function App() {
                 }
                 const careerEndedByAge: CareerEndReason | null = hasReachedInsuranceCap(eraCount) ? 'insuranceCap' : null
                 if (careerEndedByAge) {
-                  appendSchoolHistoryEntry(buildSchoolHistoryEntry(team.coachName, team.careerLog, careerEndedByAge, null))
+                  appendSchoolHistoryEntry(
+                    buildSchoolHistoryEntry(team.coachName, team.careerLog, careerEndedByAge, null, graduateLog),
+                  )
                 }
                 setTeam({
                   ...team,
@@ -619,11 +623,11 @@ function App() {
       <EventScreen
         key={team.totalWeek}
         card={card}
-        featuredPlayerName={featuredPlayer.name}
+        featuredPlayer={featuredPlayer}
         lastResult={team.lastResult}
         onChoose={(risk) => {
           const resolutionRng = createSeededRng(hashSeed(`${team.seed}-${team.totalWeek}-event-resolve`))
-          const resolution = resolveEventChoice(card, risk, featuredPlayer.name, resolutionRng)
+          const resolution = resolveEventChoice(card, risk, featuredPlayer, resolutionRng)
 
           const players = team.players.map((player) => {
             if (player.id !== featuredPlayer.id) return player
@@ -764,7 +768,9 @@ function App() {
         open={team.pendingChallengeDecision && !team.pendingSeasonSummary}
         onContinue={() => setTeam({ ...team, pendingChallengeDecision: false })}
         onEnd={() => {
-          appendSchoolHistoryEntry(buildSchoolHistoryEntry(team.coachName, team.careerLog, 'shortChallengeComplete', null))
+          appendSchoolHistoryEntry(
+            buildSchoolHistoryEntry(team.coachName, team.careerLog, 'shortChallengeComplete', null, team.graduateLog),
+          )
           setTeam({ ...team, pendingChallengeDecision: false, careerEnded: 'shortChallengeComplete' })
         }}
       />

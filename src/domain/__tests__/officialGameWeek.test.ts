@@ -134,6 +134,30 @@ describe('resolveOfficialGameWeek', () => {
     expect(history).toHaveLength(1)
     expect(history[0].reason).toBe('champion')
     expect(history[0].championRoster).not.toBeNull()
+    expect(history[0].notableGraduates).toEqual([])
+  })
+
+  it('carries the most recent 5 graduate-log entries into the school history on a championship-winning season', () => {
+    const maxAttributes = Object.fromEntries(ATTRIBUTE_KEYS.map((key) => [key, 99])) as AttributeSet
+    const players = createInitialRoster(1).map((p) => ({ ...p, grade: 3, attributes: maxAttributes }))
+    const lineup = fullLineup(players)
+    const finalWeek = getPhaseWeekRange('final4').start + 1
+
+    let seed = 0
+    while (simulateOfficialGame(players, 'final4', seed, DEFAULT_TACTICS, testAce, lineup).outcome !== 'win') seed++
+
+    const graduateLog = Array.from({ length: 7 }, (_, i) => `畢業生 ${i} 的後日談。`)
+    const state = baseState({
+      totalWeek: finalWeek,
+      players,
+      graduateLog,
+      seasonGameLog: [{ totalWeek: finalWeek - 1, phase: 'final4', outcome: 'win' }],
+    })
+    const gameResult = simulateOfficialGame(players, 'final4', seed, DEFAULT_TACTICS, testAce, lineup)
+
+    resolveOfficialGameWeek(state, gameResult)
+
+    expect(loadSchoolHistory()[0].notableGraduates).toEqual(graduateLog.slice(-5))
   })
 
   it('advances graduation/recruiting and never writes school history when the career continues', () => {

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { SetupScreen } from './SetupScreen'
@@ -19,7 +19,7 @@ describe('SetupScreen', () => {
     await user.type(screen.getByLabelText('種子碼(選填)'), 'lucky-seed')
     await user.click(screen.getByRole('button', { name: '建隊' }))
 
-    expect(onSubmit).toHaveBeenCalledWith('淡水高中', '山田', 'lucky-seed', 'long')
+    expect(onSubmit).toHaveBeenCalledWith('淡水高中', '山田', 'lucky-seed', 'long', 'standard')
   })
 
   it('submits undefined seed when the seed field is left blank', async () => {
@@ -31,7 +31,7 @@ describe('SetupScreen', () => {
     await user.type(screen.getByLabelText('教練名稱'), '山田')
     await user.click(screen.getByRole('button', { name: '建隊' }))
 
-    expect(onSubmit).toHaveBeenCalledWith('淡水高中', '山田', undefined, 'long')
+    expect(onSubmit).toHaveBeenCalledWith('淡水高中', '山田', undefined, 'long', 'standard')
   })
 
   it('defaults to 長期生涯 mode and submits 短局 mode once switched', async () => {
@@ -45,7 +45,22 @@ describe('SetupScreen', () => {
     await user.click(screen.getByRole('radio', { name: '三年挑戰' }))
     await user.click(screen.getByRole('button', { name: '建隊' }))
 
-    expect(onSubmit).toHaveBeenCalledWith('淡水高中', expect.any(String), undefined, 'short')
+    expect(onSubmit).toHaveBeenCalledWith('淡水高中', expect.any(String), undefined, 'short', 'standard')
+  })
+
+  it('defaults to 一般接班 scenario and submits the selected scenario once switched', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(<SetupScreen schoolHistory={[]} onSubmit={onSubmit} />)
+
+    expect(screen.getByRole('radio', { name: '一般接班' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: '新手教練接弱校' })).not.toBeChecked()
+    expect(screen.getByRole('radio', { name: '老牌名校接班' })).not.toBeChecked()
+
+    await user.click(screen.getByRole('radio', { name: '老牌名校接班' }))
+    await user.click(screen.getByRole('button', { name: '建隊' }))
+
+    expect(onSubmit).toHaveBeenCalledWith('淡水高中', expect.any(String), undefined, 'long', 'contender')
   })
 
   it('pre-fills the coach name field with a randomly generated name', () => {
@@ -78,7 +93,7 @@ describe('SetupScreen', () => {
   })
 
   it('lists past careers, most recent first, including a champion roster snapshot', () => {
-    render(
+    const { container } = render(
       <SetupScreen
         schoolHistory={[
           {
@@ -89,6 +104,7 @@ describe('SetupScreen', () => {
             totalLosses: 8,
             bestPlacementLabel: '亞軍',
             championRoster: null,
+            notableGraduates: [],
           },
           {
             coachName: '第二任',
@@ -97,6 +113,7 @@ describe('SetupScreen', () => {
             totalWins: 20,
             totalLosses: 2,
             bestPlacementLabel: '冠軍',
+            notableGraduates: [],
             championRoster: [{ name: '王小明', position: 'PG', overallGrade: 'S' }],
           },
         ]}
@@ -105,9 +122,10 @@ describe('SetupScreen', () => {
     )
 
     expect(screen.getByText('校史')).toBeInTheDocument()
-    const entries = screen.getAllByText(/教練・/)
+    const historyList = container.querySelector<HTMLElement>('.setup__history-list')!
+    const entries = within(historyList).getAllByText(/教練・/)
     expect(entries[0]).toHaveTextContent('第二任')
     expect(entries[1]).toHaveTextContent('第一任')
-    expect(screen.getByText(/王小明\(S\)/)).toBeInTheDocument()
+    expect(within(historyList).getByText(/王小明\(S\)/)).toBeInTheDocument()
   })
 })

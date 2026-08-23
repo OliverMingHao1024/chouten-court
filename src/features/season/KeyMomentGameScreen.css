@@ -10,16 +10,53 @@
   gap: var(--space-3);
 }
 
-.key-moment-game__opponent {
-  margin: 0;
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  font-weight: 600;
+/* 計分板式呈現(呼應球類轉播比分條慣例):我方用主色、對手用中性色,大字體數字
+   一眼就能讀出目前比分,不必先讀完一行文字才知道誰領先。 */
+.key-moment-game__scoreboard {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
 }
 
-.key-moment-game__score {
-  margin: 0;
-  font-size: 1.6rem;
+.key-moment-game__scoreboard-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.key-moment-game__scoreboard-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.key-moment-game__scoreboard-side--us .key-moment-game__scoreboard-label {
+  color: var(--accent-strong);
+}
+
+.key-moment-game__scoreboard-score {
+  font-size: 2.4rem;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.key-moment-game__scoreboard-side--us .key-moment-game__scoreboard-score {
+  color: var(--accent-strong);
+}
+
+.key-moment-game__scoreboard-vs {
+  color: var(--text-muted);
+  font-size: 0.8rem;
   font-weight: 700;
 }
 
@@ -41,7 +78,17 @@
   padding: 4px;
   background: var(--bg);
   border: 1px solid var(--border);
+  border-top: 3px solid var(--border);
   border-radius: var(--radius);
+}
+
+/* 每節結果色碼:贏該節=勝場綠、輸該節=敗場紅,還沒打的節維持中性邊框。 */
+.key-moment-game__quarters li[data-result='win'] {
+  border-top-color: var(--win);
+}
+
+.key-moment-game__quarters li[data-result='loss'] {
+  border-top-color: var(--loss);
 }
 
 .key-moment-game__quarter-label {

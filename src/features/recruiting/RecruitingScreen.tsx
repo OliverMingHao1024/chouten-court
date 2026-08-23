@@ -39,12 +39,14 @@ export function RecruitingScreen({ candidates, vacancies, announcement, onConfir
               <button
                 type="button"
                 className={`recruiting-card__candidate${selected ? ' recruiting-card__candidate--selected' : ''}`}
+                data-position={candidate.position}
                 aria-pressed={selected}
                 onClick={() => toggle(candidate.id)}
               >
                 <div className="recruiting-card__candidate-name">{candidate.name}</div>
                 <div className="recruiting-card__candidate-meta">
-                  {candidate.position} · {candidate.height}cm · {PERSONALITY_LABELS[candidate.personality]}
+                  <span className="recruiting-card__candidate-position">{candidate.position}</span> ·{' '}
+                  {candidate.height}cm · {PERSONALITY_LABELS[candidate.personality]}
                 </div>
                 <ul className="recruiting-card__ranges">
                   {ATTRIBUTE_KEYS.map((key) => {

@@ -130,14 +130,24 @@ export function KeyMomentGameScreen({
 
   return (
     <section className="key-moment-game">
-      <p className="key-moment-game__opponent">VS {opponentName}</p>
-      <p className="key-moment-game__score">
-        目前比分 {runningFinal.us} - {runningFinal.them}
-      </p>
+      <div className="key-moment-game__scoreboard">
+        <div className="key-moment-game__scoreboard-side key-moment-game__scoreboard-side--us">
+          <span className="key-moment-game__scoreboard-label">我方</span>
+          <span className="key-moment-game__scoreboard-score">{runningFinal.us}</span>
+        </div>
+        <span className="key-moment-game__scoreboard-vs">VS</span>
+        <div className="key-moment-game__scoreboard-side key-moment-game__scoreboard-side--them">
+          <span className="key-moment-game__scoreboard-score">{runningFinal.them}</span>
+          <span className="key-moment-game__scoreboard-label">{opponentName}</span>
+        </div>
+      </div>
 
       <ul className="key-moment-game__quarters" aria-label="逐節比分">
         {quarters.map((quarter, index) => (
-          <li key={index}>
+          <li
+            key={index}
+            data-result={quarter.us === quarter.them ? 'tie' : quarter.us > quarter.them ? 'win' : 'loss'}
+          >
             <span className="key-moment-game__quarter-label">第{index + 1}節</span>
             <span className="key-moment-game__quarter-score">
               {quarter.us} - {quarter.them}

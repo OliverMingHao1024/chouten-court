@@ -1,3 +1,4 @@
+import { clamp, ATTRIBUTE_MAX as GLOBAL_ATTRIBUTE_MAX } from './matchEngine'
 import { generatePersonName } from './nameGenerator'
 import { createSeededRng, type Rng } from './rng'
 import { computeStyleTag } from './styleTag'
@@ -33,10 +34,15 @@ export function randomHeight(position: Position, rng: Rng): number {
   return randomInt(rng, min, max)
 }
 
-function randomAttributes(rng: Rng): AttributeSet {
+/**
+ * attributeShift 疊加到每項屬性的隨機範圍上(原創數值,待調校),供開局起始情境
+ * (startingScenario.ts)調整名冊強度;預設 0,行為與過去完全相同。結果仍 clamp 到全域
+ * 屬性上限,避免「老牌名校」情境把新生初始屬性推到不合理的滿值。
+ */
+function randomAttributes(rng: Rng, attributeShift = 0): AttributeSet {
   const attrs = {} as AttributeSet
   for (const key of ATTRIBUTE_KEYS) {
-    attrs[key] = randomInt(rng, ATTRIBUTE_MIN, ATTRIBUTE_MAX)
+    attrs[key] = clamp(randomInt(rng, ATTRIBUTE_MIN, ATTRIBUTE_MAX) + attributeShift, 0, GLOBAL_ATTRIBUTE_MAX)
   }
   return attrs
 }
@@ -76,14 +82,14 @@ function generateUniquePlayerName(rng: Rng, usedNames: Set<string>): string {
   return name
 }
 
-export function createInitialRoster(seed: number, size: number = ROSTER_SIZE): Player[] {
+export function createInitialRoster(seed: number, size: number = ROSTER_SIZE, attributeShift = 0): Player[] {
   const rng = createSeededRng(seed)
   const positions = assignPositions(size, rng)
   const grades = assignGrades(size, rng)
   const usedNames = new Set<string>()
 
   return Array.from({ length: size }, (_, index) => {
-    const attributes = randomAttributes(rng)
+    const attributes = randomAttributes(rng, attributeShift)
     const personality = PERSONALITY_KEYS[randomInt(rng, 0, PERSONALITY_KEYS.length - 1)]
     const position = positions[index]
     return {

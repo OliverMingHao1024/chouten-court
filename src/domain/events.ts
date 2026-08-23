@@ -1,6 +1,6 @@
 import { ATTRIBUTE_MAX, clamp, FATIGUE_MAX, FATIGUE_MIN } from './matchEngine'
 import type { Rng } from './rng'
-import type { AttributeKey } from './types'
+import { ATTRIBUTE_KEYS, type AttributeKey, type Player } from './types'
 
 // 隨機事件卡系統:每個非賽季週有機率觸發一張情境卡,教練需在三檔風險中擇一應對。
 // 純原創設計(分類、卡牌內容、數值皆為本專案原創),概念上參考「分類事件 + 風險選項」
@@ -462,16 +462,46 @@ export interface EventResolution {
   reputationDelta: number
 }
 
-export function resolveEventChoice(card: EventCard, risk: EventRisk, playerName: string, rng: Rng): EventResolution {
+// 事件成功率的球員修正(原創數值,待調校):同一張卡、同一個風險選項,不同球員處理起來
+// 難度不同——不再是全隊共用一個固定成功率。以「該選項成功結果會成長的屬性」(沒有指定屬性
+// 的選項退回綜合屬性平均)相對 50 分的落差,小幅推高/拉低基礎成功率;個性再疊加一次小幅
+// 修正:抗壓型在「放手一搏」較穩、穩健型在「穩妥處理」較穩、玻璃體質整體略不穩定,呼應
+// 這兩型個性原本就與抗壓/風險相關的設定。上下限夾住,任何情況都不會變成必成功或必失敗。
+export const EVENT_ATTRIBUTE_SUCCESS_SCALE = 0.004
+export const EVENT_PERSONALITY_SUCCESS_BONUS = 0.1
+export const EVENT_MIN_SUCCESS_CHANCE = 0.1
+export const EVENT_MAX_SUCCESS_CHANCE = 0.95
+
+function relevantAttributeValue(choice: EventChoice, player: Player): number {
+  const key = choice.onSuccess.attribute
+  if (key) return player.attributes[key]
+  return ATTRIBUTE_KEYS.reduce((sum, k) => sum + player.attributes[k], 0) / ATTRIBUTE_KEYS.length
+}
+
+function personalitySuccessAdjustment(risk: EventRisk, player: Player): number {
+  if (player.personality === 'fragile') return -EVENT_PERSONALITY_SUCCESS_BONUS / 2
+  if (risk === 'bold' && player.personality === 'clutch') return EVENT_PERSONALITY_SUCCESS_BONUS
+  if (risk === 'safe' && player.personality === 'steady') return EVENT_PERSONALITY_SUCCESS_BONUS
+  return 0
+}
+
+/** 這名球員面對這個選項的實際成功率;供畫面顯示與 resolveEventChoice 共用同一套計算。 */
+export function computeEventSuccessChance(choice: EventChoice, player: Player): number {
+  const attributeAdjustment = (relevantAttributeValue(choice, player) - 50) * EVENT_ATTRIBUTE_SUCCESS_SCALE
+  const adjusted = choice.successChance + attributeAdjustment + personalitySuccessAdjustment(choice.risk, player)
+  return clamp(adjusted, EVENT_MIN_SUCCESS_CHANCE, EVENT_MAX_SUCCESS_CHANCE)
+}
+
+export function resolveEventChoice(card: EventCard, risk: EventRisk, player: Player, rng: Rng): EventResolution {
   const choice = card.choices.find((c) => c.risk === risk)
   if (!choice) throw new Error(`event card ${card.id} has no choice for risk ${risk}`)
 
-  const succeeded = rng() < choice.successChance
+  const succeeded = rng() < computeEventSuccessChance(choice, player)
   const outcome = succeeded ? choice.onSuccess : choice.onFailure
 
   return {
     succeeded,
-    text: fillEventTemplate(outcome.text, playerName),
+    text: fillEventTemplate(outcome.text, player.name),
     attribute: outcome.attribute,
     attributeDelta: outcome.attributeDelta ?? 0,
     fatigueDelta: outcome.fatigueDelta ?? 0,

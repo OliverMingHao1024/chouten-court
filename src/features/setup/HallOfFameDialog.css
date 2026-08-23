@@ -1,0 +1,104 @@
+.hall-of-fame-trigger {
+  background: none;
+  border: 1px solid var(--accent-strong);
+  color: var(--accent-strong);
+  border-radius: var(--radius);
+  padding: 2px var(--space-3);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.hall-of-fame-dialog {
+  border: none;
+  border-radius: var(--radius);
+  padding: 0;
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-card);
+  color: var(--text);
+  max-width: min(90vw, 480px);
+  max-height: 85vh;
+}
+
+.hall-of-fame-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.hall-of-fame-dialog__content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  overflow-y: auto;
+}
+
+.hall-of-fame-dialog__stats {
+  display: flex;
+  gap: var(--space-4);
+  margin: 0;
+  padding: var(--space-3);
+  background: var(--bg);
+  border-radius: var(--radius);
+}
+
+.hall-of-fame-dialog__stats dt {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.hall-of-fame-dialog__stats dd {
+  margin: 0;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--accent-strong);
+}
+
+.hall-of-fame-dialog__section h3 {
+  font-size: 0.95rem;
+  margin: 0 0 var(--space-2);
+}
+
+.hall-of-fame-dialog__champion-list,
+.hall-of-fame-dialog__graduate-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.hall-of-fame-dialog__champion-entry {
+  border-left: 3px solid var(--accent);
+  padding-left: var(--space-2);
+}
+
+.hall-of-fame-dialog__champion-headline {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.hall-of-fame-dialog__champion-roster {
+  margin: 2px 0 0;
+  font-size: 0.75rem;
+  color: var(--accent-strong);
+}
+
+.hall-of-fame-dialog__graduate-list li {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-2);
+}
+
+.hall-of-fame-dialog__graduate-list li:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.hall-of-fame-dialog__empty {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
