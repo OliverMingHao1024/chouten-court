@@ -215,7 +215,11 @@ export function TrainingCardPoolScreen({
                 disabled={disabled}
                 onClick={() => toggleCard(card)}
               >
-                <span className="training-card-pool__card-kind">{KIND_LABELS[card.kind]}</span>
+                {/* 卡種標籤只在全隊訓練卡顯示(標題已經是屬性名);其他卡種的標題本身就是卡種名稱,
+                    再重複一次卡種標籤是純粹的重複資訊,拿掉能少一整行。 */}
+                {card.kind === 'teamTraining' && (
+                  <span className="training-card-pool__card-kind">{KIND_LABELS[card.kind]}</span>
+                )}
                 <span className="training-card-pool__card-title">{cardTitle(card)}</span>
                 <span className="training-card-pool__card-cost">
                   {discounted && <span className="training-card-pool__card-cost-original">{baseCost}</span>}
@@ -225,18 +229,23 @@ export function TrainingCardPoolScreen({
                   {'●'.repeat(effectTier)}
                   {'○'.repeat(MAX_EFFECT_TIER - effectTier)}
                 </span>
+                {/* 個性契合與球風契合合併成一行(以「・」分隔),原本各佔一行資訊量偏重。 */}
                 {affinity && (affinity.personalityCount > 0 || affinity.styleCount > 0) && (
-                  <span className="training-card-pool__card-affinity">
-                    {affinity.personalityCount > 0 && (
-                      <span title={`${affinity.personalityLabel}訓練此屬性效果更好`}>
-                        ★{affinity.personalityLabel} {affinity.personalityCount}人
-                      </span>
-                    )}
-                    {affinity.styleCount > 0 && (
-                      <span title={`已是「${affinity.styleLabel}型」球風的球員,此屬性會強化既有優勢`}>
-                        {affinity.styleLabel}型契合 {affinity.styleCount}人
-                      </span>
-                    )}
+                  <span
+                    className="training-card-pool__card-affinity"
+                    title={[
+                      affinity.personalityCount > 0 ? `${affinity.personalityLabel}訓練此屬性效果更好` : null,
+                      affinity.styleCount > 0 ? `已是「${affinity.styleLabel}型」球風的球員,此屬性會強化既有優勢` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(';')}
+                  >
+                    {[
+                      affinity.personalityCount > 0 ? `★${affinity.personalityCount}人` : null,
+                      affinity.styleCount > 0 ? `${affinity.styleLabel}型${affinity.styleCount}人` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
                   </span>
                 )}
               </button>

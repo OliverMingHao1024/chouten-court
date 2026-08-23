@@ -127,12 +127,9 @@
 }
 
 .training-card-pool__card-affinity {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1px;
   font-size: 0.62rem;
   color: var(--accent-strong);
+  text-align: center;
 }
 
 .training-card-pool__sub-choice {

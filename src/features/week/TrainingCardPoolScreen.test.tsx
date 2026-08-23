@@ -25,6 +25,54 @@ describe('TrainingCardPoolScreen', () => {
     expect(screen.getAllByText('三分')).toHaveLength(9)
   })
 
+  it('does not repeat the kind label on non-teamTraining cards, since the title already says it', () => {
+    const cards = [
+      makeCard({ id: 'rest', kind: 'rest', attribute: null }),
+      makeCard({ id: 'individual', kind: 'individualTraining', attribute: null }),
+      makeCard({ id: 'practice', kind: 'practiceMatch', attribute: null }),
+    ]
+    const { container } = render(
+      <TrainingCardPoolScreen pool={makePool(cards)} trainingPoints={10} maxTrainingPoints={10} players={players} reputation={100} opponentNames={opponentNames} onConfirm={() => {}} />,
+    )
+    expect(container.querySelectorAll('.training-card-pool__card-kind')).toHaveLength(0)
+    // 標題本身還是有顯示卡種名稱,只是不再重複一次。
+    expect(screen.getByText('休養')).toBeInTheDocument()
+    expect(screen.getByText('個別訓練')).toBeInTheDocument()
+    expect(screen.getByText('練習賽')).toBeInTheDocument()
+  })
+
+  it('combines personality and style affinity hints into a single line', () => {
+    const geniusPlayer = { ...players[0], personality: 'genius' as const }
+    const shootingStylePlayer = {
+      ...players[1],
+      styleTag: { ...players[1].styleTag, primary: 'shooting' as const },
+    }
+    const cards = [makeCard({ id: 'team', kind: 'teamTraining', attribute: 'three' })]
+    render(
+      <TrainingCardPoolScreen
+        pool={makePool(cards)}
+        trainingPoints={10}
+        maxTrainingPoints={10}
+        players={[geniusPlayer, shootingStylePlayer, ...players.slice(2)]}
+        reputation={100}
+        opponentNames={opponentNames}
+        onConfirm={() => {}}
+      />,
+    )
+    // 個性契合(★N人)與球風契合(OO型N人)合併成一行,中間用「・」分隔。
+    expect(screen.getByText(/★\d+人 · .+型\d+人/)).toBeInTheDocument()
+  })
+
+  it('still shows the teamTraining kind label above the attribute title', () => {
+    const cards = [makeCard({ id: 'team', kind: 'teamTraining', attribute: 'three' })]
+    const { container } = render(
+      <TrainingCardPoolScreen pool={makePool(cards)} trainingPoints={10} maxTrainingPoints={10} players={players} reputation={100} opponentNames={opponentNames} onConfirm={() => {}} />,
+    )
+    expect(container.querySelectorAll('.training-card-pool__card-kind')).toHaveLength(1)
+    expect(screen.getByText('全隊訓練')).toBeInTheDocument()
+    expect(screen.getByText('三分')).toBeInTheDocument()
+  })
+
   it('selects a card on click and shows it as selected, then deselects on a second click', async () => {
     const user = userEvent.setup()
     const cards = [makeCard({ id: 'a', kind: 'rest', attribute: null })]
