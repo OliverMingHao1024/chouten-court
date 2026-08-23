@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { getOpponentTier } from '../../domain/opponentTier'
 import { learnableAbilitiesForPlayer, SPECIAL_ABILITY_LABELS, type SpecialAbilityKey } from '../../domain/specialAbilities'
 import { primaryStyleForAttribute, STYLE_LABELS } from '../../domain/styleTag'
@@ -100,6 +100,7 @@ export function TrainingCardPoolScreen({
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [individualChoices, setIndividualChoices] = useState<Record<string, IndividualChoice>>({})
   const [strengthChoices, setStrengthChoices] = useState<Record<string, PracticeStrength>>({})
+  const confirmButtonRef = useRef<HTMLButtonElement>(null)
 
   const focusStyle = computeTeamFocusStyle(players)
   const selectedCards = pool.cards.filter((card) => selectedIds.includes(card.id))
@@ -142,6 +143,11 @@ export function TrainingCardPoolScreen({
     }
     setIndividualChoices(nextIndividualChoices)
     setStrengthChoices(nextStrengthChoices)
+    // 套用建議後,子選項展開會讓頁面變高、確認按鈕的位置往下移;等這次 render 真的畫出來
+    // (下一個 frame)後再捲動,才會捲到按鈕實際落點,不是套用前的舊位置。
+    requestAnimationFrame(() => {
+      confirmButtonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    })
   }
 
   const allSubChoicesFilled = selectedCards.every((card) => {
@@ -330,7 +336,7 @@ export function TrainingCardPoolScreen({
         })}
       </ul>
 
-      <button type="button" className="button-primary" disabled={!canConfirm} onClick={handleConfirm}>
+      <button ref={confirmButtonRef} type="button" className="button-primary" disabled={!canConfirm} onClick={handleConfirm}>
         確認本週訓練
       </button>
     </section>

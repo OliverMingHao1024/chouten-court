@@ -14,6 +14,12 @@ if (typeof HTMLDialogElement !== 'undefined' && !HTMLDialogElement.prototype.sho
   }
 }
 
+// jsdom doesn't implement Element.scrollIntoView(); shim it as a no-op so components that
+// call it (e.g. scrolling to a button after an auto-fill action) don't throw in tests.
+if (typeof Element !== 'undefined' && !Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = function () {}
+}
+
 // The save system persists to localStorage; without this, a save written by one test
 // would leak into the next test's fresh render.
 beforeEach(() => {

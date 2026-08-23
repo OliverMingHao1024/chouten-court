@@ -574,6 +574,8 @@ HUD 或行程帶必須回答：
 - [x] 訓練卡池畫面精簡:拿掉重複的卡種標籤、個性/球風契合提示合併成一行(見下方補充)。
 - [x] 訓練卡子選項內嵌到選中的卡片本身,不再是頁面下方另一個彙整區塊(見下方補充)。
 - [x] 疲勞平衡調校:基礎回復量調高、訓練負荷調降(見下方補充;同步更新 `docs/spec.md` 第 11 節)。
+- [x] 快速選擇套用後自動捲動到確認按鈕(見下方補充)。
+- [x] 結果彈窗改成逐行/逐區塊淡入的揭曉動畫(見下方補充)。
 
 補充（2026-08-23）：新增 `opponentRoster.ts` 的 `generateOpponentRoster(seed, size)`,包裝既有的 `createInitialRoster` 產生一份跟我方名冊同規格的完整對手名冊。`SeasonMatchScreen` 在已偵察(`isOpponentScouted(reputation)` 或永久解鎖影片分析室)時,新增一個可展開的「對手名冊」清單,顯示每位球員的姓名/位置/年級評等。**刻意縮小範圍**:純資訊展示,不影響戰力計算——正式賽勝負仍由 `matchEngine.ts` 既有的戰力/戰術模型決定,對手名冊不是「真的在場上打球的 12 人」,只是給玩家多一點資訊感。
 
@@ -600,6 +602,12 @@ HUD 或行程帶必須回答：
 補充（2026-08-24）:訓練卡的子選項(個別訓練選球員/選能力、練習賽選強度)原本集中在卡池格子下方另一個彙整區塊,選中一張卡後要往下捲一段才找得到對應的設定,回應「盡量讓選擇都產生在同一個畫面中」的要求,把子選項直接內嵌到選中的那張卡片裡:`training-card-pool__grid` 用 CSS Grid,選中且需要子選項的格子加上 `training-card-pool__grid-item--expanded`(`grid-column: 1 / -1`)佔滿整列,子選項就在該格子的卡片按鈕正下方展開,不用再往下找。純畫面結構調整,資料流(`selectedIds`/`individualChoices`/`strengthChoices`)完全沒變。
 
 補充（2026-08-24）:回應「體力耗盡過快」的回饋,調校兩個疲勞相關常數(皆為原創數值,待調校)。根源是全隊訓練卡的負荷會套用到「整個名冊」的每一位球員身上,而疊多張同屬性全隊訓練卡觸發連鎖加成(`comboAttributes`)是遊戲刻意鼓勵的策略,最容易把全隊體力一次推高很多——`matchEngine.ts` 的 `BASELINE_RECOVERY` 從 10 調高到 12,`weeklyAction.ts` 的 `TRAINING_LOAD`(全隊/個別訓練共用)從 8 調降到 6。以最壞情況(一週疊 3 張全隊訓練卡)估算:調整前每人淨負荷約 `3×8 − 10 = +14`,調整後約 `3×6 − 12 = +6`,單週疲勞累積速度大致腰斬。**刻意縮小範圍**:沒有動練習賽(`PRACTICE_LOAD`)、正式賽(`OFFICIAL_MATCH_LOAD`/`ROTATION_MATCH_LOAD`)、休養(`TEAM_REST_LOAD`)——比賽本來就該讓人感覺吃重,休養本來就該是明確的恢復手段,真正造成「日常節奏」過快耗損的是訓練負荷本身,只調整這個最直接對應問題根源。
+
+補充（2026-08-24）:「快速選擇」套用建議後,選中的卡會展開子選項、頁面變高,確認按鈕的位置往下移,玩家還是得自己往下找才點得到。`TrainingCardPoolScreen.tsx` 新增 `confirmButtonRef`,套用建議後用 `requestAnimationFrame` 等這次 render 真的畫出來(子選項展開後的最終高度)才呼叫 `scrollIntoView({ behavior: 'smooth', block: 'end' })`,捲到的是套用後的實際位置,不是套用前的舊位置。順便在 `src/test/setup.ts` 補上 jsdom 沒有實作的 `Element.prototype.scrollIntoView` 空實作 shim,比照既有 `HTMLDialogElement.showModal`/`close` 的作法。
+
+補充（2026-08-24）:回應「選下一步之後就直接跳出結果,感覺少了點啥」的回饋,研究同類育成/球類模擬遊戲常見的結果揭曉手法後,幫三個結果彈窗(`TrainingCardResultDialog`、`EventResultDialog`、`GameSummaryDialog`)加上一行接一行的淡入+微幅上滑動畫,取代原本整包內容一次全部出現。做法:`src/index.css` 新增共用的 `.result-reveal`(`@keyframes result-reveal-in` + `animation-delay: var(--reveal-delay, 0ms)`,並加上 `prefers-reduced-motion` 保護),純 CSS 動畫,不用計時器或額外的 state。訓練結果與事件結果彈窗項目數少(通常 1~4 項),逐「行」錯開 80ms;賽後摘要彈窗區塊多、球員名單長度不定,若逐行錯開總時長會隨名單長度膨脹,改成逐「區塊」(戰績標題→比分→逐節→戰力→原因→球員名單→傷勢→下一步)錯開 120ms,區塊內部(例如球員清單)仍是同時出現,讓整體揭曉時間固定落在 1~1.5 秒內。三個彈窗都改用 `useResultDialog` 既有但先前沒人用的 `version` 值當作內容區塊的 React `key`,確保下一次新結果進來時(哪怕內容剛好相同)一定會重新掛載、動畫才會重播,而不是原地更新內容跳過動畫。
+
+補充（2026-08-24）:對近期熱點(訓練週流程 `App.tsx` orchestration、三個結果彈窗)跑了一輪架構檢視,找出三個 shallow module 收斂成 deep module 的機會,全部套用:(1) 新增 `src/features/shared/reveal.ts`(`revealStyle`/`createRevealStagger`),取代 `TrainingCardResultDialog`/`EventResultDialog`/`GameSummaryDialog` 三處各自手刻的 `--reveal-delay` 算式——之後要調整揭曉節奏(例如把 80ms 改成別的值)只改一處。(2) `App.tsx` 新增 `runEventChoice`/`runOfficialGameCompletion` 兩個純函式,把原本內嵌在 `onChoose`/`onComplete` JSX 事件處理常式裡的狀態轉換邏輯(球員屬性/疲勞、聲望、學校資產解鎖、宿敵戰績、賽後摘要組裝)抽出來,形狀比照既有的 `runTrainingCardWeek`——三個「一週/一次選擇會怎麼影響 Team」的轉換邏輯現在都是同一種形狀的純函式,不用透過渲染整個 `<App />` 間接測試。(3) `teamToSaveData` 從逐一列出 19 個要存的欄位,改成用物件 rest 解構排除 4 個已知的執行期欄位(`cardPoolResult`/`eventRevealResult`/`pendingGameSummary`/`livePlay`)——新增 `Team` 欄位時只需要決定一次要不要存檔,回傳型別仍是 `SaveData`,型別檢查照樣擋得住多漏欄位。三項都是純重構,不改變任何行為,既有 683 個測試全數維持通過,沒有新增或修改任何測試。
 
 ## 13. 明確不建議現在做
 

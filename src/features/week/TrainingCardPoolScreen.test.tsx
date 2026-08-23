@@ -256,6 +256,22 @@ describe('TrainingCardPoolScreen', () => {
     expect(screen.getByRole('button', { name: /三分/ })).not.toHaveClass('training-card-pool__card--selected')
   })
 
+  it('scrolls the confirm button into view after applying quick-pick, so it is reachable without manual scrolling', async () => {
+    const user = userEvent.setup()
+    const scrollIntoView = vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(() => {})
+    const card = makeCard({ id: 'rest', kind: 'rest', attribute: null, age: 0 })
+    render(
+      <TrainingCardPoolScreen pool={makePool([card])} trainingPoints={10} maxTrainingPoints={10} players={players} reputation={100} opponentNames={opponentNames} onConfirm={() => {}} />,
+    )
+
+    expect(scrollIntoView).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: '快速選擇' }))
+    await vi.waitFor(() => expect(scrollIntoView).toHaveBeenCalledOnce())
+    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'end' })
+
+    scrollIntoView.mockRestore()
+  })
+
   it('resets the selection after confirming', async () => {
     const user = userEvent.setup()
     const card = makeCard({ id: 'a', kind: 'rest', attribute: null })

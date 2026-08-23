@@ -157,3 +157,30 @@ input {
   padding: var(--space-2) var(--space-3);
   font-size: 0.9rem;
 }
+
+/* 結果揭曉節奏(2026-08-24):結果彈窗原本整包內容一次全部出現,缺少揭曉的節奏感。
+   結果項目依序套用這個 class,搭配 --reveal-delay(每項各自的延遲,通常是 index * 80ms)
+   做出一行接一行淡入上滑的效果。呼叫端要搭配 useResultDialog 回傳的 version 當作外層
+   容器的 key,讓同一份資料再次出現(下一週的新結果)時 React 真的重新掛載、動畫才會重播,
+   不是只更新內容。 */
+@keyframes result-reveal-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.result-reveal {
+  animation: result-reveal-in 0.35s ease both;
+  animation-delay: var(--reveal-delay, 0ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .result-reveal {
+    animation: none;
+  }
+}

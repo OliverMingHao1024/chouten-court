@@ -1,5 +1,6 @@
 import { EVENT_RISK_LABELS, type EventRisk } from '../../domain/events'
 import { ATTRIBUTE_LABELS, type AttributeKey } from '../../domain/types'
+import { createRevealStagger, REVEAL_CLASS } from '../shared/reveal'
 import { useResultDialog } from '../shared/useResultDialog'
 import './EventResultDialog.css'
 
@@ -23,7 +24,7 @@ function formatSigned(value: number): string {
 }
 
 export function EventResultDialog({ result }: EventResultDialogProps) {
-  const { dialogRef, displayed } = useResultDialog(result)
+  const { dialogRef, displayed, version } = useResultDialog(result)
 
   return (
     <dialog
@@ -31,31 +32,45 @@ export function EventResultDialog({ result }: EventResultDialogProps) {
       className="event-result-dialog"
       onClick={(e) => e.target === e.currentTarget && dialogRef.current?.close()}
     >
-      {displayed && (
-        <div className="event-result-dialog__content">
-          <h2>{displayed.cardTitle}</h2>
-          <p className="event-result-dialog__verdict">
-            {EVENT_RISK_LABELS[displayed.risk]} · {displayed.succeeded ? '成功' : '失敗'}
-          </p>
-          <p className="event-result-dialog__text">{displayed.text}</p>
+      {displayed &&
+        (() => {
+          const stagger = createRevealStagger()
+          return (
+            <div className="event-result-dialog__content" key={version}>
+              <h2>{displayed.cardTitle}</h2>
+              <p className={`event-result-dialog__verdict ${REVEAL_CLASS}`} style={stagger.next()}>
+                {EVENT_RISK_LABELS[displayed.risk]} · {displayed.succeeded ? '成功' : '失敗'}
+              </p>
+              <p className={`event-result-dialog__text ${REVEAL_CLASS}`} style={stagger.next()}>
+                {displayed.text}
+              </p>
 
-          {(displayed.attribute || displayed.fatigueDelta !== 0 || displayed.reputationDelta !== 0) && (
-            <ul className="event-result-dialog__effects">
-              {displayed.attribute && displayed.attributeDelta !== 0 && (
-                <li>
-                  {ATTRIBUTE_LABELS[displayed.attribute]} {formatSigned(displayed.attributeDelta)}
-                </li>
+              {(displayed.attribute || displayed.fatigueDelta !== 0 || displayed.reputationDelta !== 0) && (
+                <ul className="event-result-dialog__effects">
+                  {displayed.attribute && displayed.attributeDelta !== 0 && (
+                    <li className={REVEAL_CLASS} style={stagger.next()}>
+                      {ATTRIBUTE_LABELS[displayed.attribute]} {formatSigned(displayed.attributeDelta)}
+                    </li>
+                  )}
+                  {displayed.fatigueDelta !== 0 && (
+                    <li className={REVEAL_CLASS} style={stagger.next()}>
+                      疲勞 {formatSigned(displayed.fatigueDelta)}
+                    </li>
+                  )}
+                  {displayed.reputationDelta !== 0 && (
+                    <li className={REVEAL_CLASS} style={stagger.next()}>
+                      聲望 {formatSigned(displayed.reputationDelta)}
+                    </li>
+                  )}
+                </ul>
               )}
-              {displayed.fatigueDelta !== 0 && <li>疲勞 {formatSigned(displayed.fatigueDelta)}</li>}
-              {displayed.reputationDelta !== 0 && <li>聲望 {formatSigned(displayed.reputationDelta)}</li>}
-            </ul>
-          )}
 
-          <button type="button" className="button-primary" onClick={() => dialogRef.current?.close()}>
-            關閉
-          </button>
-        </div>
-      )}
+              <button type="button" className="button-primary" onClick={() => dialogRef.current?.close()}>
+                關閉
+              </button>
+            </div>
+          )
+        })()}
     </dialog>
   )
 }

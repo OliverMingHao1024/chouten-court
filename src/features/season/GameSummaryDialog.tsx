@@ -1,5 +1,6 @@
 import type { QuarterScore } from '../../domain/quarterSimulation'
 import { ATTRIBUTE_LABELS, INJURY_STATUS_LABELS, type AttributeKey, type InjuryStatus } from '../../domain/types'
+import { createRevealStagger, REVEAL_CLASS } from '../shared/reveal'
 import { useResultDialog } from '../shared/useResultDialog'
 import { deriveGameSummaryNextStep, deriveGameSummaryReasons } from './gameSummaryReasons'
 import './GameSummaryDialog.css'
@@ -50,13 +51,20 @@ function GameSummaryContent({ result, onConfirm }: { result: GameSummaryResult; 
   const reasons = deriveGameSummaryReasons(result)
   const nextStep = deriveGameSummaryNextStep(result)
 
+  // 揭曉節奏(2026-08-24):賽後摘要區塊多、玩家人數不定,若逐行 stagger 總時長會隨名單長度
+  // 膨脹,所以改成「一個區塊一個延遲」——區塊內部(例如球員清單)仍是同時出現,但區塊之間
+  // 依序淡入,讓總揭曉時間固定落在 1~1.5 秒內,不受球員數量影響。
+  const stagger = createRevealStagger(120)
+
   return (
     <div className="game-summary-dialog__content">
-      <h2>{result.outcome === 'win' ? '本場獲勝' : '本場落敗'}</h2>
-      <p className="game-summary-dialog__final-score">
+      <h2 className={REVEAL_CLASS} style={stagger.next()}>
+        {result.outcome === 'win' ? '本場獲勝' : '本場落敗'}
+      </h2>
+      <p className={`game-summary-dialog__final-score ${REVEAL_CLASS}`} style={stagger.next()}>
         最終比分 {result.boxScore.final.us} - {result.boxScore.final.them}
       </p>
-      <ul className="game-summary-dialog__quarters" aria-label="逐節比分">
+      <ul className={`game-summary-dialog__quarters ${REVEAL_CLASS}`} style={stagger.next()} aria-label="逐節比分">
         {result.boxScore.quarters.map((quarter, index) => (
           <li key={index}>
             <span className="game-summary-dialog__quarter-label">第{index + 1}節</span>
@@ -66,45 +74,47 @@ function GameSummaryContent({ result, onConfirm }: { result: GameSummaryResult; 
           </li>
         ))}
       </ul>
-      <p className="game-summary-dialog__strength">
+      <p className={`game-summary-dialog__strength ${REVEAL_CLASS}`} style={stagger.next()}>
         球隊有效戰力:{result.strengthBefore.toFixed(1)} → {result.strengthAfter.toFixed(1)}(
         {formatSigned(result.strengthAfter - result.strengthBefore)})
       </p>
 
       {reasons.length > 0 && (
-        <>
+        <div className={REVEAL_CLASS} style={stagger.next()}>
           <h3>主要原因</h3>
           <ul className="game-summary-dialog__reasons">
             {reasons.map((reason, index) => (
               <li key={index}>{reason}</li>
             ))}
           </ul>
-        </>
+        </div>
       )}
 
-      <h3>先發與主要輪替</h3>
-      <ul className="game-summary-dialog__players">
-        {result.players.map((player) => (
-          <li key={player.playerId}>
-            <span className="game-summary-dialog__player-role">
-              {player.role === 'starter' ? '先發' : '輪替'}
-            </span>
-            <span className="game-summary-dialog__player-name">{player.playerName}</span>
-            <span className="game-summary-dialog__player-stats">
-              {player.points}分 {player.rebounds}籃 {player.assists}助攻
-            </span>
-            <span className="game-summary-dialog__player-fatigue">
-              疲勞 {player.fatigueBefore} → {player.fatigueAfter}
-            </span>
-            {player.grewAttribute && (
-              <span className="game-summary-dialog__player-growth">{ATTRIBUTE_LABELS[player.grewAttribute]} +1</span>
-            )}
-          </li>
-        ))}
-      </ul>
+      <div className={REVEAL_CLASS} style={stagger.next()}>
+        <h3>先發與主要輪替</h3>
+        <ul className="game-summary-dialog__players">
+          {result.players.map((player) => (
+            <li key={player.playerId}>
+              <span className="game-summary-dialog__player-role">
+                {player.role === 'starter' ? '先發' : '輪替'}
+              </span>
+              <span className="game-summary-dialog__player-name">{player.playerName}</span>
+              <span className="game-summary-dialog__player-stats">
+                {player.points}分 {player.rebounds}籃 {player.assists}助攻
+              </span>
+              <span className="game-summary-dialog__player-fatigue">
+                疲勞 {player.fatigueBefore} → {player.fatigueAfter}
+              </span>
+              {player.grewAttribute && (
+                <span className="game-summary-dialog__player-growth">{ATTRIBUTE_LABELS[player.grewAttribute]} +1</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
 
       {result.newInjuries.length > 0 && (
-        <>
+        <div className={REVEAL_CLASS} style={stagger.next()}>
           <h3>新發生的傷勢</h3>
           <ul className="game-summary-dialog__injuries">
             {result.newInjuries.map((injury, index) => (
@@ -114,10 +124,12 @@ function GameSummaryContent({ result, onConfirm }: { result: GameSummaryResult; 
               </li>
             ))}
           </ul>
-        </>
+        </div>
       )}
 
-      <p className="game-summary-dialog__next-step">下一步:{nextStep}</p>
+      <p className={`game-summary-dialog__next-step ${REVEAL_CLASS}`} style={stagger.next()}>
+        下一步:{nextStep}
+      </p>
 
       <button type="button" className="button-primary" onClick={onConfirm}>
         繼續
@@ -127,7 +139,7 @@ function GameSummaryContent({ result, onConfirm }: { result: GameSummaryResult; 
 }
 
 export function GameSummaryDialog({ result, onConfirm }: GameSummaryDialogProps) {
-  const { dialogRef, displayed } = useResultDialog(result)
+  const { dialogRef, displayed, version } = useResultDialog(result)
 
   function confirm() {
     dialogRef.current?.close()
@@ -140,7 +152,7 @@ export function GameSummaryDialog({ result, onConfirm }: GameSummaryDialogProps)
       className="game-summary-dialog"
       onClick={(e) => e.target === e.currentTarget && confirm()}
     >
-      {displayed && <GameSummaryContent result={displayed} onConfirm={confirm} />}
+      {displayed && <GameSummaryContent key={version} result={displayed} onConfirm={confirm} />}
     </dialog>
   )
 }

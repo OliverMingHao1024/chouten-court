@@ -19,6 +19,7 @@ import {
   isClutchPhase,
   PHASE_GAME_COUNT,
   type GameGrowthEntry,
+  type OfficialGameResult,
   type OfficialPhase,
 } from './domain/officialMatch'
 import type { GameLineup } from './domain/lineup'
@@ -36,6 +37,7 @@ import {
   resolveEventChoice,
   rollForWeeklyEvent,
   type EventCard,
+  type EventRisk,
 } from './domain/events'
 import { generateCandidatePool, signCandidates, type Candidate } from './domain/recruiting'
 import { applyReputationDelta } from './domain/reputation'
@@ -149,33 +151,16 @@ interface PendingGameSummary {
   nextTeamState: Team
 }
 
+/**
+ * Team 就是 SaveData 加這 4 個執行期專用欄位(見 Team 介面上各自的註解:賽後/訓練/事件揭曉
+ * 彈窗與進行中比賽,都不寫入存檔)。用排除法列出「哪些欄位不存」,新增 Team 欄位時要不要存檔
+ * 只需要決定一次;若改回逐一列出「哪些欄位要存」,漏改這裡跟 saveDataToTeam 兩處任一邊都不會
+ * 讓 TypeScript 報錯,只會安靜漏存或漏讀——回傳型別仍是 SaveData,拿掉/多出欄位還是會被
+ * 型別檢查擋下來。
+ */
 function teamToSaveData(team: Team): SaveData {
-  return {
-    version: SAVE_FORMAT_VERSION,
-    teamName: team.teamName,
-    coachName: team.coachName,
-    seed: team.seed,
-    totalWeek: team.totalWeek,
-    players: team.players,
-    lastResult: team.lastResult,
-    seasonGameLog: team.seasonGameLog,
-    cardPool: team.cardPool,
-    trainingPoints: team.trainingPoints,
-    reputation: team.reputation,
-    graduateLog: team.graduateLog,
-    recruitingCandidates: team.recruitingCandidates,
-    careerLog: team.careerLog,
-    eraCount: team.eraCount,
-    pendingSeasonSummary: team.pendingSeasonSummary,
-    careerEnded: team.careerEnded,
-    lastLineup: team.lastLineup,
-    rivals: team.rivals,
-    schoolAssets: team.schoolAssets,
-    challengeMode: team.challengeMode,
-    pendingChallengeDecision: team.pendingChallengeDecision,
-    achievements: team.achievements,
-    seasonHadInjury: team.seasonHadInjury,
-  }
+  const { cardPoolResult: _cardPoolResult, eventRevealResult: _eventRevealResult, pendingGameSummary: _pendingGameSummary, livePlay: _livePlay, ...persisted } = team
+  return { version: SAVE_FORMAT_VERSION, ...persisted }
 }
 
 function saveDataToTeam(data: SaveData): Team {
@@ -283,6 +268,84 @@ function buildGameSummaryDisplay(
   }
 }
 
+/**
+ * 一場正式賽完賽後,把宿敵戰績、resolveOfficialGameWeek 的季末結算、與待確認的賽後摘要
+ * 顯示資料組成下一個 Team 部分更新。抽成純函式(同 runTrainingCardWeek 的形狀),讓「完賽
+ * 後狀態怎麼變」可以直接餵 Player[]/OfficialGameResult 單元測試,不必透過 KeyMomentGameScreen
+ * 的完整互動流程間接驗證。
+ */
+function runOfficialGameCompletion(
+  team: Team,
+  gameResult: OfficialGameResult,
+  lineup: GameLineup,
+  tactics: GameTactics,
+  phase: OfficialPhase,
+): Pick<Team, 'livePlay' | 'pendingGameSummary'> {
+  const comebackMargin = computeComebackMargin(gameResult.boxScore.quarters, gameResult.outcome)
+  const rivals = recordRivalGame(team.rivals, opponentNameForWeek(team), gameResult.outcome, comebackMargin)
+  const resolved = resolveOfficialGameWeek(
+    {
+      totalWeek: team.totalWeek,
+      players: team.players,
+      seasonGameLog: team.seasonGameLog,
+      reputation: team.reputation,
+      graduateLog: team.graduateLog,
+      careerLog: team.careerLog,
+      eraCount: team.eraCount,
+      schoolAssets: team.schoolAssets,
+      pendingSeasonSummary: team.pendingSeasonSummary,
+      challengeMode: team.challengeMode,
+      pendingChallengeDecision: team.pendingChallengeDecision,
+      coachName: team.coachName,
+      seed: team.seed,
+      achievements: team.achievements,
+      seasonHadInjury: team.seasonHadInjury,
+    },
+    gameResult,
+  )
+
+  const nextTeamState: Team = {
+    ...team,
+    totalWeek: resolved.nextTotalWeek,
+    players: resolved.players,
+    reputation: resolved.reputation,
+    graduateLog: resolved.graduateLog,
+    recruitingCandidates: resolved.recruitingCandidates,
+    careerLog: resolved.careerLog,
+    eraCount: resolved.eraCount,
+    pendingSeasonSummary: resolved.pendingSeasonSummary,
+    careerEnded: resolved.careerEnded,
+    lastLineup: lineup,
+    lastResult: resolved.message,
+    seasonGameLog: resolved.seasonGameLog,
+    pendingGameSummary: null,
+    livePlay: null,
+    rivals,
+    schoolAssets: resolved.schoolAssets,
+    pendingChallengeDecision: resolved.pendingChallengeDecision,
+    achievements: resolved.achievements,
+    seasonHadInjury: resolved.seasonHadInjury,
+  }
+
+  return {
+    livePlay: null,
+    pendingGameSummary: {
+      display: buildGameSummaryDisplay(
+        team.players,
+        gameResult.roster,
+        lineup,
+        tactics,
+        gameResult.growth,
+        gameResult.outcome,
+        phase,
+        gameResult.boxScore,
+        hashSeed(`${team.seed}-${team.totalWeek}-boxstats`),
+      ),
+      nextTeamState,
+    },
+  }
+}
+
 interface WeeklyEvent {
   card: EventCard
   featuredPlayer: Player
@@ -299,6 +362,59 @@ function weeklyEventForWeek(team: Team): WeeklyEvent | null {
   const featuredPlayer = team.players[Math.floor(playerRng() * team.players.length)]
 
   return { card, featuredPlayer }
+}
+
+/**
+ * 事件卡選擇後的完整結算(當事人屬性/疲勞、聲望、學校資產解鎖、揭曉彈窗資料)。
+ * 抽成純函式(同 runTrainingCardWeek 的形狀),原本整段內嵌在 EventScreen 的 onChoose
+ * 事件處理常式裡,只能透過渲染 EventScreen 間接測試「選了放手一搏、失敗了會怎樣」。
+ */
+function runEventChoice(
+  team: Team,
+  card: EventCard,
+  featuredPlayer: Player,
+  risk: EventRisk,
+): Pick<Team, 'totalWeek' | 'players' | 'reputation' | 'schoolAssets' | 'lastResult' | 'eventRevealResult'> {
+  const resolutionRng = createSeededRng(hashSeed(`${team.seed}-${team.totalWeek}-event-resolve`))
+  const resolution = resolveEventChoice(card, risk, featuredPlayer, resolutionRng)
+
+  const players = team.players.map((player) => {
+    if (player.id !== featuredPlayer.id) return player
+    const fatigue = clampFatigue(player.fatigue + resolution.fatigueDelta)
+    if (!resolution.attribute) return { ...player, fatigue }
+    const attributes = {
+      ...player.attributes,
+      [resolution.attribute]: clampAttribute(player.attributes[resolution.attribute] + resolution.attributeDelta),
+    }
+    return { ...player, fatigue, attributes, styleTag: computeStyleTag(attributes) }
+  })
+
+  const reputation = applyReputationDelta(team.reputation, resolution.reputationDelta)
+  const schoolAssets = evaluateSchoolAssetUnlocks(team.schoolAssets, reputation)
+  const unlockedNow = newlyUnlockedAssets(team.schoolAssets, schoolAssets)
+  const lastResult =
+    resolution.text +
+    (unlockedNow.length > 0
+      ? ` 永久解鎖學校資產:${unlockedNow.map((key) => SCHOOL_ASSET_LABELS[key]).join('、')}!`
+      : '')
+
+  return {
+    totalWeek: team.totalWeek + 1,
+    players,
+    reputation,
+    schoolAssets,
+    lastResult,
+    eventRevealResult: {
+      cardTitle: card.title,
+      risk,
+      succeeded: resolution.succeeded,
+      text: resolution.text,
+      attribute: resolution.attribute ?? null,
+      attributeDelta: resolution.attributeDelta,
+      fatigueDelta: resolution.fatigueDelta,
+      reputationDelta: resolution.reputationDelta,
+    },
+  }
 }
 
 function practiceOpponentNamesForWeek(team: Team): Record<PracticeStrength, string> {
@@ -526,71 +642,8 @@ function App() {
         lineup={lineup}
         recoveryBonus={hasSchoolAsset(team.schoolAssets, 'recoveryCenter') ? RECOVERY_CENTER_BONUS : 0}
         onComplete={(gameResult) => {
-          const comebackMargin = computeComebackMargin(gameResult.boxScore.quarters, gameResult.outcome)
-          const rivals = recordRivalGame(team.rivals, opponentNameForWeek(team), gameResult.outcome, comebackMargin)
-          const resolved = resolveOfficialGameWeek(
-            {
-              totalWeek: team.totalWeek,
-              players: team.players,
-              seasonGameLog: team.seasonGameLog,
-              reputation: team.reputation,
-              graduateLog: team.graduateLog,
-              careerLog: team.careerLog,
-              eraCount: team.eraCount,
-              schoolAssets: team.schoolAssets,
-              pendingSeasonSummary: team.pendingSeasonSummary,
-              challengeMode: team.challengeMode,
-              pendingChallengeDecision: team.pendingChallengeDecision,
-              coachName: team.coachName,
-              seed: team.seed,
-              achievements: team.achievements,
-              seasonHadInjury: team.seasonHadInjury,
-            },
-            gameResult,
-          )
-
-          const nextTeamState: Team = {
-            ...team,
-            totalWeek: resolved.nextTotalWeek,
-            players: resolved.players,
-            reputation: resolved.reputation,
-            graduateLog: resolved.graduateLog,
-            recruitingCandidates: resolved.recruitingCandidates,
-            careerLog: resolved.careerLog,
-            eraCount: resolved.eraCount,
-            pendingSeasonSummary: resolved.pendingSeasonSummary,
-            careerEnded: resolved.careerEnded,
-            lastLineup: lineup,
-            lastResult: resolved.message,
-            seasonGameLog: resolved.seasonGameLog,
-            pendingGameSummary: null,
-            livePlay: null,
-            rivals,
-            schoolAssets: resolved.schoolAssets,
-            pendingChallengeDecision: resolved.pendingChallengeDecision,
-            achievements: resolved.achievements,
-            seasonHadInjury: resolved.seasonHadInjury,
-          }
-
           // 賽後摘要待玩家確認後才真正套用(進入下一週);在那之前畫面維持原本這場比賽的狀態。
-          setTeam({
-            ...team,
-            livePlay: null,
-            pendingGameSummary: {
-              display: buildGameSummaryDisplay(
-                team.players,
-                gameResult.roster,
-                lineup,
-                tactics,
-                gameResult.growth,
-                gameResult.outcome,
-                phase,
-                gameResult.boxScore,
-                hashSeed(`${team.seed}-${team.totalWeek}-boxstats`),
-              ),
-              nextTeamState,
-            },
-          })
+          setTeam({ ...team, ...runOfficialGameCompletion(team, gameResult, lineup, tactics, phase) })
         }}
       />
     )
@@ -626,49 +679,7 @@ function App() {
         featuredPlayer={featuredPlayer}
         lastResult={team.lastResult}
         onChoose={(risk) => {
-          const resolutionRng = createSeededRng(hashSeed(`${team.seed}-${team.totalWeek}-event-resolve`))
-          const resolution = resolveEventChoice(card, risk, featuredPlayer, resolutionRng)
-
-          const players = team.players.map((player) => {
-            if (player.id !== featuredPlayer.id) return player
-            const fatigue = clampFatigue(player.fatigue + resolution.fatigueDelta)
-            if (!resolution.attribute) return { ...player, fatigue }
-            const attributes = {
-              ...player.attributes,
-              [resolution.attribute]: clampAttribute(
-                player.attributes[resolution.attribute] + resolution.attributeDelta,
-              ),
-            }
-            return { ...player, fatigue, attributes, styleTag: computeStyleTag(attributes) }
-          })
-
-          const reputation = applyReputationDelta(team.reputation, resolution.reputationDelta)
-          const schoolAssets = evaluateSchoolAssetUnlocks(team.schoolAssets, reputation)
-          const unlockedNow = newlyUnlockedAssets(team.schoolAssets, schoolAssets)
-          const lastResult =
-            resolution.text +
-            (unlockedNow.length > 0
-              ? ` 永久解鎖學校資產:${unlockedNow.map((key) => SCHOOL_ASSET_LABELS[key]).join('、')}!`
-              : '')
-
-          setTeam({
-            ...team,
-            totalWeek: team.totalWeek + 1,
-            players,
-            reputation,
-            schoolAssets,
-            lastResult,
-            eventRevealResult: {
-              cardTitle: card.title,
-              risk,
-              succeeded: resolution.succeeded,
-              text: resolution.text,
-              attribute: resolution.attribute ?? null,
-              attributeDelta: resolution.attributeDelta,
-              fatigueDelta: resolution.fatigueDelta,
-              reputationDelta: resolution.reputationDelta,
-            },
-          })
+          setTeam({ ...team, ...runEventChoice(team, card, featuredPlayer, risk) })
         }}
       />
     )
