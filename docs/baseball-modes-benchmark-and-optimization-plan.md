@@ -611,6 +611,8 @@ HUD 或行程帶必須回答：
 
 補充(2026-08-24):再對熱點檔案跑了第二輪架構檢視,這次聚焦最近 4 個 commit 有 3 個都動到的 `TrainingCardPoolScreen.tsx`,找到兩個候選並全部套用:(1) 新增 `src/domain/trainingCardSubChoice.ts`(`isSubChoiceComplete`/`toCardSelection`/`subChoiceFromSelection`),取代畫面原本三處各自重複的「哪種卡對應哪種子選項欄位」判斷邏輯(檢查填完沒/組成 `CardSelection`/套用快速選擇建議),原本用兩個平行的 `individualChoices`/`strengthChoices` state 分開存,合併成單一 `subChoices: Record<string, SubChoiceValue>`——以後新增第三種需要子選項的卡種,只需要改這一個 module,不必同時記得改畫面裡三個分散的地方。(2) `trainingCardPool.ts` 新增 `summarizeSelection`,把「剩餘點數/某張卡能不能再選」這組互相依賴的衍生狀態(原本剩餘點數重算兩次、每張卡的 disabled 判斷各自重算一次)收成一次算好的 `{ remainingPoints, isCardDisabled }`,畫面只呼叫這一個函式取用結果。兩項都是純重構,不改變任何行為,既有 683 個測試全數維持通過,沒有新增或修改任何測試。
 
+補充(2026-08-24):第三輪架構檢視聚焦全庫最熱的 `App.tsx`(近 25 個 commit 有 12 個動到它),找到一個「同一條領域規則被實作兩次」的候選:正規球季結束時,`domain/officialGameWeek.ts` 的 `resolveOfficialGameWeek` 有一段完整、有測試覆蓋的「球員畢業→eraCount 累加→檢查是否達保險上限(屆滿寫入校史結束生涯)→沒屆滿就檢查三年挑戰里程碑、開招生名單」邏輯;`App.tsx` 的 `onContinueDynasty`(奪冠後選擇王朝模式續季,不開新生涯直接接下一季)因為不會經過 `resolveOfficialGameWeek`,手刻了幾乎一樣的邏輯,而且已經觀察到兩份實作漂移:王朝模式那份漏掉了三年挑戰里程碑檢查。抽出共用的 `advanceGraduationAndRecruiting(state, graduationRng, recruitsSeed)`(新增於 `officialGameWeek.ts`),`resolveOfficialGameWeek` 與 `onContinueDynasty` 都改成呼叫它,不再各自維護。這次除了收斂重複,也**順帶修掉了那個漂移**(王朝模式續季現在會正確觸發三年挑戰提示)——嚴格來說不是純重構,但既有測試預設 `challengeMode: 'long'` 沒有踩到這個組合,不影響任何既有測試結果;新增一個 `App.test.tsx` 回歸測試(短局挑戰 + 王朝模式續季跨過里程碑)直接驗證修好了。684 個測試全數通過(683 既有 + 1 新增)。
+
 ## 13. 明確不建議現在做
 
 1. **完整 3D 比賽**：成本與現有純前端手機優先方向不相稱。

@@ -548,6 +548,61 @@ describe('App', () => {
     expect(await screen.findByText(/第 4 年/)).toBeInTheDocument()
   })
 
+  it('still offers the 三年挑戰 milestone prompt when dynasty-mode graduation crosses it', async () => {
+    // regression test for the architecture-review fix: dynasty continuation now shares
+    // advanceGraduationAndRecruiting with the normal season-end path, so a 短局 run that
+    // crosses SHORT_CHALLENGE_ERAS via a dynasty-mode graduation gets the same prompt a
+    // normal season-end graduation would have triggered.
+    const maxAttributes = Object.fromEntries(ATTRIBUTE_KEYS.map((key) => [key, 99])) as AttributeSet
+    const players = createInitialRoster(1).map((p) => ({ ...p, grade: 3, attributes: maxAttributes }))
+
+    const aceEraIndex = opponentAceEraIndex(getCalendarPosition(LAST_YEAR3_FINAL4_WEEK).year)
+    const lineup = {
+      starters: players.slice(0, 5).map((p) => p.id),
+      rotation: players.slice(5, 8).map((p) => p.id),
+    }
+    let engineSeed = 0
+    let teamSeed = engineSeed - LAST_YEAR3_FINAL4_WEEK
+    let opponentAce = generateOpponentAce(hashSeed(`${teamSeed}-ace-${aceEraIndex}`))
+    while (
+      simulateOfficialGame(players, 'final4', engineSeed, DEFAULT_TACTICS, opponentAce, lineup).outcome !== 'win'
+    ) {
+      engineSeed++
+      teamSeed = engineSeed - LAST_YEAR3_FINAL4_WEEK
+      opponentAce = generateOpponentAce(hashSeed(`${teamSeed}-ace-${aceEraIndex}`))
+    }
+
+    window.localStorage.setItem(
+      SAVE_STORAGE_KEY,
+      JSON.stringify(
+        baseSaveData({
+          seed: teamSeed,
+          totalWeek: LAST_YEAR3_FINAL4_WEEK,
+          players,
+          seasonGameLog: [{ totalWeek: LAST_YEAR3_FINAL4_WEEK - 1, phase: 'final4', outcome: 'win' }],
+          challengeMode: 'short',
+          eraCount: 2,
+        }),
+      ),
+    )
+
+    const user = userEvent.setup()
+    render(<App />)
+
+    expect(await screen.findByText('第 2 / 2 戰')).toBeInTheDocument()
+    await playOutTheGame(user)
+
+    expect(await screen.findByText('恭喜奪冠!教練生涯圓滿落幕')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /王朝模式/ }))
+
+    // the 三年挑戰 prompt waits until the season summary (carried over from the champion
+    // season) is dismissed, same as the normal season-end path
+    await user.click(await screen.findByRole('button', { name: '關閉' }))
+
+    expect(await screen.findByRole('button', { name: '繼續帶下去' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '在此結束,寫進校史' })).toBeInTheDocument()
+  })
+
   it('forces the career to end once the insurance cap of eras is reached, without champion', async () => {
     const players = createInitialRoster(1).map((p) => ({ ...p, grade: 3 }))
     window.localStorage.setItem(

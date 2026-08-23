@@ -26,10 +26,14 @@ import type { GameLineup } from './domain/lineup'
 import { computeTeamStrength, describePermanentAftereffects, RECOVERY_CENTER_BONUS } from './domain/matchEngine'
 import type { AchievementKey } from './domain/achievements'
 import { computeTacticAttributeWeights, type GameTactics } from './domain/tactics'
-import { advanceGrades, describeGraduate } from './domain/graduation'
-import { hasReachedInsuranceCap, type CareerEndReason } from './domain/career'
+import type { CareerEndReason } from './domain/career'
 import { appendSchoolHistoryEntry, loadSchoolHistory } from './domain/schoolHistory'
-import { buildSchoolHistoryEntry, describeNewInjuries, resolveOfficialGameWeek } from './domain/officialGameWeek'
+import {
+  advanceGraduationAndRecruiting,
+  buildSchoolHistoryEntry,
+  describeNewInjuries,
+  resolveOfficialGameWeek,
+} from './domain/officialGameWeek'
 import {
   clampAttribute,
   clampFatigue,
@@ -39,7 +43,7 @@ import {
   type EventCard,
   type EventRisk,
 } from './domain/events'
-import { generateCandidatePool, signCandidates, type Candidate } from './domain/recruiting'
+import { signCandidates, type Candidate } from './domain/recruiting'
 import { applyReputationDelta } from './domain/reputation'
 import { STARTING_SCENARIO_ATTRIBUTE_SHIFT, STARTING_SCENARIO_REPUTATION } from './domain/startingScenario'
 import { createInitialRoster, ROSTER_SIZE } from './domain/roster'
@@ -559,41 +563,34 @@ function App() {
             ? () => {
                 // 王朝模式:不清存檔、不開新生涯,直接以奪冠當下的球隊狀態接續下一季——
                 // team.totalWeek/reputation/careerLog 早在確認賽後摘要時就已經套用到位,
-                // 這裡只需要補做原本奪冠會跳過的畢業/招生流程。
-                const { roster: advancedRoster, graduates } = advanceGrades(team.players)
-                let players = advancedRoster
-                let graduateLog = team.graduateLog
-                let recruitingCandidates: Candidate[] | null = null
-                let eraCount = team.eraCount
-                if (graduates.length > 0) {
-                  eraCount += 1
-                  const graduationRng = createSeededRng(hashSeed(`${team.seed}-${team.totalWeek}-graduation-dynasty`))
-                  graduateLog = [
-                    ...graduateLog,
-                    ...graduates.map((graduate) => describeGraduate(graduate, team.reputation, graduationRng)),
-                  ]
-                  const vacancies = ROSTER_SIZE - players.length
-                  const candidatePoolMultiplier = hasSchoolAsset(team.schoolAssets, 'scoutingNetwork') ? 4 : 2
-                  recruitingCandidates = generateCandidatePool(
-                    team.reputation,
-                    vacancies * candidatePoolMultiplier,
-                    hashSeed(`${team.seed}-${team.totalWeek}-recruits-dynasty`),
-                  )
-                }
-                const careerEndedByAge: CareerEndReason | null = hasReachedInsuranceCap(eraCount) ? 'insuranceCap' : null
-                if (careerEndedByAge) {
-                  appendSchoolHistoryEntry(
-                    buildSchoolHistoryEntry(team.coachName, team.careerLog, careerEndedByAge, null, graduateLog),
-                  )
-                }
+                // 這裡只需要補做原本奪冠會跳過的畢業/招生流程,跟正規季末走同一份
+                // advanceGraduationAndRecruiting(見 officialGameWeek.ts)。
+                const graduation = advanceGraduationAndRecruiting(
+                  {
+                    players: team.players,
+                    graduateLog: team.graduateLog,
+                    eraCount: team.eraCount,
+                    careerLog: team.careerLog,
+                    coachName: team.coachName,
+                    reputation: team.reputation,
+                    schoolAssets: team.schoolAssets,
+                    challengeMode: team.challengeMode,
+                    pendingChallengeDecision: team.pendingChallengeDecision,
+                  },
+                  createSeededRng(hashSeed(`${team.seed}-${team.totalWeek}-graduation-dynasty`)),
+                  hashSeed(`${team.seed}-${team.totalWeek}-recruits-dynasty`),
+                )
                 setTeam({
                   ...team,
-                  players,
-                  graduateLog,
-                  recruitingCandidates,
-                  eraCount,
-                  careerEnded: careerEndedByAge,
-                  lastResult: careerEndedByAge ? team.lastResult : '王朝模式:帶著奪冠榮耀邁向新的一季。',
+                  players: graduation.players,
+                  graduateLog: graduation.graduateLog,
+                  recruitingCandidates: graduation.recruitingCandidates,
+                  eraCount: graduation.eraCount,
+                  careerEnded: graduation.careerEnded,
+                  pendingChallengeDecision: graduation.pendingChallengeDecision,
+                  lastResult: graduation.careerEnded
+                    ? team.lastResult
+                    : `王朝模式:帶著奪冠榮耀邁向新的一季。${graduation.message}`,
                 })
               }
             : undefined
