@@ -609,6 +609,8 @@ HUD 或行程帶必須回答：
 
 補充（2026-08-24）:對近期熱點(訓練週流程 `App.tsx` orchestration、三個結果彈窗)跑了一輪架構檢視,找出三個 shallow module 收斂成 deep module 的機會,全部套用:(1) 新增 `src/features/shared/reveal.ts`(`revealStyle`/`createRevealStagger`),取代 `TrainingCardResultDialog`/`EventResultDialog`/`GameSummaryDialog` 三處各自手刻的 `--reveal-delay` 算式——之後要調整揭曉節奏(例如把 80ms 改成別的值)只改一處。(2) `App.tsx` 新增 `runEventChoice`/`runOfficialGameCompletion` 兩個純函式,把原本內嵌在 `onChoose`/`onComplete` JSX 事件處理常式裡的狀態轉換邏輯(球員屬性/疲勞、聲望、學校資產解鎖、宿敵戰績、賽後摘要組裝)抽出來,形狀比照既有的 `runTrainingCardWeek`——三個「一週/一次選擇會怎麼影響 Team」的轉換邏輯現在都是同一種形狀的純函式,不用透過渲染整個 `<App />` 間接測試。(3) `teamToSaveData` 從逐一列出 19 個要存的欄位,改成用物件 rest 解構排除 4 個已知的執行期欄位(`cardPoolResult`/`eventRevealResult`/`pendingGameSummary`/`livePlay`)——新增 `Team` 欄位時只需要決定一次要不要存檔,回傳型別仍是 `SaveData`,型別檢查照樣擋得住多漏欄位。三項都是純重構,不改變任何行為,既有 683 個測試全數維持通過,沒有新增或修改任何測試。
 
+補充(2026-08-24):再對熱點檔案跑了第二輪架構檢視,這次聚焦最近 4 個 commit 有 3 個都動到的 `TrainingCardPoolScreen.tsx`,找到兩個候選並全部套用:(1) 新增 `src/domain/trainingCardSubChoice.ts`(`isSubChoiceComplete`/`toCardSelection`/`subChoiceFromSelection`),取代畫面原本三處各自重複的「哪種卡對應哪種子選項欄位」判斷邏輯(檢查填完沒/組成 `CardSelection`/套用快速選擇建議),原本用兩個平行的 `individualChoices`/`strengthChoices` state 分開存,合併成單一 `subChoices: Record<string, SubChoiceValue>`——以後新增第三種需要子選項的卡種,只需要改這一個 module,不必同時記得改畫面裡三個分散的地方。(2) `trainingCardPool.ts` 新增 `summarizeSelection`,把「剩餘點數/某張卡能不能再選」這組互相依賴的衍生狀態(原本剩餘點數重算兩次、每張卡的 disabled 判斷各自重算一次)收成一次算好的 `{ remainingPoints, isCardDisabled }`,畫面只呼叫這一個函式取用結果。兩項都是純重構,不改變任何行為,既有 683 個測試全數維持通過,沒有新增或修改任何測試。
+
 ## 13. 明確不建議現在做
 
 1. **完整 3D 比賽**：成本與現有純前端手機優先方向不相稱。

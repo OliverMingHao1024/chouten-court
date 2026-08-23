@@ -92,6 +92,32 @@ export function canSelectCards(
   return cards.length > 0 && cards.length <= maxCards && totalCost(cards, focusStyle) <= remainingPoints
 }
 
+export interface SelectionSummary {
+  remainingPoints: number
+  isCardDisabled: (card: PoolCard, selected: boolean) => boolean
+}
+
+/**
+ * 「已選這些卡之後,剩餘點數是多少、某張卡能不能再選」——這組互相依賴的衍生狀態原本在
+ * 畫面端要重算好幾次(剩餘點數的顯示文字、每張卡的 disabled 判斷各自重算一次),收在這裡
+ * 一次算好,畫面只需要呼叫這一個函式取用結果。
+ */
+export function summarizeSelection(
+  cards: PoolCard[],
+  selectedIds: string[],
+  trainingPoints: number,
+  focusStyle: StyleKey | null = null,
+  maxCards: number = MAX_CARDS_PER_WEEK,
+): SelectionSummary {
+  const selectedCards = cards.filter((card) => selectedIds.includes(card.id))
+  const remainingPoints = trainingPoints - totalCost(selectedCards, focusStyle)
+  return {
+    remainingPoints,
+    isCardDisabled: (card, selected) =>
+      !selected && (selectedCards.length >= maxCards || cardCost(card, focusStyle) > remainingPoints),
+  }
+}
+
 // 同類卡疊加時額外再乘一次的效果倍率(原創數值,待調校)。
 export const COMBO_BONUS_MULTIPLIER = 1.3
 

@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { getOpponentTier } from '../../domain/opponentTier'
-import { learnableAbilitiesForPlayer, SPECIAL_ABILITY_LABELS, type SpecialAbilityKey } from '../../domain/specialAbilities'
+import { learnableAbilitiesForPlayer, SPECIAL_ABILITY_LABELS } from '../../domain/specialAbilities'
 import { primaryStyleForAttribute, STYLE_LABELS } from '../../domain/styleTag'
 import {
   canSelectCards,
@@ -8,11 +8,18 @@ import {
   cardEffectTier,
   MAX_CARDS_PER_WEEK,
   MAX_EFFECT_TIER,
+  summarizeSelection,
   type CardKind,
   type PoolCard,
   type TrainingCardPoolState,
 } from '../../domain/trainingCardPool'
 import type { CardSelection } from '../../domain/trainingCardResolution'
+import {
+  isSubChoiceComplete,
+  subChoiceFromSelection,
+  toCardSelection,
+  type SubChoiceState,
+} from '../../domain/trainingCardSubChoice'
 import { suggestTrainingCardSelections } from '../../domain/trainingCardSuggestion'
 import { computeTeamFocusStyle, FOCUS_DISCOUNT } from '../../domain/trainingDirection'
 import { ATTRIBUTE_LABELS, PERSONALITY_LABELS, type AttributeKey, type Player } from '../../domain/types'
@@ -81,11 +88,6 @@ export interface TrainingCardPoolScreenProps {
   bonusAbilitySlots?: number
 }
 
-interface IndividualChoice {
-  playerId?: string
-  ability?: SpecialAbilityKey
-}
-
 export function TrainingCardPoolScreen({
   pool,
   trainingPoints,
@@ -98,14 +100,12 @@ export function TrainingCardPoolScreen({
   bonusAbilitySlots = 0,
 }: TrainingCardPoolScreenProps) {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
-  const [individualChoices, setIndividualChoices] = useState<Record<string, IndividualChoice>>({})
-  const [strengthChoices, setStrengthChoices] = useState<Record<string, PracticeStrength>>({})
+  const [subChoices, setSubChoices] = useState<SubChoiceState>({})
   const confirmButtonRef = useRef<HTMLButtonElement>(null)
 
   const focusStyle = computeTeamFocusStyle(players)
   const selectedCards = pool.cards.filter((card) => selectedIds.includes(card.id))
-  const remainingAfterSelection =
-    trainingPoints - selectedCards.reduce((sum, card) => sum + cardCost(card, focusStyle), 0)
+  const summary = summarizeSelection(pool.cards, selectedIds, trainingPoints, focusStyle, maxCardsPerWeek)
 
   function toggleCard(card: PoolCard) {
     setSelectedIds((prev) => {
@@ -131,18 +131,12 @@ export function TrainingCardPoolScreen({
       bonusAbilitySlots,
     )
     setSelectedIds(suggestions.map((selection) => selection.card.id))
-    const nextIndividualChoices: Record<string, IndividualChoice> = {}
-    const nextStrengthChoices: Record<string, PracticeStrength> = {}
+    const nextSubChoices: SubChoiceState = {}
     for (const selection of suggestions) {
-      if (selection.card.kind === 'individualTraining') {
-        nextIndividualChoices[selection.card.id] = { playerId: selection.playerId, ability: selection.ability }
-      }
-      if (selection.card.kind === 'practiceMatch' && selection.strength) {
-        nextStrengthChoices[selection.card.id] = selection.strength
-      }
+      const subChoice = subChoiceFromSelection(selection)
+      if (subChoice) nextSubChoices[selection.card.id] = subChoice
     }
-    setIndividualChoices(nextIndividualChoices)
-    setStrengthChoices(nextStrengthChoices)
+    setSubChoices(nextSubChoices)
     // 套用建議後,子選項展開會讓頁面變高、確認按鈕的位置往下移;等這次 render 真的畫出來
     // (下一個 frame)後再捲動,才會捲到按鈕實際落點,不是套用前的舊位置。
     requestAnimationFrame(() => {
@@ -150,14 +144,7 @@ export function TrainingCardPoolScreen({
     })
   }
 
-  const allSubChoicesFilled = selectedCards.every((card) => {
-    if (card.kind === 'individualTraining') {
-      const choice = individualChoices[card.id]
-      return !!choice?.playerId && !!choice?.ability
-    }
-    if (card.kind === 'practiceMatch') return !!strengthChoices[card.id]
-    return true
-  })
+  const allSubChoicesFilled = selectedCards.every((card) => isSubChoiceComplete(card, subChoices))
 
   const canConfirm =
     selectedCards.length > 0 &&
@@ -166,20 +153,10 @@ export function TrainingCardPoolScreen({
 
   function handleConfirm() {
     if (!canConfirm) return
-    const selections: CardSelection[] = selectedCards.map((card) => {
-      if (card.kind === 'individualTraining') {
-        const choice = individualChoices[card.id]!
-        return { card, playerId: choice.playerId, ability: choice.ability }
-      }
-      if (card.kind === 'practiceMatch') {
-        return { card, strength: strengthChoices[card.id] }
-      }
-      return { card }
-    })
+    const selections: CardSelection[] = selectedCards.map((card) => toCardSelection(card, subChoices))
     onConfirm(selections)
     setSelectedIds([])
-    setIndividualChoices({})
-    setStrengthChoices({})
+    setSubChoices({})
   }
 
   return (
@@ -192,10 +169,9 @@ export function TrainingCardPoolScreen({
 
       <div className="training-card-pool__points-row">
         <p className="training-card-pool__points">
-          訓練點數 {trainingPoints - selectedCards.reduce((sum, card) => sum + cardCost(card, focusStyle), 0)} /{' '}
-          {maxTrainingPoints}
+          訓練點數 {summary.remainingPoints} / {maxTrainingPoints}
           {selectedCards.length > 0 && (
-            <span className="training-card-pool__points-preview">(已選 {selectedCards.length} 張,剩餘 {remainingAfterSelection})</span>
+            <span className="training-card-pool__points-preview">(已選 {selectedCards.length} 張,剩餘 {summary.remainingPoints})</span>
           )}
         </p>
         <button type="button" className="training-card-pool__quick-pick" onClick={applyQuickPick}>
@@ -209,7 +185,7 @@ export function TrainingCardPoolScreen({
           const cost = cardCost(card, focusStyle)
           const baseCost = cardCost(card, null)
           const discounted = cost < baseCost
-          const disabled = !selected && (selectedCards.length >= maxCardsPerWeek || cost > remainingAfterSelection)
+          const disabled = summary.isCardDisabled(card, selected)
           const effectTier = cardEffectTier(card)
           const affinity = card.kind === 'teamTraining' && card.attribute ? computeAffinityHint(card.attribute, players) : null
           // 選中且需要子選項的卡,連同子選項一起佔滿整列(見下方 CSS),讓選項就在選中的
@@ -262,75 +238,89 @@ export function TrainingCardPoolScreen({
                 )}
               </button>
 
-              {selected && card.kind === 'individualTraining' && (
-                <div className="training-card-pool__sub-choice">
-                  <p className="training-card-pool__sub-choice-label">選球員與要教的特殊能力</p>
-                  <select
-                    aria-label={`${card.id}-player`}
-                    value={individualChoices[card.id]?.playerId ?? ''}
-                    onChange={(e) =>
-                      setIndividualChoices((prev) => ({ ...prev, [card.id]: { playerId: e.target.value } }))
-                    }
-                  >
-                    <option value="" disabled>
-                      選球員
-                    </option>
-                    {players
-                      .filter((player) => player.injuryStatus === 'healthy' || player.injuryStatus === 'returning')
-                      .map((player) => (
-                        <option key={player.id} value={player.id}>
-                          {player.name}
-                        </option>
-                      ))}
-                  </select>
-                  {(() => {
-                    const choice = individualChoices[card.id]
-                    const selectedPlayer = players.find((player) => player.id === choice?.playerId)
-                    if (!selectedPlayer) return null
-                    const learnable = learnableAbilitiesForPlayer(selectedPlayer, reputation, bonusAbilitySlots)
-                    return (
-                      <div className="training-card-pool__attribute-picker" role="group" aria-label="個別訓練能力">
-                        {learnable.length === 0 && (
-                          <p className="training-card-pool__sub-choice-label">
-                            {selectedPlayer.name}已經學會目前解鎖的所有特殊能力
-                          </p>
-                        )}
-                        {learnable.map((ability) => (
-                          <button
-                            key={ability}
-                            type="button"
-                            className={`training-card-pool__attribute-button${choice?.ability === ability ? ' training-card-pool__attribute-button--selected' : ''}`}
-                            onClick={() =>
-                              setIndividualChoices((prev) => ({ ...prev, [card.id]: { ...prev[card.id], ability } }))
-                            }
-                          >
-                            {SPECIAL_ABILITY_LABELS[ability]}
-                          </button>
+              {selected && card.kind === 'individualTraining' && (() => {
+                const individualChoice = subChoices[card.id]
+                const chosenPlayerId = individualChoice?.kind === 'individualTraining' ? individualChoice.playerId : undefined
+                return (
+                  <div className="training-card-pool__sub-choice">
+                    <p className="training-card-pool__sub-choice-label">選球員與要教的特殊能力</p>
+                    <select
+                      aria-label={`${card.id}-player`}
+                      value={chosenPlayerId ?? ''}
+                      onChange={(e) =>
+                        setSubChoices((prev) => ({
+                          ...prev,
+                          [card.id]: { kind: 'individualTraining', playerId: e.target.value },
+                        }))
+                      }
+                    >
+                      <option value="" disabled>
+                        選球員
+                      </option>
+                      {players
+                        .filter((player) => player.injuryStatus === 'healthy' || player.injuryStatus === 'returning')
+                        .map((player) => (
+                          <option key={player.id} value={player.id}>
+                            {player.name}
+                          </option>
                         ))}
-                      </div>
-                    )
-                  })()}
-                </div>
-              )}
-
-              {selected && card.kind === 'practiceMatch' && (
-                <div className="training-card-pool__sub-choice">
-                  <p className="training-card-pool__sub-choice-label">選對手強度</p>
-                  <div className="training-card-pool__options">
-                    {PRACTICE_STRENGTHS.map((strength) => (
-                      <button
-                        key={strength}
-                        type="button"
-                        className={`training-card-pool__option${strengthChoices[card.id] === strength ? ' training-card-pool__option--selected' : ''}`}
-                        onClick={() => setStrengthChoices((prev) => ({ ...prev, [card.id]: strength }))}
-                      >
-                        <span className="training-card-pool__option-label">{opponentNames[strength]}</span>
-                        <span className="training-card-pool__option-rate">{STRENGTH_LABELS[strength]}</span>
-                      </button>
-                    ))}
+                    </select>
+                    {(() => {
+                      const chosenAbility = individualChoice?.kind === 'individualTraining' ? individualChoice.ability : undefined
+                      const selectedPlayer = players.find((player) => player.id === chosenPlayerId)
+                      if (!selectedPlayer) return null
+                      const learnable = learnableAbilitiesForPlayer(selectedPlayer, reputation, bonusAbilitySlots)
+                      return (
+                        <div className="training-card-pool__attribute-picker" role="group" aria-label="個別訓練能力">
+                          {learnable.length === 0 && (
+                            <p className="training-card-pool__sub-choice-label">
+                              {selectedPlayer.name}已經學會目前解鎖的所有特殊能力
+                            </p>
+                          )}
+                          {learnable.map((option) => (
+                            <button
+                              key={option}
+                              type="button"
+                              className={`training-card-pool__attribute-button${chosenAbility === option ? ' training-card-pool__attribute-button--selected' : ''}`}
+                              onClick={() =>
+                                setSubChoices((prev) => ({
+                                  ...prev,
+                                  [card.id]: { kind: 'individualTraining', playerId: chosenPlayerId, ability: option },
+                                }))
+                              }
+                            >
+                              {SPECIAL_ABILITY_LABELS[option]}
+                            </button>
+                          ))}
+                        </div>
+                      )
+                    })()}
                   </div>
-                </div>
-              )}
+                )
+              })()}
+
+              {selected && card.kind === 'practiceMatch' && (() => {
+                const choice = subChoices[card.id]
+                const selectedStrength = choice?.kind === 'practiceMatch' ? choice.strength : undefined
+                return (
+                  <div className="training-card-pool__sub-choice">
+                    <p className="training-card-pool__sub-choice-label">選對手強度</p>
+                    <div className="training-card-pool__options">
+                      {PRACTICE_STRENGTHS.map((strength) => (
+                        <button
+                          key={strength}
+                          type="button"
+                          className={`training-card-pool__option${selectedStrength === strength ? ' training-card-pool__option--selected' : ''}`}
+                          onClick={() => setSubChoices((prev) => ({ ...prev, [card.id]: { kind: 'practiceMatch', strength } }))}
+                        >
+                          <span className="training-card-pool__option-label">{opponentNames[strength]}</span>
+                          <span className="training-card-pool__option-rate">{STRENGTH_LABELS[strength]}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })()}
             </li>
           )
         })}
