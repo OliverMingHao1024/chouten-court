@@ -23,3 +23,16 @@ coverage
 *.njsproj
 *.sln
 *.sw?
+
+# PROJECTD_CORE_AI_AGENT_MD_START
+# AI agent entry files managed by projectD-core.
+/AGENTS.md
+/CLAUDE.md
+/GEMINI.md
+/.agents/skills/frontend-core
+/.claude/skills/frontend-core
+/.agents/skills/frontend-react
+/.claude/skills/frontend-react
+/.agents/skills/typescript
+/.claude/skills/typescript
+# PROJECTD_CORE_AI_AGENT_MD_END
