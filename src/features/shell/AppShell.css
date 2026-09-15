@@ -64,14 +64,9 @@
 }
 
 .app-shell__roster-toggle {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
   background: var(--bg);
-  color: inherit;
   padding: var(--space-1) var(--space-2);
   font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
 }
 
 .app-shell__roster-panel {
@@ -87,15 +82,15 @@
 }
 
 .app-shell__menu-toggle {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
   background: var(--bg);
-  color: inherit;
   width: 2rem;
   height: 2rem;
-  font-size: 1.1rem;
-  line-height: 1;
-  cursor: pointer;
+  min-height: 2rem;
+}
+
+.app-shell__menu-toggle .pixel-button__icon {
+  width: 1.2rem;
+  height: 1.2rem;
 }
 
 .app-shell__menu-panel {

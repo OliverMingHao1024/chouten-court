@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 import type { SchoolHistoryEntry } from '../../domain/schoolHistory'
+import { PixelButton } from '../shared/PixelButton'
 import './HallOfFameDialog.css'
 
 export interface HallOfFameDialogProps {
@@ -34,9 +35,9 @@ export function HallOfFameDialog({ schoolHistory }: HallOfFameDialogProps) {
 
   return (
     <>
-      <button type="button" className="hall-of-fame-trigger" onClick={open}>
+      <PixelButton type="button" className="hall-of-fame-trigger" icon="hall-of-fame" onClick={open}>
         名人堂
-      </button>
+      </PixelButton>
       <dialog
         ref={dialogRef}
         className="hall-of-fame-dialog"

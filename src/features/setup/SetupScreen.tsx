@@ -8,6 +8,7 @@ import {
   type StartingScenario,
 } from '../../domain/startingScenario'
 import { HallOfFameDialog } from './HallOfFameDialog'
+import { PixelButton } from '../shared/PixelButton'
 import './SetupScreen.css'
 
 export type ChallengeMode = 'short' | 'long'
@@ -153,14 +154,16 @@ export function SetupScreen({ schoolHistory, onSubmit }: SetupScreenProps) {
               value={coachName}
               onChange={(event) => setCoachName(event.target.value)}
             />
-            <button
+            <PixelButton
               type="button"
               className="setup__dice"
+              icon="randomize"
+              iconOnly
               aria-label="隨機產生教練名稱"
               onClick={() => setCoachName(generateCoachName(Math.random))}
             >
-              🎲
-            </button>
+              隨機產生教練名稱
+            </PixelButton>
           </div>
         </div>
         <div className="setup__field">
@@ -171,9 +174,9 @@ export function SetupScreen({ schoolHistory, onSubmit }: SetupScreenProps) {
             onChange={(event) => setSeedInput(event.target.value)}
           />
         </div>
-        <button className="button-primary" type="submit" disabled={!canSubmit}>
+        <PixelButton className="button-primary" icon="team-create" type="submit" disabled={!canSubmit}>
           建隊
-        </button>
+        </PixelButton>
       </form>
     </div>
   )

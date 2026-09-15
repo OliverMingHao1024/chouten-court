@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { PixelButton } from '../shared/PixelButton'
 import './AppShell.css'
 
 export interface AppShellProps {
@@ -57,28 +58,31 @@ export function AppShell({
           </div>
           <div className="app-shell__hud-actions">
             {roster && (
-              <button
+              <PixelButton
                 type="button"
                 className="app-shell__roster-toggle"
+                icon="roster"
                 aria-expanded={rosterOpen}
                 aria-label="名冊"
                 onClick={() => setRosterOpen((open) => !open)}
               >
                 名冊
-              </button>
+              </PixelButton>
             )}
             {actions && (
               <div className="app-shell__menu">
-                <button
+                <PixelButton
                   type="button"
                   className="app-shell__menu-toggle"
+                  icon="menu"
+                  iconOnly
                   aria-haspopup="true"
                   aria-expanded={menuOpen}
                   aria-label="更多選項"
                   onClick={() => setMenuOpen((open) => !open)}
                 >
-                  ⋯
-                </button>
+                  更多選項
+                </PixelButton>
                 {menuOpen && (
                   <div className="app-shell__menu-panel" onClick={() => setMenuOpen(false)}>
                     {actions}

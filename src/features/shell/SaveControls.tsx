@@ -1,4 +1,5 @@
 import { useRef } from 'react'
+import { PixelButton } from '../shared/PixelButton'
 import './SaveControls.css'
 
 export interface SaveControlsProps {
@@ -18,12 +19,12 @@ export function SaveControls({ onExport, onImport, onNewGame, onSwitchSlot }: Sa
     <div className="save-controls">
       {EXPORT_IMPORT_ENABLED && (
         <>
-          <button type="button" className="save-controls__button" onClick={onExport}>
+          <PixelButton type="button" className="save-controls__button" icon="download" onClick={onExport}>
             匯出存檔
-          </button>
-          <button type="button" className="save-controls__button" onClick={() => fileInputRef.current?.click()}>
+          </PixelButton>
+          <PixelButton type="button" className="save-controls__button" icon="switch-save" onClick={() => fileInputRef.current?.click()}>
             匯入存檔
-          </button>
+          </PixelButton>
           <input
             ref={fileInputRef}
             type="file"
@@ -37,12 +38,12 @@ export function SaveControls({ onExport, onImport, onNewGame, onSwitchSlot }: Sa
           />
         </>
       )}
-      <button type="button" className="save-controls__button" onClick={onSwitchSlot}>
+      <PixelButton type="button" className="save-controls__button" icon="switch-save" onClick={onSwitchSlot}>
         切換存檔
-      </button>
-      <button type="button" className="save-controls__button save-controls__button--danger" onClick={onNewGame}>
+      </PixelButton>
+      <PixelButton type="button" className="save-controls__button save-controls__button--danger" icon="restart" onClick={onNewGame}>
         重新開始
-      </button>
+      </PixelButton>
     </div>
   )
 }
