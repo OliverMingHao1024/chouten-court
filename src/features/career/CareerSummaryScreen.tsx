@@ -3,6 +3,7 @@ import { summarizeCareer, type CareerEndReason } from '../../domain/career'
 import { FINAL4_PLACEMENT_LABEL } from '../../domain/season'
 import type { SeasonRecord } from '../../domain/seasonSummary'
 import { downloadDataUrl, renderCareerShareCard } from './shareCard'
+import { PixelButton } from '../shared/PixelButton'
 import './CareerSummaryScreen.css'
 
 export interface CareerSummaryScreenProps {
@@ -104,9 +105,10 @@ export function CareerSummaryScreen({
       )}
 
       <div className="career-summary__actions">
-        <button
+        <PixelButton
           type="button"
           className="button-primary"
+          icon="download"
           onClick={() => {
             const dataUrl = renderCareerShareCard({
               teamName,
@@ -121,15 +123,15 @@ export function CareerSummaryScreen({
           }}
         >
           下載戰績分享卡
-        </button>
+        </PixelButton>
         {onContinueDynasty && (
-          <button type="button" className="button-primary" onClick={onContinueDynasty}>
+          <PixelButton type="button" className="button-primary" icon="continue" onClick={onContinueDynasty}>
             不退休,繼續帶下去(王朝模式)
-          </button>
+          </PixelButton>
         )}
-        <button type="button" className="career-summary__new-career" onClick={onNewCareer}>
+        <PixelButton type="button" className="career-summary__new-career" icon="restart" onClick={onNewCareer}>
           開始新生涯
-        </button>
+        </PixelButton>
       </div>
     </div>
   )

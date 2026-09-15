@@ -2,6 +2,7 @@ import type { QuarterScore } from '../../domain/quarterSimulation'
 import { ATTRIBUTE_LABELS, INJURY_STATUS_LABELS, type AttributeKey, type InjuryStatus } from '../../domain/types'
 import { createRevealStagger, REVEAL_CLASS } from '../shared/reveal'
 import { useResultDialog } from '../shared/useResultDialog'
+import { PixelButton } from '../shared/PixelButton'
 import { deriveGameSummaryNextStep, deriveGameSummaryReasons } from './gameSummaryReasons'
 import './GameSummaryDialog.css'
 
@@ -131,9 +132,9 @@ function GameSummaryContent({ result, onConfirm }: { result: GameSummaryResult; 
         下一步:{nextStep}
       </p>
 
-      <button type="button" className="button-primary" onClick={onConfirm}>
+      <PixelButton type="button" className="button-primary" icon="continue" onClick={onConfirm}>
         繼續
-      </button>
+      </PixelButton>
     </div>
   )
 }

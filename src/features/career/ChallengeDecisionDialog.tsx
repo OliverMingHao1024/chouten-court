@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { PixelButton } from '../shared/PixelButton'
 import './ChallengeDecisionDialog.css'
 
 export interface ChallengeDecisionDialogProps {
@@ -24,26 +25,28 @@ export function ChallengeDecisionDialog({ open, onContinue, onEnd }: ChallengeDe
         <h2>三年挑戰完成</h2>
         <p>你已經帶領這支球隊走過三年。要在此為這段故事畫下句點,寫進校史,還是繼續帶下去?</p>
         <div className="challenge-decision-dialog__actions">
-          <button
+          <PixelButton
             type="button"
             className="button-primary"
+            icon="continue"
             onClick={() => {
               dialogRef.current?.close()
               onContinue()
             }}
           >
             繼續帶下去
-          </button>
-          <button
+          </PixelButton>
+          <PixelButton
             type="button"
             className="challenge-decision-dialog__end"
+            icon="hall-of-fame"
             onClick={() => {
               dialogRef.current?.close()
               onEnd()
             }}
           >
             在此結束,寫進校史
-          </button>
+          </PixelButton>
         </div>
       </div>
     </dialog>

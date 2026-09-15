@@ -17,6 +17,23 @@ const players = createInitialRoster(1)
 const opponentNames = { weak: '弱校聯', medium: '中堅高校', strong: '名門學院' }
 
 describe('TrainingCardPoolScreen', () => {
+  it('shows pixel icons on the quick-pick, training cards, and confirm action', () => {
+    const cards = [
+      makeCard({ id: 'rest', kind: 'rest', attribute: null }),
+      makeCard({ id: 'practice', kind: 'practiceMatch', attribute: null }),
+      makeCard({ id: 'training', kind: 'teamTraining', attribute: 'three' }),
+    ]
+    render(
+      <TrainingCardPoolScreen pool={makePool(cards)} trainingPoints={10} maxTrainingPoints={10} players={players} reputation={100} opponentNames={opponentNames} onConfirm={() => {}} />,
+    )
+
+    expect(screen.getByRole('button', { name: '快速選擇' }).querySelector('[data-pixel-icon="confirm"]')).not.toBeNull()
+    expect(screen.getByRole('button', { name: /休養/ }).querySelector('[data-pixel-icon="rest"]')).not.toBeNull()
+    expect(screen.getByRole('button', { name: /練習賽/ }).querySelector('[data-pixel-icon="play-game"]')).not.toBeNull()
+    expect(screen.getByRole('button', { name: /三分/ }).querySelector('[data-pixel-icon="training"]')).not.toBeNull()
+    expect(screen.getByRole('button', { name: '確認本週訓練' }).querySelector('[data-pixel-icon="confirm"]')).not.toBeNull()
+  })
+
   it('renders every card in the pool with its cost', () => {
     const cards = Array.from({ length: 9 }, (_, i) => makeCard({ id: `c${i}`, attribute: 'three' }))
     render(

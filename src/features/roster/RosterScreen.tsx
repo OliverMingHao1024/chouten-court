@@ -7,6 +7,7 @@ import { ATTRIBUTE_KEYS, ATTRIBUTE_LABELS, INJURY_STATUS_LABELS, type Player } f
 import { AttributeBar } from './AttributeBar'
 import { FatigueBar } from './FatigueBar'
 import { PlayerAvatar } from './PlayerAvatar'
+import { PixelButton, PixelIcon } from '../shared/PixelButton'
 import './RosterScreen.css'
 
 export interface RosterScreenProps {
@@ -34,6 +35,7 @@ export function RosterScreen({ players, recoveryBonus = 0 }: RosterScreenProps) 
                 dialogRef.current?.showModal()
               }}
             >
+              <PixelIcon icon="roster" />
               <PlayerAvatar seed={player.id} size={56} />
               <FatigueBar fatigue={player.fatigue} />
               <span className="roster-tile__name">{player.name}</span>
@@ -101,9 +103,9 @@ export function RosterScreen({ players, recoveryBonus = 0 }: RosterScreenProps) 
                 ))}
               </ul>
             )}
-            <button type="button" className="button-primary" onClick={() => dialogRef.current?.close()}>
+            <PixelButton type="button" className="button-primary" icon="close" onClick={() => dialogRef.current?.close()}>
               關閉
-            </button>
+            </PixelButton>
           </div>
         )}
       </dialog>

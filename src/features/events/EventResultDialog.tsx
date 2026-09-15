@@ -2,6 +2,7 @@ import { EVENT_RISK_LABELS, type EventRisk } from '../../domain/events'
 import { ATTRIBUTE_LABELS, type AttributeKey } from '../../domain/types'
 import { createRevealStagger, REVEAL_CLASS } from '../shared/reveal'
 import { useResultDialog } from '../shared/useResultDialog'
+import { PixelButton } from '../shared/PixelButton'
 import './EventResultDialog.css'
 
 export interface EventRevealResult {
@@ -65,9 +66,9 @@ export function EventResultDialog({ result }: EventResultDialogProps) {
                 </ul>
               )}
 
-              <button type="button" className="button-primary" onClick={() => dialogRef.current?.close()}>
+              <PixelButton type="button" className="button-primary" icon="close" onClick={() => dialogRef.current?.close()}>
                 關閉
-              </button>
+              </PixelButton>
             </div>
           )
         })()}

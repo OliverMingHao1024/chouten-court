@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Candidate } from '../../domain/recruiting'
 import { ATTRIBUTE_KEYS, ATTRIBUTE_LABELS, PERSONALITY_LABELS } from '../../domain/types'
+import { PixelButton, PixelIcon } from '../shared/PixelButton'
 import './RecruitingScreen.css'
 
 export interface RecruitingScreenProps {
@@ -43,6 +44,7 @@ export function RecruitingScreen({ candidates, vacancies, announcement, onConfir
                 aria-pressed={selected}
                 onClick={() => toggle(candidate.id)}
               >
+                <PixelIcon icon="recruit" />
                 <div className="recruiting-card__candidate-name">{candidate.name}</div>
                 <div className="recruiting-card__candidate-meta">
                   <span className="recruiting-card__candidate-position">{candidate.position}</span> ·{' '}
@@ -64,14 +66,15 @@ export function RecruitingScreen({ candidates, vacancies, announcement, onConfir
         })}
       </ul>
 
-      <button
+      <PixelButton
         type="button"
         className="button-primary"
+        icon="confirm"
         disabled={selectedIds.length !== vacancies}
         onClick={() => onConfirm(selectedIds)}
       >
         確認名單
-      </button>
+      </PixelButton>
     </section>
   )
 }

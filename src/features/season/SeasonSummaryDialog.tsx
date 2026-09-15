@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { describeSeasonRecord, type SeasonSummaryResult } from '../../domain/seasonSummary'
+import { PixelButton } from '../shared/PixelButton'
 import './SeasonSummaryDialog.css'
 
 export type { SeasonSummaryResult }
@@ -50,9 +51,9 @@ export function SeasonSummaryDialog({ result, onClose }: SeasonSummaryDialogProp
               </li>
             ))}
           </ul>
-          <button type="button" className="button-primary" onClick={close}>
+          <PixelButton type="button" className="button-primary" icon="close" onClick={close}>
             關閉
-          </button>
+          </PixelButton>
         </div>
       )}
     </dialog>

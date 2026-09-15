@@ -3,6 +3,7 @@ import type { ResolvedCard } from '../../domain/trainingCardResolution'
 import { ATTRIBUTE_LABELS } from '../../domain/types'
 import { REVEAL_CLASS, revealStyle } from '../shared/reveal'
 import { useResultDialog } from '../shared/useResultDialog'
+import { PixelButton } from '../shared/PixelButton'
 import './TrainingCardResultDialog.css'
 
 export interface TrainingCardWeekResult {
@@ -85,9 +86,9 @@ export function TrainingCardResultDialog({ result }: TrainingCardResultDialogPro
               <ResolvedCardSummary key={index} card={card} playerNameById={displayed.playerNameById} index={index} />
             ))}
           </ul>
-          <button type="button" className="button-primary" onClick={() => dialogRef.current?.close()}>
+          <PixelButton type="button" className="button-primary" icon="close" onClick={() => dialogRef.current?.close()}>
             關閉
-          </button>
+          </PixelButton>
         </div>
       )}
     </dialog>
