@@ -19,6 +19,7 @@ import type { OpponentAce } from '../../domain/opponentAce'
 import { decideOutcome, simulateOneQuarter, sumQuarters, QUARTER_COUNT, type QuarterScore } from '../../domain/quarterSimulation'
 import type { GameTactics } from '../../domain/tactics'
 import type { Player } from '../../domain/types'
+import { PixelIcon } from '../shared/PixelButton'
 import './KeyMomentGameScreen.css'
 
 export interface KeyMomentGameScreenProps {
@@ -169,6 +170,7 @@ export function KeyMomentGameScreen({
               aria-label={KEY_MOMENT_OPTION_LABELS[option]}
               onClick={() => chooseOption(option)}
             >
+              <PixelIcon icon="play-game" />
               <span className="key-moment-game__option-label">{KEY_MOMENT_OPTION_LABELS[option]}</span>
               <span className="key-moment-game__option-hint">{KEY_MOMENT_OPTION_HINTS[option]}</span>
             </button>
@@ -178,6 +180,7 @@ export function KeyMomentGameScreen({
 
       {quarters.length < QUARTER_COUNT && (
         <button type="button" className="key-moment-game__skip" onClick={skipToQuickResult}>
+          <PixelIcon icon="quick-result" />
           快速結果(跳過剩餘節數與決策)
         </button>
       )}

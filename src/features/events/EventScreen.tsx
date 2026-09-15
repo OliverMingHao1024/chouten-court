@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { computeEventSuccessChance, EVENT_CATEGORY_LABELS, EVENT_RISK_LABELS, fillEventTemplate } from '../../domain/events'
 import type { EventCard, EventRisk } from '../../domain/events'
 import type { Player } from '../../domain/types'
+import { PixelIcon } from '../shared/PixelButton'
 import './EventScreen.css'
 
 export interface EventScreenProps {
@@ -36,6 +37,7 @@ export function EventScreen({ card, featuredPlayer, lastResult, onChoose }: Even
               onChoose(choice.risk)
             }}
           >
+            <PixelIcon icon="continue" />
             <span className="event-card__choice-risk">{EVENT_RISK_LABELS[choice.risk]}</span>
             <span className="event-card__choice-label">{choice.label}</span>
             <span className="event-card__choice-rate">

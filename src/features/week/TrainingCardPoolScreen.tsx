@@ -14,6 +14,7 @@ import {
   type TrainingCardPoolState,
 } from '../../domain/trainingCardPool'
 import type { CardSelection } from '../../domain/trainingCardResolution'
+import { PixelButton, PixelIcon, type PixelIconName } from '../shared/PixelButton'
 import {
   isSubChoiceComplete,
   subChoiceFromSelection,
@@ -42,6 +43,13 @@ const STRENGTH_LABELS: Record<PracticeStrength, string> = {
   weak: getOpponentTier(PRACTICE_OPPONENT_STRENGTH.weak),
   medium: getOpponentTier(PRACTICE_OPPONENT_STRENGTH.medium),
   strong: getOpponentTier(PRACTICE_OPPONENT_STRENGTH.strong),
+}
+
+const CARD_ICONS: Record<CardKind, PixelIconName> = {
+  teamTraining: 'training',
+  individualTraining: 'training',
+  practiceMatch: 'play-game',
+  rest: 'rest',
 }
 
 function cardTitle(card: PoolCard): string {
@@ -175,6 +183,7 @@ export function TrainingCardPoolScreen({
           )}
         </p>
         <button type="button" className="training-card-pool__quick-pick" onClick={applyQuickPick}>
+          <PixelIcon icon="confirm" />
           快速選擇
         </button>
       </div>
@@ -203,6 +212,7 @@ export function TrainingCardPoolScreen({
                 disabled={disabled}
                 onClick={() => toggleCard(card)}
               >
+                <PixelIcon icon={CARD_ICONS[card.kind]} />
                 {/* 卡種標籤只在全隊訓練卡顯示(標題已經是屬性名);其他卡種的標題本身就是卡種名稱,
                     再重複一次卡種標籤是純粹的重複資訊,拿掉能少一整行。 */}
                 {card.kind === 'teamTraining' && (
@@ -289,6 +299,7 @@ export function TrainingCardPoolScreen({
                                 }))
                               }
                             >
+                              <PixelIcon icon="training" />
                               {SPECIAL_ABILITY_LABELS[option]}
                             </button>
                           ))}
@@ -313,6 +324,7 @@ export function TrainingCardPoolScreen({
                           className={`training-card-pool__option${selectedStrength === strength ? ' training-card-pool__option--selected' : ''}`}
                           onClick={() => setSubChoices((prev) => ({ ...prev, [card.id]: { kind: 'practiceMatch', strength } }))}
                         >
+                          <PixelIcon icon="play-game" />
                           <span className="training-card-pool__option-label">{opponentNames[strength]}</span>
                           <span className="training-card-pool__option-rate">{STRENGTH_LABELS[strength]}</span>
                         </button>
@@ -326,9 +338,9 @@ export function TrainingCardPoolScreen({
         })}
       </ul>
 
-      <button ref={confirmButtonRef} type="button" className="button-primary" disabled={!canConfirm} onClick={handleConfirm}>
+      <PixelButton ref={confirmButtonRef} type="button" className="button-primary" icon="confirm" disabled={!canConfirm} onClick={handleConfirm}>
         確認本週訓練
-      </button>
+      </PixelButton>
     </section>
   )
 }

@@ -39,6 +39,12 @@ function renderScreen(overrides: Partial<React.ComponentProps<typeof SeasonMatch
 }
 
 describe('SeasonMatchScreen', () => {
+  it('shows pixel icons on lineup suggestions and the play-game action', () => {
+    renderScreen()
+    expect(screen.getByRole('button', { name: '最佳戰力' }).querySelector('[data-pixel-icon="roster"]')).not.toBeNull()
+    expect(screen.getByRole('button', { name: '開打' }).querySelector('[data-pixel-icon="play-game"]')).not.toBeNull()
+  })
+
   it('shows game progress within the phase', () => {
     renderScreen()
     expect(screen.getByText('第 2 / 4 戰')).toBeInTheDocument()

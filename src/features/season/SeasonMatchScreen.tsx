@@ -32,6 +32,7 @@ import {
   type OffenseTactic,
 } from '../../domain/tactics'
 import { ATTRIBUTE_LABELS, type Player } from '../../domain/types'
+import { PixelButton, PixelIcon } from '../shared/PixelButton'
 import './SeasonMatchScreen.css'
 
 export interface SeasonMatchScreenProps {
@@ -164,6 +165,7 @@ export function SeasonMatchScreen({
             {rival.biggestComebackMargin !== null && `・最大逆轉 ${rival.biggestComebackMargin} 分`}
           </p>
           <button type="button" className="matchup-card__rival-button" onClick={() => onUnpinRival(rival.name)}>
+            <PixelIcon icon="close" />
             取消宿敵
           </button>
         </div>
@@ -174,6 +176,7 @@ export function SeasonMatchScreen({
             className="matchup-card__rival-button"
             onClick={() => onPinRival(opponentName)}
           >
+            <PixelIcon icon="hall-of-fame" />
             釘選為宿敵
           </button>
         )
@@ -257,6 +260,7 @@ export function SeasonMatchScreen({
               className="matchup-card__suggestion-button"
               onClick={() => applySuggestion(strategy)}
             >
+              <PixelIcon icon="roster" />
               {SUGGESTION_LABELS[strategy]}
             </button>
           ))}
@@ -293,6 +297,7 @@ export function SeasonMatchScreen({
                 className={`matchup-card__lineup-player matchup-card__lineup-player--${role}`}
                 onClick={() => togglePlayer(player.id)}
               >
+                <PixelIcon icon="roster" />
                 <span className="matchup-card__lineup-player-name">{player.name}</span>
                 <span className="matchup-card__lineup-player-meta">
                   {player.position}・高{player.grade}・{computeOverallGrade(player.attributes)}
@@ -319,6 +324,7 @@ export function SeasonMatchScreen({
               className={`matchup-card__tactic-button${offense === tactic ? ' matchup-card__tactic-button--active' : ''}`}
               onClick={() => setOffense(tactic)}
             >
+              <PixelIcon icon="training" />
               {OFFENSE_TACTIC_LABELS[tactic]}
             </button>
           ))}
@@ -331,6 +337,7 @@ export function SeasonMatchScreen({
               className={`matchup-card__tactic-button${defense === tactic ? ' matchup-card__tactic-button--active' : ''}`}
               onClick={() => setDefense(tactic)}
             >
+              <PixelIcon icon="training" />
               {DEFENSE_TACTIC_LABELS[tactic]}
             </button>
           ))}
@@ -338,9 +345,9 @@ export function SeasonMatchScreen({
       </div>
 
       {lastResult && <p className="result-banner">{lastResult}</p>}
-      <button className="button-primary" type="button" onClick={() => onPlayGame(tactics, previewLineup)}>
+      <PixelButton className="button-primary" icon="play-game" type="button" onClick={() => onPlayGame(tactics, previewLineup)}>
         開打
-      </button>
+      </PixelButton>
     </section>
   )
 }

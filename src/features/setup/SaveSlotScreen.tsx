@@ -1,4 +1,5 @@
 import type { SaveSlotMeta } from '../../domain/saveData'
+import { PixelButton, PixelIcon } from '../shared/PixelButton'
 import './SaveSlotScreen.css'
 
 export interface SaveSlotScreenProps {
@@ -30,6 +31,7 @@ export function SaveSlotScreen({ slots, onLoad, onDelete, onCreateNew }: SaveSlo
         {sorted.map((slot) => (
           <li key={slot.id} className="save-slots__item">
             <button type="button" className="save-slots__load" onClick={() => onLoad(slot.id)}>
+              <PixelIcon icon="switch-save" />
               <span className="save-slots__label">{slot.label}</span>
               <span className="save-slots__updated">最後更新:{formatUpdatedAt(slot.updatedAt)}</span>
             </button>
@@ -41,14 +43,15 @@ export function SaveSlotScreen({ slots, onLoad, onDelete, onCreateNew }: SaveSlo
                 if (window.confirm(`確定要刪除存檔「${slot.label}」嗎?此操作無法復原。`)) onDelete(slot.id)
               }}
             >
+              <PixelIcon icon="close" />
               刪除
             </button>
           </li>
         ))}
       </ul>
-      <button type="button" className="button-primary" onClick={onCreateNew}>
+      <PixelButton type="button" className="button-primary" icon="team-create" onClick={onCreateNew}>
         新增存檔
-      </button>
+      </PixelButton>
     </div>
   )
 }

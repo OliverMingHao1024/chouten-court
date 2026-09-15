@@ -5,6 +5,14 @@ import { generateCandidatePool } from '../../domain/recruiting'
 import { RecruitingScreen } from './RecruitingScreen'
 
 describe('RecruitingScreen', () => {
+  it('shows recruit icons on candidates and a confirm icon on the final action', () => {
+    const candidates = generateCandidatePool(50, 3, 1)
+    render(<RecruitingScreen candidates={candidates} vacancies={2} onConfirm={() => {}} announcement={null} />)
+
+    expect(screen.getByRole('button', { name: new RegExp(candidates[0].name) }).querySelector('[data-pixel-icon="recruit"]')).not.toBeNull()
+    expect(screen.getByRole('button', { name: '確認名單' }).querySelector('[data-pixel-icon="confirm"]')).not.toBeNull()
+  })
+
   it('shows every candidate with position and attribute ranges', () => {
     const candidates = generateCandidatePool(50, 3, 1)
     render(<RecruitingScreen candidates={candidates} vacancies={2} onConfirm={() => {}} announcement={null} />)

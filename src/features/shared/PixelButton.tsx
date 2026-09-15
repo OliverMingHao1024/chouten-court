@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import type { ComponentPropsWithRef, ReactNode } from 'react'
 import closeIcon from '../../assets/icons/pixel-v2/close.png'
 import confirmIcon from '../../assets/icons/pixel-v2/confirm.png'
 import continueIcon from '../../assets/icons/pixel-v2/continue.png'
@@ -53,10 +53,27 @@ const icons: Record<PixelIconName, string> = {
   training: trainingIcon,
 }
 
-export interface PixelButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+export type PixelButtonProps = ComponentPropsWithRef<'button'> & {
   children: ReactNode
   icon: PixelIconName
   iconOnly?: boolean
+}
+
+export interface PixelIconProps {
+  icon: PixelIconName
+  className?: string
+}
+
+export function PixelIcon({ icon, className = '' }: PixelIconProps) {
+  return (
+    <img
+      className={`pixel-icon${className ? ` ${className}` : ''}`}
+      src={icons[icon]}
+      alt=""
+      aria-hidden="true"
+      data-pixel-icon={icon}
+    />
+  )
 }
 
 export function PixelButton({ children, className = '', icon, iconOnly = false, ...props }: PixelButtonProps) {
@@ -65,7 +82,7 @@ export function PixelButton({ children, className = '', icon, iconOnly = false, 
       className={`pixel-button${iconOnly ? ' pixel-button--icon-only' : ''}${className ? ` ${className}` : ''}`}
       {...props}
     >
-      <img className="pixel-button__icon" src={icons[icon]} alt="" aria-hidden="true" />
+      <PixelIcon className="pixel-button__icon" icon={icon} />
       <span className={iconOnly ? 'sr-only' : 'pixel-button__label'}>{children}</span>
     </button>
   )

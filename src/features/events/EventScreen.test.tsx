@@ -21,6 +21,13 @@ function neutralPlayer(): Player {
 }
 
 describe('EventScreen', () => {
+  it('shows a continue icon on every event choice', () => {
+    render(<EventScreen card={card} featuredPlayer={neutralPlayer()} lastResult={null} onChoose={() => {}} />)
+    screen.getAllByRole('button').forEach((button) => {
+      expect(button.querySelector('[data-pixel-icon="continue"]')).not.toBeNull()
+    })
+  })
+
   it('shows the card title, category, and prompt with the featured player filled in', () => {
     render(<EventScreen card={card} featuredPlayer={neutralPlayer()} lastResult={null} onChoose={() => {}} />)
 

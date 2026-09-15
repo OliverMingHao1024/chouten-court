@@ -94,9 +94,9 @@ export function HallOfFameDialog({ schoolHistory }: HallOfFameDialogProps) {
 
           {totalCareers === 0 && <p className="hall-of-fame-dialog__empty">還沒有任何生涯留下紀錄。</p>}
 
-          <button type="button" className="button-primary" onClick={close}>
+          <PixelButton type="button" className="button-primary" icon="close" onClick={close}>
             關閉
-          </button>
+          </PixelButton>
         </div>
       </dialog>
     </>
